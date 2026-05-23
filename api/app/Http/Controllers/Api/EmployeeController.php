@@ -1,0 +1,111 @@
+<?php
+
+namespace App\Http\Controllers\Api;
+
+use App\Http\Controllers\Controller;
+use App\Models\Employee;
+use Illuminate\Http\Request;
+
+class EmployeeController extends Controller
+{
+    public function index(Request $request)
+    {
+        $query = Employee::with(['department', 'position', 'manager', 'activeContract'])
+            ->when($request->search, fn($q, $s) => $q->where(fn($q) =>
+                $q->where('first_name', 'like', "%{$s}%")
+                  ->orWhere('last_name', 'like', "%{$s}%")
+                  ->orWhere('employee_number', 'like', "%{$s}%")
+                  ->orWhere('professional_email', 'like', "%{$s}%")
+            ))
+            ->when($request->department_id, fn($q, $d) => $q->where('department_id', $d))
+            ->when($request->status, fn($q, $s) => $q->where('status', $s))
+            ->when($request->position_id, fn($q, $p) => $q->where('position_id', $p));
+
+        $employees = $query->orderBy('last_name')->paginate($request->per_page ?? 15);
+
+        return response()->json($employees);
+    }
+
+    public function store(Request $request)
+    {
+        $data = $request->validate([
+            'first_name'           => ['required', 'string', 'max:100'],
+            'last_name'            => ['required', 'string', 'max:100'],
+            'department_id'        => ['nullable', 'exists:departments,id'],
+            'position_id'          => ['nullable', 'exists:positions,id'],
+            'professional_email'   => ['nullable', 'email', 'unique:employees'],
+            'personal_email'       => ['nullable', 'email'],
+            'phone_personal'       => ['nullable', 'string'],
+            'phone_professional'   => ['nullable', 'string'],
+            'hire_date'            => ['required', 'date'],
+            'birth_date'           => ['nullable', 'date'],
+            'gender'               => ['nullable', 'in:M,F,other'],
+            'nationality'          => ['nullable', 'string'],
+            'national_id'          => ['nullable', 'string'],
+            'address'              => ['nullable', 'string'],
+            'city'                 => ['nullable', 'string'],
+            'postal_code'          => ['nullable', 'string'],
+            'country'              => ['nullable', 'string'],
+            'base_salary'          => ['nullable', 'numeric', 'min:0'],
+            'annual_leave_days'    => ['nullable', 'integer', 'min:0'],
+            'manager_id'           => ['nullable', 'exists:employees,id'],
+        ]);
+
+        $data['employee_number'] = $this->generateEmployeeNumber();
+
+        $employee = Employee::create($data);
+
+        return response()->json($employee->load(['department', 'position']), 201);
+    }
+
+    public function show(Employee $employee)
+    {
+        return response()->json(
+            $employee->load(['department', 'position', 'manager', 'contracts', 'user'])
+        );
+    }
+
+    public function update(Request $request, Employee $employee)
+    {
+        $data = $request->validate([
+            'first_name'         => ['sometimes', 'string', 'max:100'],
+            'last_name'          => ['sometimes', 'string', 'max:100'],
+            'department_id'      => ['nullable', 'exists:departments,id'],
+            'position_id'        => ['nullable', 'exists:positions,id'],
+            'professional_email' => ['nullable', 'email', 'unique:employees,professional_email,' . $employee->id],
+            'personal_email'     => ['nullable', 'email'],
+            'phone_personal'     => ['nullable', 'string'],
+            'phone_professional' => ['nullable', 'string'],
+            'hire_date'          => ['sometimes', 'date'],
+            'birth_date'         => ['nullable', 'date'],
+            'gender'             => ['nullable', 'in:M,F,other'],
+            'nationality'        => ['nullable', 'string'],
+            'national_id'        => ['nullable', 'string'],
+            'address'            => ['nullable', 'string'],
+            'city'               => ['nullable', 'string'],
+            'postal_code'        => ['nullable', 'string'],
+            'country'            => ['nullable', 'string'],
+            'base_salary'        => ['nullable', 'numeric', 'min:0'],
+            'annual_leave_days'  => ['nullable', 'integer', 'min:0'],
+            'status'             => ['nullable', 'in:active,inactive,on_leave,terminated'],
+            'manager_id'         => ['nullable', 'exists:employees,id'],
+        ]);
+
+        $employee->update($data);
+
+        return response()->json($employee->fresh()->load(['department', 'position']));
+    }
+
+    public function destroy(Employee $employee)
+    {
+        $employee->delete();
+        return response()->json(['message' => 'Employé supprimé.']);
+    }
+
+    private function generateEmployeeNumber(): string
+    {
+        $last = Employee::withTrashed()->orderByDesc('id')->first();
+        $num  = $last ? (int) substr($last->employee_number, 3) + 1 : 1;
+        return 'EMP' . str_pad($num, 4, '0', STR_PAD_LEFT);
+    }
+}

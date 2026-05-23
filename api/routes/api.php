@@ -1,0 +1,56 @@
+<?php
+
+use App\Http\Controllers\Api\AttendanceController;
+use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\ContractController;
+use App\Http\Controllers\Api\DashboardController;
+use App\Http\Controllers\Api\DepartmentController;
+use App\Http\Controllers\Api\EmployeeController;
+use App\Http\Controllers\Api\LeaveController;
+use Illuminate\Support\Facades\Route;
+
+// Health check
+Route::get('/health', fn () => response()->json(['status' => 'ok', 'app' => 'NiidPro API v1']));
+
+// Auth routes (public)
+Route::prefix('auth')->group(function () {
+    Route::post('/login', [AuthController::class, 'login']);
+});
+
+// Protected routes
+Route::middleware('auth:sanctum')->group(function () {
+
+    // Auth
+    Route::prefix('auth')->group(function () {
+        Route::post('/logout', [AuthController::class, 'logout']);
+        Route::get('/me', [AuthController::class, 'me']);
+        Route::put('/profile', [AuthController::class, 'updateProfile']);
+        Route::put('/password', [AuthController::class, 'changePassword']);
+    });
+
+    // Dashboard
+    Route::get('/dashboard', [DashboardController::class, 'index']);
+
+    // Departments
+    Route::apiResource('departments', DepartmentController::class);
+
+    // Employees
+    Route::apiResource('employees', EmployeeController::class);
+
+    // Contracts
+    Route::get('/contracts/expiring', [ContractController::class, 'expiringSoon']);
+    Route::apiResource('contracts', ContractController::class);
+
+    // Attendance
+    Route::get('/attendances/today', [AttendanceController::class, 'today']);
+    Route::post('/attendances/check-in', [AttendanceController::class, 'checkIn']);
+    Route::post('/attendances/check-out', [AttendanceController::class, 'checkOut']);
+    Route::apiResource('attendances', AttendanceController::class)->only(['index', 'store']);
+
+    // Leaves
+    Route::get('/leaves/pending', [LeaveController::class, 'pending']);
+    Route::get('/leaves/types', [LeaveController::class, 'types']);
+    Route::post('/leaves/{leave}/approve', [LeaveController::class, 'approve']);
+    Route::post('/leaves/{leave}/reject', [LeaveController::class, 'reject']);
+    Route::apiResource('leaves', LeaveController::class);
+});
