@@ -12,12 +12,18 @@ import { Add } from '@mui/icons-material';
 export default function ContractsPage() {
   const { data: contracts, isLoading } = useQuery({
     queryKey: ['contracts'],
-    queryFn: () => contractsApi.list().then((r) => r.data),
+    queryFn: () => contractsApi.list().then((r) => {
+      const d = r.data as unknown;
+      return Array.isArray(d) ? d : ((d as { data?: unknown[] }).data ?? []);
+    }),
   });
 
   const { data: expiring } = useQuery({
     queryKey: ['contracts', 'expiring'],
-    queryFn: () => contractsApi.expiringSoon().then((r) => r.data),
+    queryFn: () => contractsApi.expiringSoon().then((r) => {
+      const d = r.data as unknown;
+      return Array.isArray(d) ? d : ((d as { data?: unknown[] }).data ?? []);
+    }),
   });
 
   return (
@@ -60,7 +66,7 @@ export default function ContractsPage() {
                 : contracts?.map((c) => (
                     <TableRow key={c.id} hover>
                       <TableCell>
-                        <Typography variant="body2" fontWeight={600}>
+                        <Typography variant="body2" sx={{ fontWeight: 600 }}>
                           {c.employee?.first_name} {c.employee?.last_name}
                         </Typography>
                         <Typography variant="caption" color="text.secondary">

@@ -18,7 +18,10 @@ export default function DepartmentsPage() {
 
   const { data, isLoading } = useQuery({
     queryKey: ['departments'],
-    queryFn: () => departmentsApi.list().then((r) => r.data),
+    queryFn: () => departmentsApi.list().then((r) => {
+      const d = r.data as unknown;
+      return Array.isArray(d) ? d : ((d as { data?: unknown[] }).data ?? []);
+    }),
   });
 
   const { register, handleSubmit, reset, setValue } = useForm<Partial<Department>>();

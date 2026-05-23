@@ -74,7 +74,7 @@ export default function EmployeesPage() {
                     <TableRow key={emp.id} hover>
                       <TableCell>
                         <Stack direction="row" alignItems="center" spacing={1.5}>
-                          <Avatar sx={{ width: 36, height: 36, bgcolor: '#6366F1', fontSize: 14 }}>
+                          <Avatar sx={{ width: 36, height: 36, background: 'linear-gradient(135deg,#2563EB,#7C3AED)', fontSize: 13, fontWeight: 700 }}>
                             {emp.first_name[0]}{emp.last_name[0]}
                           </Avatar>
                           <Box>

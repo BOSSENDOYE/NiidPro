@@ -16,7 +16,10 @@ function minutesToHM(minutes: number | null | undefined) {
 export default function AttendancesPage() {
   const { data, isLoading } = useQuery({
     queryKey: ['attendances', 'today'],
-    queryFn: () => attendancesApi.today().then((r) => r.data),
+    queryFn: () => attendancesApi.today().then((r) => {
+      const d = r.data as unknown;
+      return Array.isArray(d) ? d : ((d as { data?: unknown[] }).data ?? []);
+    }),
     refetchInterval: 30_000,
   });
 
@@ -70,11 +73,11 @@ export default function AttendancesPage() {
                     <TableRow key={att.id} hover>
                       <TableCell>
                         <Stack direction="row" alignItems="center" spacing={1.5}>
-                          <Avatar sx={{ width: 32, height: 32, bgcolor: '#6366F1', fontSize: 12 }}>
+                          <Avatar sx={{ width: 32, height: 32, background: 'linear-gradient(135deg,#2563EB,#7C3AED)', fontSize: 12, fontWeight: 700 }}>
                             {att.employee?.first_name?.[0]}{att.employee?.last_name?.[0]}
                           </Avatar>
                           <Box>
-                            <Typography variant="body2" fontWeight={600}>
+                            <Typography variant="body2" sx={{ fontWeight: 600 }}>
                               {att.employee?.first_name} {att.employee?.last_name}
                             </Typography>
                           </Box>

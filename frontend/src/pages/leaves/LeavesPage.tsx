@@ -21,7 +21,10 @@ export default function LeavesPage() {
 
   const { data: allLeaves, isLoading } = useQuery({
     queryKey: ['leaves'],
-    queryFn: () => leavesApi.list().then((r) => r.data),
+    queryFn: () => leavesApi.list().then((r) => {
+      const d = r.data as unknown;
+      return Array.isArray(d) ? d : ((d as { data?: unknown[] }).data ?? []);
+    }),
   });
 
   const { data: pendingLeaves } = useQuery({
@@ -89,7 +92,7 @@ export default function LeavesPage() {
                     <TableRow key={leave.id} hover>
                       <TableCell>
                         <Stack direction="row" sx={{ alignItems: 'center' }} spacing={1.5}>
-                          <Avatar sx={{ width: 32, height: 32, bgcolor: '#6366F1', fontSize: 12 }}>
+                          <Avatar sx={{ width: 32, height: 32, background: 'linear-gradient(135deg,#2563EB,#7C3AED)', fontSize: 12, fontWeight: 700 }}>
                             {leave.employee?.first_name?.[0]}{leave.employee?.last_name?.[0]}
                           </Avatar>
                           <Typography variant="body2" sx={{ fontWeight: 600 }}>

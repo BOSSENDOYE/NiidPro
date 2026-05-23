@@ -5,13 +5,51 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { theme } from './theme';
 import { useAuthStore } from './store/auth.store';
 import AppLayout from './components/layout/AppLayout';
+
+// Auth
 import LoginPage from './pages/auth/LoginPage';
+
+// Dashboard
 import DashboardPage from './pages/dashboard/DashboardPage';
+
+// Employees
 import EmployeesPage from './pages/employees/EmployeesPage';
+import EmployeeDetailPage from './pages/employees/EmployeeDetailPage';
+import EmployeeFormPage from './pages/employees/EmployeeFormPage';
+
+// Organisation
 import DepartmentsPage from './pages/departments/DepartmentsPage';
+
+// Contrats
 import ContractsPage from './pages/contracts/ContractsPage';
+
+// Pointage
 import AttendancesPage from './pages/attendances/AttendancesPage';
+import AttendanceVisualPage from './pages/attendances/AttendanceVisualPage';
+
+// Congés
 import LeavesPage from './pages/leaves/LeavesPage';
+
+// Justifications
+import JustificationsPage from './pages/justifications/JustificationsPage';
+
+// Tâches
+import TasksPage from './pages/tasks/TasksPage';
+
+// Paie
+import PayrollPage from './pages/payroll/PayrollPage';
+
+// Bilan social
+import SocialReportPage from './pages/social-report/SocialReportPage';
+
+// Schéma SQL
+import SchemaPage from './pages/schema/SchemaPage';
+
+// Portail agent
+import AgentPortalPage from './pages/agent-portal/AgentPortalPage';
+
+// Profil
+import ProfilePage from './pages/profile/ProfilePage';
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 30_000 } },
@@ -39,13 +77,41 @@ export default function App() {
               }
             >
               <Route index element={<Navigate to="/dashboard" replace />} />
+
+              {/* Vue d'ensemble */}
               <Route path="dashboard" element={<DashboardPage />} />
+
+              {/* Gestion RH */}
               <Route path="employees" element={<EmployeesPage />} />
-              <Route path="departments" element={<DepartmentsPage />} />
+              <Route path="employees/new" element={<EmployeeFormPage />} />
+              <Route path="employees/:id" element={<EmployeeDetailPage />} />
+              <Route path="employees/:id/edit" element={<EmployeeFormPage />} />
+
               <Route path="contracts" element={<ContractsPage />} />
+
               <Route path="attendances" element={<AttendancesPage />} />
+              <Route path="attendance-visual" element={<AttendanceVisualPage />} />
+
               <Route path="leaves" element={<LeavesPage />} />
+              <Route path="justifications" element={<JustificationsPage />} />
+
+              {/* Organisation */}
+              <Route path="departments" element={<DepartmentsPage />} />
+              <Route path="tasks" element={<TasksPage />} />
+              <Route path="payroll" element={<PayrollPage />} />
+              <Route path="social-report" element={<SocialReportPage />} />
+
+              {/* Configuration */}
+              <Route path="schema" element={<SchemaPage />} />
+
+              {/* Espace agent */}
+              <Route path="agent-portal" element={<AgentPortalPage />} />
+
+              {/* Profil */}
+              <Route path="profile" element={<ProfilePage />} />
             </Route>
+
+            {/* Catch-all */}
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Routes>
         </BrowserRouter>

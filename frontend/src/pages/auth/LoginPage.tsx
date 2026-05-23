@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Box, Card, CardContent, TextField, Button, Typography,
-  Alert, InputAdornment, IconButton, CircularProgress,
+  Box, TextField, Button, Typography,
+  Alert, InputAdornment, IconButton, CircularProgress, Stack,
 } from '@mui/material';
-import { Visibility, VisibilityOff } from '@mui/icons-material';
+import { Visibility, VisibilityOff, Shield } from '@mui/icons-material';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -18,13 +18,19 @@ const schema = z.object({
 
 type FormData = z.infer<typeof schema>;
 
+const demoAccounts = [
+  { role: 'Super Admin', email: 'admin@niidpro.com', color: '#7C3AED' },
+  { role: 'Admin RH', email: 'rh@niidpro.com', color: '#2563EB' },
+  { role: 'Manager', email: 'manager@niidpro.com', color: '#059669' },
+];
+
 export default function LoginPage() {
   const [showPwd, setShowPwd] = useState(false);
   const [error, setError] = useState('');
   const { setAuth } = useAuthStore();
   const navigate = useNavigate();
 
-  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<FormData>({
+  const { register, handleSubmit, setValue, formState: { errors, isSubmitting } } = useForm<FormData>({
     resolver: zodResolver(schema),
     defaultValues: { email: '', password: '' },
   });
@@ -42,86 +48,220 @@ export default function LoginPage() {
   };
 
   return (
-    <Box sx={{
-      minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
-      background: 'linear-gradient(135deg, #1E1B4B 0%, #312E81 50%, #4338CA 100%)',
-      p: 2,
-    }}>
-      <Card sx={{ width: '100%', maxWidth: 420, borderRadius: 3 }}>
-        <CardContent sx={{ p: 4 }}>
-          {/* Logo */}
-          <Box sx={{ textAlign: 'center', mb: 4 }}>
+    <Box sx={{ minHeight: '100vh', display: 'flex' }}>
+      {/* Left — Brand panel */}
+      <Box sx={{
+        display: { xs: 'none', md: 'flex' },
+        flexDirection: 'column',
+        justifyContent: 'space-between',
+        width: '45%',
+        background: 'linear-gradient(160deg, #0F172A 0%, #1E3A8A 60%, #1D4ED8 100%)',
+        p: 5,
+        position: 'relative',
+        overflow: 'hidden',
+      }}>
+        {/* Decorative circles */}
+        <Box sx={{
+          position: 'absolute', width: 400, height: 400,
+          borderRadius: '50%', border: '1px solid rgba(255,255,255,0.06)',
+          top: -100, right: -100,
+        }} />
+        <Box sx={{
+          position: 'absolute', width: 600, height: 600,
+          borderRadius: '50%', border: '1px solid rgba(255,255,255,0.04)',
+          bottom: -200, left: -200,
+        }} />
+        <Box sx={{
+          position: 'absolute', width: 200, height: 200,
+          borderRadius: '50%',
+          background: 'radial-gradient(circle, rgba(37,99,235,0.3) 0%, transparent 70%)',
+          top: '40%', left: '60%',
+        }} />
+
+        {/* Logo */}
+        <Box sx={{ position: 'relative', zIndex: 1 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
             <Box sx={{
-              width: 56, height: 56, borderRadius: 2.5, bgcolor: '#6366F1',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', mx: 'auto', mb: 2,
+              width: 40, height: 40, borderRadius: '11px',
+              background: 'linear-gradient(135deg, #3B82F6 0%, #7C3AED 100%)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              boxShadow: '0 8px 24px rgba(37,99,235,0.5)',
             }}>
-              <Typography sx={{ color: 'white', fontWeight: 800, fontSize: 24 }}>N</Typography>
+              <Typography sx={{ color: '#fff', fontWeight: 800, fontSize: 18 }}>N</Typography>
             </Box>
-            <Typography variant="h5" fontWeight={700}>NiidPro</Typography>
-            <Typography variant="body2" color="text.secondary">Connectez-vous à votre espace RH</Typography>
-          </Box>
-
-          {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
-
-          <Box component="form" onSubmit={handleSubmit(onSubmit)} noValidate>
-            <TextField
-              {...register('email')}
-              label="Adresse email"
-              type="email"
-              fullWidth
-              autoComplete="email"
-              error={!!errors.email}
-              helperText={errors.email?.message}
-              sx={{ mb: 2 }}
-            />
-            <TextField
-              {...register('password')}
-              label="Mot de passe"
-              type={showPwd ? 'text' : 'password'}
-              fullWidth
-              autoComplete="current-password"
-              error={!!errors.password}
-              helperText={errors.password?.message}
-              InputProps={{
-                endAdornment: (
-                  <InputAdornment position="end">
-                    <IconButton onClick={() => setShowPwd(!showPwd)} edge="end">
-                      {showPwd ? <VisibilityOff /> : <Visibility />}
-                    </IconButton>
-                  </InputAdornment>
-                ),
-              }}
-              sx={{ mb: 3 }}
-            />
-            <Button
-              type="submit"
-              variant="contained"
-              fullWidth
-              size="large"
-              disabled={isSubmitting}
-              sx={{ py: 1.5 }}
-            >
-              {isSubmitting ? <CircularProgress size={22} color="inherit" /> : 'Se connecter'}
-            </Button>
-          </Box>
-
-          {/* Demo credentials */}
-          <Box sx={{ mt: 3, p: 2, bgcolor: 'grey.50', borderRadius: 2 }}>
-            <Typography variant="caption" color="text.secondary" display="block" mb={1} fontWeight={600}>
-              Comptes de démonstration
+            <Typography sx={{ color: '#fff', fontWeight: 800, fontSize: 20, letterSpacing: '-0.5px' }}>
+              NiidPro
             </Typography>
+          </Box>
+        </Box>
+
+        {/* Center content */}
+        <Box sx={{ position: 'relative', zIndex: 1 }}>
+          <Typography sx={{
+            fontSize: 36, fontWeight: 800, color: '#F8FAFC',
+            letterSpacing: '-1px', lineHeight: 1.2, mb: 2,
+          }}>
+            Gérez vos<br />
+            ressources<br />
+            <Box component="span" sx={{
+              background: 'linear-gradient(90deg, #60A5FA, #A78BFA)',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+            }}>
+              humaines
+            </Box>
+          </Typography>
+          <Typography sx={{ color: 'rgba(255,255,255,0.55)', fontSize: 15, lineHeight: 1.7, maxWidth: 340 }}>
+            Plateforme RH complète : pointage, congés, contrats, paie et organigramme en un seul endroit.
+          </Typography>
+        </Box>
+
+        {/* Footer stats */}
+        <Box sx={{ position: 'relative', zIndex: 1 }}>
+          <Box sx={{ display: 'flex', gap: 4 }}>
             {[
-              { role: 'Super Admin', email: 'admin@niidpro.com' },
-              { role: 'Admin RH', email: 'rh@niidpro.com' },
-              { role: 'Manager', email: 'manager@niidpro.com' },
-            ].map((c) => (
-              <Typography key={c.email} variant="caption" color="text.secondary" display="block">
-                <strong>{c.role}</strong>: {c.email} / password
-              </Typography>
+              { value: '500+', label: 'Entreprises' },
+              { value: '50k+', label: 'Employés gérés' },
+              { value: '99.9%', label: 'Disponibilité' },
+            ].map((s) => (
+              <Box key={s.label}>
+                <Typography sx={{ color: '#F8FAFC', fontWeight: 800, fontSize: 22 }}>{s.value}</Typography>
+                <Typography sx={{ color: 'rgba(255,255,255,0.45)', fontSize: 12 }}>{s.label}</Typography>
+              </Box>
             ))}
           </Box>
-        </CardContent>
-      </Card>
+        </Box>
+      </Box>
+
+      {/* Right — Login form */}
+      <Box sx={{
+        flexGrow: 1,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        bgcolor: '#F8FAFC',
+        p: 3,
+      }}>
+        <Box sx={{ width: '100%', maxWidth: 400 }}>
+          {/* Mobile logo */}
+          <Box sx={{ display: { xs: 'flex', md: 'none' }, alignItems: 'center', gap: 1.5, mb: 4 }}>
+            <Box sx={{
+              width: 36, height: 36, borderRadius: '10px',
+              background: 'linear-gradient(135deg, #2563EB, #7C3AED)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              <Typography sx={{ color: '#fff', fontWeight: 800, fontSize: 16 }}>N</Typography>
+            </Box>
+            <Typography sx={{ fontWeight: 800, fontSize: 18, color: '#0F172A' }}>NiidPro</Typography>
+          </Box>
+
+          <Typography sx={{ fontWeight: 800, fontSize: 26, color: '#0F172A', letterSpacing: '-0.5px', mb: 0.5 }}>
+            Connexion
+          </Typography>
+          <Typography sx={{ color: '#64748B', fontSize: 14, mb: 3.5 }}>
+            Accédez à votre espace de gestion RH
+          </Typography>
+
+          {error && (
+            <Alert severity="error" sx={{ mb: 2.5, borderRadius: '10px', fontSize: 13 }}>
+              {error}
+            </Alert>
+          )}
+
+          <Box component="form" onSubmit={handleSubmit(onSubmit)} noValidate>
+            <Stack spacing={2.5}>
+              <TextField
+                {...register('email')}
+                label="Adresse email"
+                type="email"
+                fullWidth
+                autoComplete="email"
+                error={!!errors.email}
+                helperText={errors.email?.message}
+                sx={{
+                  '& .MuiOutlinedInput-root': { bgcolor: '#fff', borderRadius: '10px' },
+                }}
+              />
+              <TextField
+                {...register('password')}
+                label="Mot de passe"
+                type={showPwd ? 'text' : 'password'}
+                fullWidth
+                autoComplete="current-password"
+                error={!!errors.password}
+                helperText={errors.password?.message}
+                InputProps={{
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <IconButton onClick={() => setShowPwd(!showPwd)} edge="end" size="small">
+                        {showPwd ? <VisibilityOff fontSize="small" /> : <Visibility fontSize="small" />}
+                      </IconButton>
+                    </InputAdornment>
+                  ),
+                }}
+                sx={{
+                  '& .MuiOutlinedInput-root': { bgcolor: '#fff', borderRadius: '10px' },
+                }}
+              />
+              <Button
+                type="submit"
+                variant="contained"
+                fullWidth
+                size="large"
+                disabled={isSubmitting}
+                sx={{ py: 1.5, borderRadius: '10px', fontSize: 15 }}
+              >
+                {isSubmitting
+                  ? <CircularProgress size={20} color="inherit" />
+                  : 'Se connecter'}
+              </Button>
+            </Stack>
+          </Box>
+
+          {/* Demo accounts */}
+          <Box sx={{
+            mt: 4, p: 2.5,
+            bgcolor: '#fff',
+            border: '1px solid #E2E8F0',
+            borderRadius: '12px',
+          }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+              <Shield sx={{ fontSize: 14, color: '#64748B' }} />
+              <Typography sx={{ fontSize: 12, fontWeight: 600, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                Comptes de démonstration
+              </Typography>
+            </Box>
+            <Stack spacing={1}>
+              {demoAccounts.map((c) => (
+                <Box
+                  key={c.email}
+                  onClick={() => { setValue('email', c.email); setValue('password', 'password'); }}
+                  sx={{
+                    display: 'flex', alignItems: 'center', gap: 1.5,
+                    p: 1.25, borderRadius: '8px', cursor: 'pointer',
+                    border: '1px solid #F1F5F9',
+                    '&:hover': { bgcolor: '#F8FAFC', borderColor: '#E2E8F0' },
+                    transition: 'all 150ms',
+                  }}
+                >
+                  <Box sx={{
+                    width: 8, height: 8, borderRadius: '50%',
+                    bgcolor: c.color, flexShrink: 0,
+                  }} />
+                  <Box>
+                    <Typography sx={{ fontSize: 12, fontWeight: 600, color: '#334155', lineHeight: 1.2 }}>
+                      {c.role}
+                    </Typography>
+                    <Typography sx={{ fontSize: 11, color: '#94A3B8', lineHeight: 1.3 }}>
+                      {c.email} · password
+                    </Typography>
+                  </Box>
+                </Box>
+              ))}
+            </Stack>
+          </Box>
+        </Box>
+      </Box>
     </Box>
   );
 }
