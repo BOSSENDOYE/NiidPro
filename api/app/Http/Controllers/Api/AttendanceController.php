@@ -94,6 +94,59 @@ class AttendanceController extends Controller
         return response()->json($attendance->fresh()->load('employee'));
     }
 
+    /**
+     * Badgeage manuel par un admin pour un agent (entrée ou sortie).
+     * Payload: { employee_number, action: 'in'|'out', notes? }
+     */
+    public function badge(Request $request)
+    {
+        $data = $request->validate([
+            'employee_number' => ['required', 'string', 'exists:employees,employee_number'],
+            'action'          => ['required', 'in:in,out'],
+            'notes'           => ['nullable', 'string', 'max:500'],
+        ]);
+
+        $employee = Employee::where('employee_number', $data['employee_number'])->firstOrFail();
+        $today    = Carbon::today();
+
+        $attendance = Attendance::firstOrCreate(
+            ['employee_id' => $employee->id, 'date' => $today],
+            [
+                'status'      => 'present',
+                'source'      => 'badge',
+                'recorded_by' => $request->user()->id,
+            ]
+        );
+
+        if ($data['action'] === 'in') {
+            if ($attendance->check_in) {
+                return response()->json(['message' => 'Entrée déjà enregistrée aujourd\'hui.'], 422);
+            }
+            $attendance->update([
+                'check_in' => now(),
+                'status'   => Carbon::now()->hour >= 9 ? 'late' : 'present',
+                'notes'    => $data['notes'] ?? $attendance->notes,
+            ]);
+        } else {
+            if (!$attendance->check_in) {
+                return response()->json(['message' => 'Aucune entrée enregistrée aujourd\'hui.'], 422);
+            }
+            if ($attendance->check_out) {
+                return response()->json(['message' => 'Sortie déjà enregistrée aujourd\'hui.'], 422);
+            }
+            $checkOut      = now();
+            $workedMinutes = (int) $attendance->check_in->diffInMinutes($checkOut);
+            $attendance->update([
+                'check_out'        => $checkOut,
+                'worked_minutes'   => $workedMinutes,
+                'overtime_minutes' => max(0, $workedMinutes - 480),
+                'notes'            => $data['notes'] ?? $attendance->notes,
+            ]);
+        }
+
+        return response()->json($attendance->fresh()->load('employee'));
+    }
+
     public function store(Request $request)
     {
         $data = $request->validate([

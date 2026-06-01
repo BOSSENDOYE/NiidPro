@@ -7,10 +7,14 @@ use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\DepartmentController;
 use App\Http\Controllers\Api\EmployeeController;
 use App\Http\Controllers\Api\LeaveController;
+use App\Http\Controllers\Api\SettingsController;
 use Illuminate\Support\Facades\Route;
 
 // Health check
 Route::get('/health', fn () => response()->json(['status' => 'ok', 'app' => 'NiidPro API v1']));
+
+// Paramètres publics (nom entreprise, etc.)
+Route::get('/settings', [SettingsController::class, 'index']);
 
 // Auth routes (public)
 Route::prefix('auth')->group(function () {
@@ -35,6 +39,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('departments', DepartmentController::class);
 
     // Employees
+    Route::post('/employees/{employee}/photo', [EmployeeController::class, 'uploadPhoto']);
     Route::apiResource('employees', EmployeeController::class);
 
     // Contracts
@@ -45,6 +50,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/attendances/today', [AttendanceController::class, 'today']);
     Route::post('/attendances/check-in', [AttendanceController::class, 'checkIn']);
     Route::post('/attendances/check-out', [AttendanceController::class, 'checkOut']);
+    Route::post('/attendances/badge', [AttendanceController::class, 'badge']);
     Route::apiResource('attendances', AttendanceController::class)->only(['index', 'store']);
 
     // Leaves

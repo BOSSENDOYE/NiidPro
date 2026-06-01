@@ -4,10 +4,13 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Facades\Storage;
 
 class Employee extends Model
 {
     use SoftDeletes;
+
+    protected $appends = ['photo_url', 'full_name'];
 
     protected $fillable = [
         'employee_number', 'user_id', 'department_id', 'position_id', 'manager_id',
@@ -32,6 +35,12 @@ class Employee extends Model
     public function getFullNameAttribute(): string
     {
         return "{$this->first_name} {$this->last_name}";
+    }
+
+    public function getPhotoUrlAttribute(): ?string
+    {
+        if (!$this->photo) return null;
+        return Storage::disk('public')->url($this->photo);
     }
 
     public function user()

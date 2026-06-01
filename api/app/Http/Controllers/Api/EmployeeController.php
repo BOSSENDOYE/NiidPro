@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Employee;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 
 class EmployeeController extends Controller
 {
@@ -92,6 +93,22 @@ class EmployeeController extends Controller
         ]);
 
         $employee->update($data);
+
+        return response()->json($employee->fresh()->load(['department', 'position']));
+    }
+
+    public function uploadPhoto(Request $request, Employee $employee)
+    {
+        $request->validate([
+            'photo' => ['required', 'image', 'mimes:jpeg,png,jpg,webp', 'max:3072'],
+        ]);
+
+        if ($employee->photo) {
+            Storage::disk('public')->delete($employee->photo);
+        }
+
+        $path = $request->file('photo')->store('employees/photos', 'public');
+        $employee->update(['photo' => $path]);
 
         return response()->json($employee->fresh()->load(['department', 'position']));
     }

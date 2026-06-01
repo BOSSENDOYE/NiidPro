@@ -11,5 +11,13 @@ export const employeesApi = {
 
   update: (id: number, data: Partial<Employee>) => client.put<Employee>(`/employees/${id}`, data),
 
+  uploadPhoto: (id: number, file: File) => {
+    const form = new FormData();
+    form.append('photo', file);
+    return client.post<Employee>(`/employees/${id}/photo`, form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
+
   delete: (id: number) => client.delete(`/employees/${id}`),
 };

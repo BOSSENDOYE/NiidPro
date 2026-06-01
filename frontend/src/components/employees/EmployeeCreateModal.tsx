@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Dialog, Box, Typography, Button, TextField, Grid, MenuItem,
   Stack, Avatar, IconButton, Tooltip, FormControl,
@@ -267,9 +267,10 @@ export default function EmployeeCreateModal({ open, onClose, mode = 'create', em
   const isView  = mode === 'view';
   const mCfg    = MODE_CONFIG[mode];
 
-  const [tab,      setTab]      = useState(0);
-  const [photoUrl, setPhotoUrl] = useState<string | null>(employee?.photo_url ?? null);
-  const [age,      setAge]      = useState<number | null>(null);
+  const [tab,       setTab]       = useState(0);
+  const [photoUrl,  setPhotoUrl]  = useState<string | null>(employee?.photo_url ?? null);
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [age,       setAge]       = useState<number | null>(null);
 
   /* ── Table states ── */
   const [familyRows,  setFamilyRows]  = useState<TableRow[]>([]);
@@ -295,18 +296,31 @@ export default function EmployeeCreateModal({ open, onClose, mode = 'create', em
   });
 
   /* ── Formulaire : defaultValues calculés immédiatement depuis employee ── */
-  const { register, handleSubmit, control, watch, formState: { errors } } = useForm<FormData>({
+  const { register, handleSubmit, control, watch, reset, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema),
     defaultValues: employee && mode !== 'create' ? empToForm(employee) : { status: 'active', annual_leave_days: 30, base_salary: 0 },
     mode: 'onSubmit',
   });
+
+  const uploadPhoto = async (employeeId: number) => {
+    if (!photoFile) return;
+    try {
+      await employeesApi.uploadPhoto(employeeId, photoFile);
+    } catch {
+      // photo upload failure is non-blocking
+    }
+  };
 
   const createMutation = useMutation({
     mutationFn: (data: FormData) => {
       const clean = Object.fromEntries(Object.entries(data).filter(([, v]) => v !== null && v !== undefined && v !== '')) as Partial<FormData>;
       return employeesApi.create(clean as FormData);
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['employees'] }); handleClose(); },
+    onSuccess: async (res) => {
+      await uploadPhoto(res.data.id);
+      qc.invalidateQueries({ queryKey: ['employees'] });
+      handleClose();
+    },
   });
 
   const updateMutation = useMutation({
@@ -314,7 +328,11 @@ export default function EmployeeCreateModal({ open, onClose, mode = 'create', em
       const clean = Object.fromEntries(Object.entries(data).filter(([, v]) => v !== null && v !== undefined && v !== '')) as Partial<FormData>;
       return employeesApi.update(employee!.id, clean as FormData);
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['employees'] }); handleClose(); },
+    onSuccess: async () => {
+      await uploadPhoto(employee!.id);
+      qc.invalidateQueries({ queryKey: ['employees'] });
+      handleClose();
+    },
   });
 
   const mutation = mode === 'edit' ? updateMutation : createMutation;
@@ -324,7 +342,7 @@ export default function EmployeeCreateModal({ open, onClose, mode = 'create', em
   const deptName = departments?.find((d: { id: number; name: string }) => d.id === Number(watched.department_id))?.name ?? '—';
 
   const handleClose = () => {
-    reset(); setTab(0); setPhotoUrl(null); setAge(null);
+    reset(); setTab(0); setPhotoUrl(null); setPhotoFile(null); setAge(null);
     setFamilyRows([]); setDiplomas([]); setQuals([]);
     setCategories([]); setPostings([]); setDocuments([]);
     onClose();
@@ -332,7 +350,10 @@ export default function EmployeeCreateModal({ open, onClose, mode = 'create', em
 
   const handlePhoto = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
-    if (f) setPhotoUrl(URL.createObjectURL(f));
+    if (f) {
+      setPhotoFile(f);
+      setPhotoUrl(URL.createObjectURL(f));
+    }
   };
 
   return (

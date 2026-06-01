@@ -123,6 +123,53 @@ export interface DashboardStats {
   recent_activity: { type: string; message: string; date: string }[];
 }
 
+export interface Availability {
+  id: number;
+  employee_id: number;
+  employee?: Employee;
+  type: 'remote' | 'mission' | 'training' | 'secondment' | 'personal' | 'suspension';
+  start_date: string;
+  end_date: string;
+  location?: string;
+  description?: string;
+  status: 'pending' | 'approved' | 'active' | 'ended' | 'cancelled';
+  approved_by?: string;
+  created_at: string;
+}
+
+export interface Distinction {
+  id: number;
+  employee_id: number;
+  employee?: Employee;
+  type: 'medal' | 'commendation' | 'award' | 'diploma' | 'certificate';
+  name: string;
+  issuing_authority?: string;
+  award_date: string;
+  level?: 'national' | 'regional' | 'local' | 'internal';
+  description?: string;
+  created_at: string;
+}
+
+export interface Evaluation {
+  id: number;
+  employee_id: number;
+  employee?: Employee;
+  evaluator_name?: string;
+  period: string;           // ex: "T1 2025", "Annuelle 2025"
+  evaluation_date: string;
+  score_performance: number;    // 1–5
+  score_punctuality: number;    // 1–5
+  score_teamwork: number;       // 1–5
+  score_initiative: number;     // 1–5
+  score_communication: number;  // 1–5
+  overall_score: number;        // moyenne arrondie à 2 déc.
+  rating: 'excellent' | 'good' | 'satisfactory' | 'insufficient';
+  status: 'draft' | 'submitted' | 'validated';
+  comments?: string;
+  objectives?: string;
+  created_at: string;
+}
+
 export interface PaginatedResponse<T> {
   data: T[];
   current_page: number;

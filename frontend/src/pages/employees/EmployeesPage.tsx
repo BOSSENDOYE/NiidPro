@@ -15,6 +15,12 @@ import {
 import { employeesApi } from '../../api/employees';
 import { formatDate } from '../../utils/format';
 import EmployeeCreateModal from '../../components/employees/EmployeeCreateModal';
+import ContractTab from '../../components/employees/ContractTab';
+import LeaveTab from '../../components/employees/LeaveTab';
+import EvaluationTab from '../../components/employees/EvaluationTab';
+import AvailabilityTab from '../../components/employees/AvailabilityTab';
+import DistinctionTab from '../../components/employees/DistinctionTab';
+import EmployeeBadgeCard from '../../components/employees/EmployeeBadgeCard';
 import type { Employee } from '../../types';
 
 const TAB_CONFIG = [
@@ -48,6 +54,7 @@ export default function EmployeesPage() {
   const [modalMode, setModalMode]       = useState<'create'|'edit'|'view'>('create');
   const [modalEmployee, setModalEmployee] = useState<Employee | undefined>(undefined);
   const [modalKey, setModalKey]         = useState(0);
+  const [badgeEmployee, setBadgeEmployee] = useState<Employee | null>(null);
 
   const openModal = (mode: 'create'|'edit'|'view', emp?: Employee) => {
     setModalMode(mode);
@@ -308,28 +315,29 @@ export default function EmployeesPage() {
                           onClick={() => openModal('view', emp)}
                           sx={{
                             borderRadius: '16px',
-                            border: `1.5px solid ${isSelected ? '#93C5FD' : '#E2E8F0'}`,
+                            border: `1.5px solid ${isSelected ? '#3B82F6' : 'rgba(255,255,255,0.08)'}`,
                             boxShadow: isSelected
-                              ? '0 0 0 2px rgba(37,99,235,0.2), 0 4px 16px rgba(37,99,235,0.1)'
-                              : '0 1px 6px rgba(15,23,42,0.07)',
+                              ? '0 0 0 2px rgba(59,130,246,0.25), 0 4px 16px rgba(59,130,246,0.15)'
+                              : '0 4px 16px rgba(0,0,0,0.25)',
                             overflow: 'visible',
                             cursor: 'pointer',
                             transition: 'all 0.22s cubic-bezier(.4,0,.2,1)',
-                            bgcolor: '#fff',
+                            bgcolor: '#1E293B',
                             position: 'relative',
                             '&:hover': {
                               transform: 'translateY(-5px)',
-                              boxShadow: '0 18px 44px rgba(15,23,42,0.15)',
-                              borderColor: isActive ? '#93C5FD' : '#FECACA',
+                              boxShadow: '0 18px 44px rgba(0,0,0,0.35)',
+                              borderColor: isActive ? '#3B82F6' : '#EF4444',
                             },
                           }}
                         >
                           {/* ── Bannière colorée ── */}
                           <Box sx={{
                             height: 76,
-                            background: isActive
+                            backgroundImage: isActive
                               ? 'linear-gradient(135deg, #1E3A8A 0%, #2563EB 55%, #3B82F6 100%)'
                               : 'linear-gradient(135deg, #7F1D1D 0%, #DC2626 55%, #EF4444 100%)',
+                            backgroundColor: isActive ? '#1E3A8A' : '#7F1D1D',
                             borderRadius: '14px 14px 0 0',
                             position: 'relative',
                             overflow: 'hidden',
@@ -366,13 +374,14 @@ export default function EmployeesPage() {
                               sx={{
                                 width: 74, height: 74,
                                 fontSize: 26, fontWeight: 800,
-                                background: isActive
+                                backgroundImage: isActive
                                   ? 'linear-gradient(135deg, #1D4ED8, #7C3AED)'
                                   : 'linear-gradient(135deg, #94A3B8, #475569)',
-                                border: '3.5px solid #fff',
+                                backgroundColor: isActive ? '#1D4ED8' : '#94A3B8',
+                                border: '3.5px solid #1E293B',
                                 boxShadow: isActive
                                   ? '0 6px 18px rgba(37,99,235,0.4)'
-                                  : '0 6px 18px rgba(0,0,0,0.14)',
+                                  : '0 6px 18px rgba(0,0,0,0.3)',
                               }}
                             >
                               {initials}
@@ -381,20 +390,20 @@ export default function EmployeesPage() {
                             {/* Statut */}
                             <Chip size="small"
                               icon={isActive
-                                ? <CheckCircle sx={{ fontSize: '11px !important', color: '#059669 !important' }} />
-                                : <Block sx={{ fontSize: '11px !important', color: '#DC2626 !important' }} />
+                                ? <CheckCircle sx={{ fontSize: '11px !important', color: '#34D399 !important' }} />
+                                : <Block sx={{ fontSize: '11px !important', color: '#F87171 !important' }} />
                               }
                               label={isActive ? 'Actif' : 'Inactif'}
                               sx={{
                                 mt: 0.875, height: 21, fontSize: 10, fontWeight: 700,
-                                bgcolor: isActive ? 'rgba(5,150,105,0.09)' : 'rgba(220,38,38,0.09)',
-                                color: isActive ? '#059669' : '#DC2626',
-                                border: `1px solid ${isActive ? 'rgba(5,150,105,0.28)' : 'rgba(220,38,38,0.28)'}`,
+                                bgcolor: isActive ? 'rgba(52,211,153,0.12)' : 'rgba(248,113,113,0.12)',
+                                color: isActive ? '#34D399' : '#F87171',
+                                border: `1px solid ${isActive ? 'rgba(52,211,153,0.3)' : 'rgba(248,113,113,0.3)'}`,
                               }}
                             />
 
                             {/* Nom complet */}
-                            <Typography fontWeight={800} fontSize={14.5} color="#0F172A"
+                            <Typography fontWeight={800} fontSize={14.5} color="#F1F5F9"
                               textAlign="center" lineHeight={1.25} mt={0.875} noWrap sx={{ maxWidth: 170 }}>
                               {emp.first_name} {emp.last_name}
                             </Typography>
@@ -402,7 +411,7 @@ export default function EmployeesPage() {
                             {/* Poste */}
                             {emp.position?.title && (
                               <Typography variant="caption" textAlign="center" noWrap
-                                sx={{ fontSize: 10.5, color: '#94A3B8', maxWidth: 165, mt: 0.3 }}>
+                                sx={{ fontSize: 10.5, color: '#64748B', maxWidth: 165, mt: 0.3 }}>
                                 {emp.position.title}
                               </Typography>
                             )}
@@ -413,9 +422,9 @@ export default function EmployeesPage() {
                               {emp.employee_number && (
                                 <Box component="span" sx={{
                                   fontFamily: 'monospace', fontSize: 10, fontWeight: 700,
-                                  color: '#2563EB', bgcolor: '#EFF6FF',
+                                  color: '#93C5FD', bgcolor: 'rgba(59,130,246,0.12)',
                                   px: 0.75, py: 0.2, borderRadius: '5px',
-                                  border: '1px solid #BFDBFE',
+                                  border: '1px solid rgba(59,130,246,0.25)',
                                 }}>
                                   {emp.employee_number}
                                 </Box>
@@ -423,9 +432,9 @@ export default function EmployeesPage() {
                               {emp.department?.name && (
                                 <Box component="span" sx={{
                                   fontSize: 10, fontWeight: 600,
-                                  color: '#7C3AED', bgcolor: '#F5F3FF',
+                                  color: '#C4B5FD', bgcolor: 'rgba(124,58,237,0.12)',
                                   px: 0.75, py: 0.2, borderRadius: '5px',
-                                  border: '1px solid #DDD6FE',
+                                  border: '1px solid rgba(124,58,237,0.25)',
                                   maxWidth: 105, overflow: 'hidden',
                                   textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                                   display: 'inline-block',
@@ -435,61 +444,61 @@ export default function EmployeesPage() {
                               )}
                             </Stack>
 
-                            <Divider sx={{ width: '100%', borderColor: '#F1F5F9', mb: 1.25 }} />
+                            <Divider sx={{ width: '100%', borderColor: 'rgba(255,255,255,0.07)', mb: 1.25 }} />
 
                             {/* Informations clés */}
                             <Stack spacing={0.8} width="100%">
                               <Stack direction="row" spacing={1} alignItems="center">
-                                <Email sx={{ fontSize: 12, color: '#94A3B8', flexShrink: 0 }} />
-                                <Typography variant="caption" color="text.secondary" noWrap sx={{ fontSize: 11, flex: 1 }}>
+                                <Email sx={{ fontSize: 12, color: '#475569', flexShrink: 0 }} />
+                                <Typography noWrap sx={{ fontSize: 11, flex: 1, color: '#94A3B8' }}>
                                   {emp.professional_email}
                                 </Typography>
                               </Stack>
                               <Stack direction="row" spacing={1} alignItems="center">
-                                <Phone sx={{ fontSize: 12, color: '#94A3B8', flexShrink: 0 }} />
-                                <Typography variant="caption" color="text.secondary" sx={{ fontSize: 11 }}>
+                                <Phone sx={{ fontSize: 12, color: '#475569', flexShrink: 0 }} />
+                                <Typography sx={{ fontSize: 11, color: '#94A3B8' }}>
                                   {emp.phone || '—'}
                                 </Typography>
                               </Stack>
                               <Stack direction="row" spacing={1} alignItems="center">
-                                <Event sx={{ fontSize: 12, color: '#94A3B8', flexShrink: 0 }} />
-                                <Typography variant="caption" color="text.secondary" sx={{ fontSize: 11 }}>
+                                <Event sx={{ fontSize: 12, color: '#475569', flexShrink: 0 }} />
+                                <Typography sx={{ fontSize: 11, color: '#94A3B8' }}>
                                   Recruté le {formatDate(emp.hire_date)}
                                 </Typography>
                               </Stack>
                             </Stack>
 
-                            <Divider sx={{ width: '100%', borderColor: '#F1F5F9', mt: 1.25, mb: 1.1 }} />
+                            <Divider sx={{ width: '100%', borderColor: 'rgba(255,255,255,0.07)', mt: 1.25, mb: 1.1 }} />
 
                             {/* Boutons d'action */}
                             <Stack direction="row" spacing={0.6} justifyContent="center" flexWrap="wrap" useFlexGap>
                               <Tooltip title="Voir le dossier" arrow>
                                 <IconButton size="small" onClick={e => { e.stopPropagation(); openModal('view', emp); }}
-                                  sx={{ width: 32, height: 32, borderRadius: '9px', bgcolor: '#EFF6FF', color: '#2563EB', '&:hover': { bgcolor: '#DBEAFE', transform: 'scale(1.1)' }, transition: 'all .15s' }}>
+                                  sx={{ width: 32, height: 32, borderRadius: '9px', bgcolor: 'rgba(59,130,246,0.12)', color: '#93C5FD', '&:hover': { bgcolor: 'rgba(59,130,246,0.22)', transform: 'scale(1.1)' }, transition: 'all .15s' }}>
                                   <Visibility sx={{ fontSize: 15 }} />
                                 </IconButton>
                               </Tooltip>
                               <Tooltip title="Modifier" arrow>
                                 <IconButton size="small" onClick={e => { e.stopPropagation(); openModal('edit', emp); }}
-                                  sx={{ width: 32, height: 32, borderRadius: '9px', bgcolor: '#FFF7ED', color: '#F97316', '&:hover': { bgcolor: '#FED7AA', transform: 'scale(1.1)' }, transition: 'all .15s' }}>
+                                  sx={{ width: 32, height: 32, borderRadius: '9px', bgcolor: 'rgba(249,115,22,0.12)', color: '#FB923C', '&:hover': { bgcolor: 'rgba(249,115,22,0.22)', transform: 'scale(1.1)' }, transition: 'all .15s' }}>
                                   <Edit sx={{ fontSize: 15 }} />
                                 </IconButton>
                               </Tooltip>
                               <Tooltip title="Envoyer un mail" arrow>
                                 <IconButton size="small" onClick={e => { e.stopPropagation(); window.location.href = `mailto:${emp.professional_email}`; }}
-                                  sx={{ width: 32, height: 32, borderRadius: '9px', bgcolor: '#F0FDF4', color: '#16A34A', '&:hover': { bgcolor: '#DCFCE7', transform: 'scale(1.1)' }, transition: 'all .15s' }}>
+                                  sx={{ width: 32, height: 32, borderRadius: '9px', bgcolor: 'rgba(34,197,94,0.12)', color: '#4ADE80', '&:hover': { bgcolor: 'rgba(34,197,94,0.22)', transform: 'scale(1.1)' }, transition: 'all .15s' }}>
                                   <Email sx={{ fontSize: 15 }} />
                                 </IconButton>
                               </Tooltip>
-                              <Tooltip title="Carte d'accès" arrow>
-                                <IconButton size="small" onClick={e => e.stopPropagation()}
-                                  sx={{ width: 32, height: 32, borderRadius: '9px', bgcolor: '#FAF5FF', color: '#7C3AED', '&:hover': { bgcolor: '#EDE9FE', transform: 'scale(1.1)' }, transition: 'all .15s' }}>
+                              <Tooltip title="Carte professionnelle & Badge" arrow>
+                                <IconButton size="small" onClick={e => { e.stopPropagation(); setBadgeEmployee(emp); }}
+                                  sx={{ width: 32, height: 32, borderRadius: '9px', bgcolor: 'rgba(168,85,247,0.12)', color: '#C084FC', '&:hover': { bgcolor: 'rgba(168,85,247,0.22)', transform: 'scale(1.1)' }, transition: 'all .15s' }}>
                                   <BadgeIcon sx={{ fontSize: 15 }} />
                                 </IconButton>
                               </Tooltip>
                               <Tooltip title="Supprimer" arrow>
                                 <IconButton size="small" onClick={e => e.stopPropagation()}
-                                  sx={{ width: 32, height: 32, borderRadius: '9px', bgcolor: '#FFF1F2', color: '#E11D48', '&:hover': { bgcolor: '#FFE4E6', transform: 'scale(1.1)' }, transition: 'all .15s' }}>
+                                  sx={{ width: 32, height: 32, borderRadius: '9px', bgcolor: 'rgba(225,29,72,0.12)', color: '#FB7185', '&:hover': { bgcolor: 'rgba(225,29,72,0.22)', transform: 'scale(1.1)' }, transition: 'all .15s' }}>
                                   <Delete sx={{ fontSize: 15 }} />
                                 </IconButton>
                               </Tooltip>
@@ -503,8 +512,17 @@ export default function EmployeesPage() {
               )}
             </Box>
 
-            {/* Modal création */}
+            {/* Modal création / vue / édition */}
             <EmployeeCreateModal key={modalKey} open={modalOpen} onClose={closeModal} mode={modalMode} employee={modalEmployee} />
+
+            {/* Modal carte professionnelle */}
+            {badgeEmployee && (
+              <EmployeeBadgeCard
+                open={!!badgeEmployee}
+                onClose={() => setBadgeEmployee(null)}
+                employee={badgeEmployee}
+              />
+            )}
 
             {/* Menu contextuel */}
             <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={() => setAnchorEl(null)}
@@ -641,6 +659,21 @@ export default function EmployeesPage() {
               );
             })()}
           </>
+        ) : activeTab === 1 ? (
+          /* ── ONGLET DISPONIBILITÉ ── */
+          <AvailabilityTab />
+        ) : activeTab === 2 ? (
+          /* ── ONGLET DISTINCTION ── */
+          <DistinctionTab />
+        ) : activeTab === 3 ? (
+          /* ── ONGLET CONGÉ ── */
+          <LeaveTab />
+        ) : activeTab === 5 ? (
+          /* ── ONGLET CONTRAT ── */
+          <ContractTab />
+        ) : activeTab === 6 ? (
+          /* ── ONGLET ÉVALUATION ── */
+          <EvaluationTab />
         ) : (
           /* ── PLACEHOLDER AUTRES ONGLETS ── */
           <Box sx={{ py: 14, textAlign: 'center' }}>
