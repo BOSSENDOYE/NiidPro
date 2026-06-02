@@ -15,7 +15,9 @@ import type { Employee, DocumentTemplate, GeneratedDocument } from '../../types'
 const NAV = '#0D2137';
 const ACT = '#E85D04';
 
-export default function LeaveAttestationTab() {
+interface Props { searchText?: string; }
+
+export default function LeaveAttestationTab({ searchText = '' }: Props) {
   const qc = useQueryClient();
 
   const [selectedEmp, setSelectedEmp]       = useState<Employee | null>(null);
@@ -27,7 +29,17 @@ export default function LeaveAttestationTab() {
     queryKey: ['employees', 1, '', 'all'],
     queryFn: () => employeesApi.list({ page: 1, per_page: 200 }).then((r) => r.data),
   });
-  const employees = employeesData?.data ?? [];
+  const allEmployees = employeesData?.data ?? [];
+  const employees = searchText
+    ? allEmployees.filter((e) => {
+        const s = searchText.toLowerCase();
+        return (
+          `${e.first_name} ${e.last_name}`.toLowerCase().includes(s) ||
+          e.employee_number.toLowerCase().includes(s) ||
+          (e.department?.name ?? '').toLowerCase().includes(s)
+        );
+      })
+    : allEmployees;
 
   const { data: templates = [] } = useQuery({
     queryKey: ['documents', 'templates', 'attestation'],

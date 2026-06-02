@@ -39,7 +39,7 @@ class LeaveController extends Controller
         $data = $request->validate([
             'employee_id'   => ['required', 'exists:employees,id'],
             'leave_type_id' => ['required', 'exists:leave_types,id'],
-            'start_date'    => ['required', 'date', 'after_or_equal:today'],
+            'start_date'    => ['required', 'date'],
             'end_date'      => ['required', 'date', 'after_or_equal:start_date'],
             'reason'        => ['nullable', 'string'],
         ]);
@@ -88,7 +88,7 @@ class LeaveController extends Controller
 
     public function reject(Request $request, Leave $leave)
     {
-        $request->validate(['rejection_reason' => ['required', 'string']]);
+        $request->validate(['comment' => ['nullable', 'string']]);
 
         if ($leave->status !== 'pending') {
             return response()->json(['message' => 'Cette demande ne peut plus être rejetée.'], 422);
@@ -96,7 +96,7 @@ class LeaveController extends Controller
 
         $leave->update([
             'status'           => 'rejected',
-            'rejection_reason' => $request->rejection_reason,
+            'rejection_reason' => $request->comment,
             'approved_by'      => $request->user()->id,
             'approved_at'      => now(),
         ]);

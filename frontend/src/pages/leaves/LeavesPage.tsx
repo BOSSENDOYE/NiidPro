@@ -5,17 +5,17 @@ import {
   TableRow, Typography, Skeleton, Button, TextField, MenuItem,
   Select, FormControl, InputLabel, Stack, Paper, Dialog,
   DialogTitle, DialogContent, DialogActions, Checkbox,
-  Autocomplete, Chip,
+  Autocomplete, Chip, Alert, CircularProgress,
 } from '@mui/material';
-import { Add, Search, Clear, CheckCircle, Cancel } from '@mui/icons-material';
+import { Add, Search, Clear, CheckCircle, Cancel, Print, Description } from '@mui/icons-material';
 import { leavesApi } from '../../api/leaves';
 import { employeesApi } from '../../api/employees';
+import { documentsApi } from '../../api/documents';
 import StatusChip from '../../components/common/StatusChip';
-import LeaveTab from '../../components/employees/LeaveTab';
 import LeavePlanningTab from '../../components/employees/LeavePlanningTab';
 import LeaveAttestationTab from '../../components/employees/LeaveAttestationTab';
 import { formatDate } from '../../utils/format';
-import type { Leave } from '../../types';
+import type { Leave, GeneratedDocument } from '../../types';
 
 /* ─── Palette ─── */
 const NAV  = '#0D2137';
@@ -28,7 +28,10 @@ export default function LeavesPage() {
   const [tab, setTab]         = useState(0);
   const [selectedId, setSelectedId] = useState<number | null>(null);
 
-  /* filtres */
+  /* recherche globale */
+  const [globalSearch, setGlobalSearch] = useState('');
+
+  /* filtres avancés */
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo,   setDateTo]   = useState('');
   const [service,  setService]  = useState('');
@@ -40,6 +43,9 @@ export default function LeavesPage() {
   const [detailOpen,  setDetailOpen]  = useState(false);
   const [validateOpen, setValidateOpen] = useState<{ leave: Leave; action: 'approve' | 'reject' } | null>(null);
   const [comment,     setComment]     = useState('');
+  const [attestOpen,  setAttestOpen]  = useState(false);
+  const [attestTemplate, setAttestTemplate] = useState('');
+  const [lastGenerated, setLastGenerated]   = useState<GeneratedDocument | null>(null);
 
   /* form nouveau congé */
   const [formEmpId,    setFormEmpId]    = useState<number | null>(null);
@@ -64,6 +70,11 @@ export default function LeavesPage() {
     queryFn: () => leavesApi.types().then((r) => r.data),
   });
 
+  const { data: attestTemplates = [] } = useQuery({
+    queryKey: ['documents', 'templates', 'attestation'],
+    queryFn: () => documentsApi.listTemplates({ type: 'attestation' }).then((r) => r.data),
+  });
+
   const { data: employeesData } = useQuery({
     queryKey: ['employees', 1, '', 'all'],
     queryFn: () => employeesApi.list({ page: 1, per_page: 200 }).then((r) => r.data),
@@ -86,13 +97,31 @@ export default function LeavesPage() {
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['leaves'] }); setValidateOpen(null); setComment(''); },
   });
 
+  const generateMutation = useMutation({
+    mutationFn: () => documentsApi.generate(Number(attestTemplate), [selectedLeave!.employee_id]),
+    onSuccess: (r) => {
+      setLastGenerated((r.data as { documents?: GeneratedDocument[] }).documents?.[0] ?? null);
+      qc.invalidateQueries({ queryKey: ['documents', 'generated'] });
+    },
+  });
+
   const resetForm = () => {
     setFormEmpId(null); setFormTypeId(''); setFormStart(''); setFormEnd(''); setFormReason('');
   };
 
   /* filtrage */
+  const matchSearch = (l: Leave) => {
+    if (!globalSearch) return true;
+    const s = globalSearch.toLowerCase();
+    const name = `${l.employee?.first_name ?? ''} ${l.employee?.last_name ?? ''}`.toLowerCase();
+    const mat  = (l.employee?.employee_number ?? '').toLowerCase();
+    const dept = (l.employee?.department?.name ?? '').toLowerCase();
+    return name.includes(s) || mat.includes(s) || dept.includes(s);
+  };
+
   const filtered = useMemo(() => {
     return allLeaves.filter((l) => {
+      if (!matchSearch(l)) return false;
       if (dateFrom && l.start_date < dateFrom) return false;
       if (dateTo   && l.end_date   > dateTo)   return false;
       if (service  && l.employee?.department?.name?.toLowerCase().indexOf(service.toLowerCase()) === -1) return false;
@@ -100,7 +129,14 @@ export default function LeavesPage() {
       if (matricule && !(l.employee?.employee_number ?? '').toLowerCase().includes(matricule.toLowerCase())) return false;
       return true;
     });
-  }, [allLeaves, dateFrom, dateTo, service, typeFilter, matricule]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allLeaves, globalSearch, dateFrom, dateTo, service, typeFilter, matricule]);
+
+  const filteredPending = useMemo(
+    () => pendingLeaves.filter(matchSearch),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [pendingLeaves, globalSearch],
+  );
 
   const handleSearch = () => { /* filtrage réactif */ };
   const handleClear  = () => { setDateFrom(''); setDateTo(''); setService(''); setTypeFilter(''); setMatricule(''); };
@@ -109,11 +145,10 @@ export default function LeavesPage() {
 
   /* ─── render tab content ─── */
   const renderContent = () => {
-    if (tab === 2) return <LeaveAttestationTab />;
-    if (tab === 3) return <LeaveTab />;
-    if (tab === 4) return <LeavePlanningTab />;
+    if (tab === 2) return <LeaveAttestationTab searchText={globalSearch} />;
+    if (tab === 3) return <LeavePlanningTab searchText={globalSearch} />;
 
-    const rows = tab === 1 ? pendingLeaves : filtered;
+    const rows = tab === 1 ? filteredPending : filtered;
 
     return (
       <Box>
@@ -179,6 +214,20 @@ export default function LeavesPage() {
             onClick={() => setDetailOpen(true)}
             sx={{ borderRadius: '6px', fontSize: 12, fontWeight: 700, minWidth: 90, borderColor: TH, color: TH }}>
             Détails
+          </Button>
+          <Button
+            variant="outlined"
+            size="small"
+            startIcon={<Print sx={{ fontSize: '14px !important' }} />}
+            disabled={!selectedId || selectedLeave?.status !== 'approved'}
+            onClick={() => { setLastGenerated(null); setAttestTemplate(''); setAttestOpen(true); }}
+            sx={{
+              borderRadius: '6px', fontSize: 12, fontWeight: 700, minWidth: 90,
+              borderColor: ACT, color: ACT,
+              '&:hover': { bgcolor: '#FFF7F0', borderColor: ACT },
+              '&.Mui-disabled': { borderColor: '#E2E8F0', color: '#CBD5E1' },
+            }}>
+            Imprimer Attestation
           </Button>
         </Box>
 
@@ -328,12 +377,7 @@ export default function LeavesPage() {
             dot: pendingLeaves.length > 0,
           },
           {
-            label: 'Générer Attestation',
-            count: null,
-            dot: false,
-          },
-          {
-            label: 'Gestion des congés',
+            label: 'Historique Congé',
             count: null,
             dot: false,
           },
@@ -394,6 +438,40 @@ export default function LeavesPage() {
             </Box>
           );
         })}
+      </Box>
+
+      {/* ══ Barre de recherche globale ══ */}
+      <Box sx={{
+        border: '1px solid #CBD5E1', borderTop: 'none',
+        px: 2, py: 1, bgcolor: '#F8FAFC',
+        display: 'flex', alignItems: 'center', gap: 1.5,
+      }}>
+        <Search sx={{ fontSize: 16, color: '#94A3B8', flexShrink: 0 }} />
+        <TextField
+          size="small"
+          placeholder="Rechercher par nom, matricule, service…"
+          value={globalSearch}
+          onChange={(e) => setGlobalSearch(e.target.value)}
+          sx={{ flex: 1, maxWidth: 380, bgcolor: '#fff' }}
+          InputProps={{ sx: { fontSize: 13 } }}
+        />
+        {globalSearch && (
+          <Button
+            size="small"
+            startIcon={<Clear sx={{ fontSize: '13px !important' }} />}
+            onClick={() => setGlobalSearch('')}
+            sx={{ fontSize: 11, color: '#64748B', borderColor: '#CBD5E1', minWidth: 0, px: 1 }}
+            variant="outlined"
+          >
+            Effacer
+          </Button>
+        )}
+        {globalSearch && (
+          <Typography sx={{ fontSize: 11, color: '#64748B', whiteSpace: 'nowrap' }}>
+            {tab === 0 ? filtered.length : tab === 1 ? filteredPending.length : ''}
+            {(tab === 0 || tab === 1) ? ' résultat(s)' : ''}
+          </Typography>
+        )}
       </Box>
 
       {/* ══ Contenu ══ */}
@@ -495,6 +573,103 @@ export default function LeavesPage() {
           </DialogActions>
         </Dialog>
       )}
+
+      {/* ── Dialog : Imprimer Attestation ── */}
+      <Dialog open={attestOpen} onClose={() => { setAttestOpen(false); setLastGenerated(null); setAttestTemplate(''); }} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ bgcolor: ACT, color: '#fff', fontWeight: 700, fontSize: 15 }}>
+          Imprimer une attestation de congé
+        </DialogTitle>
+        <DialogContent sx={{ pt: 2.5 }}>
+          {selectedLeave && (
+            <Box sx={{ bgcolor: '#FFF7ED', border: '1px solid #FED7AA', borderRadius: '8px', p: 1.5, mb: 2.5 }}>
+              <Typography sx={{ fontWeight: 700, fontSize: 13, color: '#9A3412' }}>
+                {selectedLeave.employee?.first_name} {selectedLeave.employee?.last_name}
+              </Typography>
+              <Typography sx={{ fontSize: 12, color: '#C2410C', mt: 0.25 }}>
+                {selectedLeave.employee?.employee_number} · {selectedLeave.employee?.department?.name ?? '—'}
+              </Typography>
+              <Typography sx={{ fontSize: 12, color: '#475569', mt: 0.5 }}>
+                {formatDate(selectedLeave.start_date)} → {formatDate(selectedLeave.end_date)} · {selectedLeave.days_count} jour(s)
+              </Typography>
+            </Box>
+          )}
+
+          {lastGenerated ? (
+            <Box sx={{ bgcolor: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: '8px', p: 2 }}>
+              <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1.5 }}>
+                <CheckCircle sx={{ color: '#059669', fontSize: 20 }} />
+                <Typography sx={{ fontWeight: 700, fontSize: 14, color: '#059669' }}>Attestation générée</Typography>
+              </Stack>
+              <Stack spacing={0.5}>
+                <Stack direction="row" spacing={1}>
+                  <Typography sx={{ minWidth: 90, fontSize: 12, fontWeight: 700, color: '#475569' }}>Référence :</Typography>
+                  <Typography sx={{ fontSize: 12, fontWeight: 800, color: '#065F46' }}>{lastGenerated.reference}</Typography>
+                </Stack>
+                <Stack direction="row" spacing={1}>
+                  <Typography sx={{ minWidth: 90, fontSize: 12, fontWeight: 700, color: '#475569' }}>Généré le :</Typography>
+                  <Typography sx={{ fontSize: 12 }}>{formatDate(lastGenerated.created_at)}</Typography>
+                </Stack>
+              </Stack>
+              <Button
+                variant="outlined"
+                size="small"
+                startIcon={<Print sx={{ fontSize: '13px !important' }} />}
+                onClick={() => window.print()}
+                sx={{ mt: 1.5, borderRadius: '6px', fontSize: 12, fontWeight: 700, borderColor: '#059669', color: '#059669' }}
+              >
+                Imprimer / Télécharger
+              </Button>
+            </Box>
+          ) : (
+            <Stack spacing={2}>
+              {attestTemplates.length === 0 ? (
+                <Alert severity="warning" sx={{ fontSize: 12 }}>
+                  Aucun modèle d'attestation disponible. Créez-en un dans la section Documents.
+                </Alert>
+              ) : (
+                <FormControl size="small" fullWidth required>
+                  <InputLabel>Modèle d'attestation</InputLabel>
+                  <Select
+                    value={attestTemplate}
+                    label="Modèle d'attestation"
+                    onChange={(e) => setAttestTemplate(e.target.value)}
+                  >
+                    {attestTemplates.map((t) => (
+                      <MenuItem key={t.id} value={String(t.id)}>
+                        <Stack>
+                          <Typography sx={{ fontSize: 13, fontWeight: 600 }}>{t.name}</Typography>
+                          {t.description && (
+                            <Typography sx={{ fontSize: 11, color: '#64748B' }}>{t.description}</Typography>
+                          )}
+                        </Stack>
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              )}
+            </Stack>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => { setAttestOpen(false); setLastGenerated(null); setAttestTemplate(''); }}>
+            {lastGenerated ? 'Fermer' : 'Annuler'}
+          </Button>
+          {!lastGenerated && (
+            <Button
+              variant="contained"
+              disabled={!attestTemplate || generateMutation.isPending}
+              startIcon={generateMutation.isPending
+                ? <CircularProgress size={13} color="inherit" />
+                : <Description sx={{ fontSize: '14px !important' }} />
+              }
+              onClick={() => generateMutation.mutate()}
+              sx={{ bgcolor: ACT, '&:hover': { bgcolor: '#C14D03' }, borderRadius: '6px', fontSize: 12, fontWeight: 700 }}
+            >
+              {generateMutation.isPending ? 'Génération…' : 'Générer'}
+            </Button>
+          )}
+        </DialogActions>
+      </Dialog>
 
       {/* ── Dialog : Valider / Refuser ── */}
       <Dialog open={Boolean(validateOpen)} onClose={() => { setValidateOpen(null); setComment(''); }} maxWidth="sm" fullWidth>

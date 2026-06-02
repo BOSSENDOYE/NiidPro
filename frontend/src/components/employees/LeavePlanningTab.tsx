@@ -13,7 +13,9 @@ const MONTH_FR = [
   'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre',
 ];
 
-export default function LeavePlanningTab() {
+interface Props { searchText?: string; }
+
+export default function LeavePlanningTab({ searchText = '' }: Props) {
   const now = new Date();
   const [calYear,  setCalYear]  = useState(now.getFullYear());
   const [calMonth, setCalMonth] = useState(now.getMonth());
@@ -38,7 +40,17 @@ export default function LeavePlanningTab() {
     else setCalMonth((m) => m + 1);
   };
 
-  const monthLeaves = leaves.filter((l) => {
+  const visibleLeaves = searchText
+    ? leaves.filter((l) => {
+        const s = searchText.toLowerCase();
+        const emp = (l as typeof l & { employee?: { first_name?: string; last_name?: string; employee_number?: string } }).employee;
+        const name = `${emp?.first_name ?? ''} ${emp?.last_name ?? ''}`.toLowerCase();
+        const mat  = (emp?.employee_number ?? '').toLowerCase();
+        return name.includes(s) || mat.includes(s);
+      })
+    : leaves;
+
+  const monthLeaves = visibleLeaves.filter((l) => {
     const m = String(calMonth + 1).padStart(2, '0');
     return (
       l.start_date.startsWith(`${calYear}-${m}`) ||
@@ -103,7 +115,7 @@ export default function LeavePlanningTab() {
       {/* ── Calendrier ── */}
       <Box sx={{ bgcolor: '#F1F5F9', pt: 1.5 }}>
         <LeaveCalendar
-          leaves={leaves}
+          leaves={visibleLeaves}
           leaveTypes={leaveTypes}
           year={calYear}
           month={calMonth}
