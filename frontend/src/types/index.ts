@@ -15,6 +15,7 @@ export interface Department {
   description?: string;
   color?: string;
   is_active: boolean;
+  parent_id?: number;
   employees_count?: number;
   parent?: Department;
   children?: Department[];
@@ -38,10 +39,20 @@ export interface Employee {
   full_name: string;
   professional_email: string;
   personal_email?: string;
+  phone_personal?: string;
+  phone_professional?: string;
+  /** @deprecated use phone_personal / phone_professional */
   phone?: string;
   hire_date: string;
+  birth_date?: string;
+  birth_place?: string;
+  gender?: string;
+  nationality?: string;
+  national_id?: string;
+  address?: string;
+  postal_code?: string;
   base_salary: number;
-  status: 'active' | 'inactive' | 'suspended';
+  status: 'active' | 'inactive' | 'suspended' | 'on_leave' | 'terminated';
   department?: Department;
   position?: Position;
   department_id: number;
@@ -167,6 +178,43 @@ export interface Evaluation {
   status: 'draft' | 'submitted' | 'validated';
   comments?: string;
   objectives?: string;
+  created_at: string;
+}
+
+export interface DocumentTemplateSettings {
+  ministry?:         string;
+  signataire_name?:  string;
+  signataire_title?: string;
+  ampliations?:      string[];
+  objet?:            string;
+}
+
+export interface DocumentTemplate {
+  id: number;
+  type: 'attestation' | 'note_service';
+  name: string;
+  content: string;
+  status: 'active' | 'archived';
+  description?: string;
+  settings?: DocumentTemplateSettings;
+  created_by?: number;
+  creator?: User;
+  generated_documents_count?: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface GeneratedDocument {
+  id: number;
+  template_id: number;
+  template?: DocumentTemplate;
+  employee_id: number;
+  employee?: Employee;
+  type: 'attestation' | 'note_service';
+  reference: string;
+  content_final: string;
+  generated_by?: number;
+  generator?: User;
   created_at: string;
 }
 

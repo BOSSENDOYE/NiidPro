@@ -79,33 +79,182 @@ class DatabaseSeeder extends Seeder
         ]);
         $managerUser->assignRole('manager');
 
-        // ── Departments ─────────────────────────────────────────────────────
-        $directions = [
-            ['name' => 'Direction Générale',      'code' => 'DG',  'color' => '#6366F1'],
-            ['name' => 'Ressources Humaines',      'code' => 'RH',  'color' => '#8B5CF6'],
-            ['name' => 'Informatique & Systèmes', 'code' => 'IT',  'color' => '#3B82F6'],
-            ['name' => 'Finance & Comptabilité',   'code' => 'FIN', 'color' => '#10B981'],
-            ['name' => 'Commercial & Marketing',   'code' => 'COM', 'color' => '#F59E0B'],
-            ['name' => 'Production & Opérations', 'code' => 'PRO', 'color' => '#EF4444'],
+        // ── Departments — Structure ANASER ──────────────────────────────────
+        // Niveau 0 : instances autonomes
+        $cs = Department::firstOrCreate(['code' => 'CS'], [
+            'name'        => 'Conseil de Surveillance',
+            'description' => 'Organe de contrôle et de surveillance',
+            'color'       => '#1B4B8A',
+            'is_active'   => true,
+        ]);
+
+        $dg = Department::firstOrCreate(['code' => 'DG'], [
+            'name'        => 'Direction Générale',
+            'description' => 'Instance de direction de l\'Agence',
+            'color'       => '#1B4B8A',
+            'is_active'   => true,
+        ]);
+
+        // Niveau 1 : Secrétariat Général (sous DG)
+        $sg = Department::firstOrCreate(['code' => 'SG'], [
+            'name'        => 'Secrétariat Général',
+            'description' => 'Coordination générale des directions et cellules rattachées',
+            'parent_id'   => $dg->id,
+            'color'       => '#1B4B8A',
+            'is_active'   => true,
+        ]);
+
+        // Niveau 2 : 5 Directions (sous SG)
+        $dep = Department::firstOrCreate(['code' => 'DEP'], [
+            'name'        => 'Direction des Études et la Planification',
+            'description' => 'Études, recherche, planification stratégique et observatoire',
+            'parent_id'   => $sg->id,
+            'color'       => '#0284C7',
+            'is_active'   => true,
+        ]);
+
+        $dac = Department::firstOrCreate(['code' => 'DAC'], [
+            'name'        => 'Direction de l\'Audit et de la Conformité',
+            'description' => 'Audit, homologation des infrastructures et conformité réglementaire',
+            'parent_id'   => $sg->id,
+            'color'       => '#7C3AED',
+            'is_active'   => true,
+        ]);
+
+        $dpsrc = Department::firstOrCreate(['code' => 'DPSRC'], [
+            'name'        => 'Direction de la Promotion Sécurité Routière et Communication',
+            'description' => 'Communication, sensibilisation, éducation et prévention routière',
+            'parent_id'   => $sg->id,
+            'color'       => '#059669',
+            'is_active'   => true,
+        ]);
+
+        $ddc = Department::firstOrCreate(['code' => 'DDC'], [
+            'name'        => 'Direction du Développement et de la Coopération',
+            'description' => 'Coopération internationale et déploiement territorial',
+            'parent_id'   => $sg->id,
+            'color'       => '#D97706',
+            'is_active'   => true,
+        ]);
+
+        $daf = Department::firstOrCreate(['code' => 'DAF'], [
+            'name'        => 'Direction Administrative et Financière',
+            'description' => 'Gestion administrative, financière et des ressources humaines',
+            'parent_id'   => $sg->id,
+            'color'       => '#DC2626',
+            'is_active'   => true,
+        ]);
+
+        // Niveau 3 : Divisions (2 par direction)
+        Department::firstOrCreate(['code' => 'DIV-ODSR'], [
+            'name'        => 'Observatoire de la sécurité routière',
+            'description' => 'Division',
+            'parent_id'   => $dep->id,
+            'color'       => '#0284C7',
+            'is_active'   => true,
+        ]);
+        Department::firstOrCreate(['code' => 'DIV-EP'], [
+            'name'        => 'Études et planification',
+            'description' => 'Division',
+            'parent_id'   => $dep->id,
+            'color'       => '#0284C7',
+            'is_active'   => true,
+        ]);
+
+        Department::firstOrCreate(['code' => 'DIV-DAHI'], [
+            'name'        => 'Audit et Homologation des Infrastructures',
+            'description' => 'Division',
+            'parent_id'   => $dac->id,
+            'color'       => '#7C3AED',
+            'is_active'   => true,
+        ]);
+        Department::firstOrCreate(['code' => 'DIV-CH'], [
+            'name'        => 'Conformité et Homologations',
+            'description' => 'Division',
+            'parent_id'   => $dac->id,
+            'color'       => '#7C3AED',
+            'is_active'   => true,
+        ]);
+
+        Department::firstOrCreate(['code' => 'DIV-CSEV'], [
+            'name'        => 'Communication de la Sensibilisation et de l\'événementiel',
+            'description' => 'Division',
+            'parent_id'   => $dpsrc->id,
+            'color'       => '#059669',
+            'is_active'   => true,
+        ]);
+        Department::firstOrCreate(['code' => 'DIV-EPR'], [
+            'name'        => 'Éducation et Prévention routière',
+            'description' => 'Division',
+            'parent_id'   => $dpsrc->id,
+            'color'       => '#059669',
+            'is_active'   => true,
+        ]);
+
+        Department::firstOrCreate(['code' => 'DIV-COOP'], [
+            'name'        => 'Coopération',
+            'description' => 'Division',
+            'parent_id'   => $ddc->id,
+            'color'       => '#D97706',
+            'is_active'   => true,
+        ]);
+        Department::firstOrCreate(['code' => 'DIV-DT'], [
+            'name'        => 'Déploiement territorial',
+            'description' => 'Division',
+            'parent_id'   => $ddc->id,
+            'color'       => '#D97706',
+            'is_active'   => true,
+        ]);
+
+        Department::firstOrCreate(['code' => 'DIV-FIN'], [
+            'name'        => 'Finances',
+            'description' => 'Division',
+            'parent_id'   => $daf->id,
+            'color'       => '#DC2626',
+            'is_active'   => true,
+        ]);
+        Department::firstOrCreate(['code' => 'DIV-RH'], [
+            'name'        => 'Ressources humaines',
+            'description' => 'Division',
+            'parent_id'   => $daf->id,
+            'color'       => '#DC2626',
+            'is_active'   => true,
+        ]);
+
+        // Map raccourci pour la suite du seeder
+        $depts = [
+            'CS'    => $cs,
+            'DG'    => $dg,
+            'SG'    => $sg,
+            'DEP'   => $dep,
+            'DAC'   => $dac,
+            'DPSRC' => $dpsrc,
+            'DDC'   => $ddc,
+            'DAF'   => $daf,
         ];
 
-        $depts = [];
-        foreach ($directions as $d) {
-            $depts[$d['code']] = Department::firstOrCreate(['code' => $d['code']], $d);
-        }
-
-        // ── Positions ───────────────────────────────────────────────────────
+        // ── Positions ANASER ─────────────────────────────────────────────────
         $positions = [
-            ['title' => 'Directeur Général',    'code' => 'DG01',  'department_id' => $depts['DG']->id,  'base_salary_min' => 5000, 'base_salary_max' => 8000],
-            ['title' => 'Responsable RH',        'code' => 'RH01',  'department_id' => $depts['RH']->id,  'base_salary_min' => 3500, 'base_salary_max' => 5000],
-            ['title' => 'Chargé RH',             'code' => 'RH02',  'department_id' => $depts['RH']->id,  'base_salary_min' => 2500, 'base_salary_max' => 3500],
-            ['title' => 'Responsable IT',        'code' => 'IT01',  'department_id' => $depts['IT']->id,  'base_salary_min' => 4000, 'base_salary_max' => 6000],
-            ['title' => 'Développeur Backend',   'code' => 'IT02',  'department_id' => $depts['IT']->id,  'base_salary_min' => 3000, 'base_salary_max' => 5000],
-            ['title' => 'Développeur Frontend',  'code' => 'IT03',  'department_id' => $depts['IT']->id,  'base_salary_min' => 3000, 'base_salary_max' => 5000],
-            ['title' => 'Directeur Financier',   'code' => 'FIN01', 'department_id' => $depts['FIN']->id, 'base_salary_min' => 4500, 'base_salary_max' => 7000],
-            ['title' => 'Comptable',             'code' => 'FIN02', 'department_id' => $depts['FIN']->id, 'base_salary_min' => 2800, 'base_salary_max' => 3800],
-            ['title' => 'Commercial Senior',     'code' => 'COM01', 'department_id' => $depts['COM']->id, 'base_salary_min' => 3000, 'base_salary_max' => 4500],
-            ['title' => 'Chargé Marketing',      'code' => 'COM02', 'department_id' => $depts['COM']->id, 'base_salary_min' => 2500, 'base_salary_max' => 3500],
+            ['title' => 'Directeur Général',                                   'code' => 'P-DG',    'department_id' => $dg->id,    'base_salary_min' => 700000, 'base_salary_max' => 1000000],
+            ['title' => 'Secrétaire Général',                                  'code' => 'P-SG',    'department_id' => $sg->id,    'base_salary_min' => 550000, 'base_salary_max' => 800000],
+            ['title' => 'Directeur des Études et la Planification',            'code' => 'P-DEP',   'department_id' => $dep->id,   'base_salary_min' => 450000, 'base_salary_max' => 650000],
+            ['title' => 'Directeur de l\'Audit et de la Conformité',           'code' => 'P-DAC',   'department_id' => $dac->id,   'base_salary_min' => 450000, 'base_salary_max' => 650000],
+            ['title' => 'Directeur de la Promotion Sécurité et Communication', 'code' => 'P-DPSRC', 'department_id' => $dpsrc->id, 'base_salary_min' => 450000, 'base_salary_max' => 650000],
+            ['title' => 'Directeur du Développement et de la Coopération',     'code' => 'P-DDC',   'department_id' => $ddc->id,   'base_salary_min' => 450000, 'base_salary_max' => 650000],
+            ['title' => 'Directeur Administratif et Financier',                'code' => 'P-DAF',   'department_id' => $daf->id,   'base_salary_min' => 450000, 'base_salary_max' => 650000],
+            ['title' => 'Chef de Division — Observatoire',                     'code' => 'P-ODSR',  'department_id' => $dep->id,   'base_salary_min' => 350000, 'base_salary_max' => 500000],
+            ['title' => 'Chef de Division — Études et Planification',          'code' => 'P-EP',    'department_id' => $dep->id,   'base_salary_min' => 350000, 'base_salary_max' => 500000],
+            ['title' => 'Chef de Division — Audit Infrastructures',            'code' => 'P-DAHI',  'department_id' => $dac->id,   'base_salary_min' => 350000, 'base_salary_max' => 500000],
+            ['title' => 'Chef de Division — Conformité',                       'code' => 'P-CH',    'department_id' => $dac->id,   'base_salary_min' => 350000, 'base_salary_max' => 500000],
+            ['title' => 'Chef de Division — Communication & Sensibilisation',  'code' => 'P-CSEV',  'department_id' => $dpsrc->id, 'base_salary_min' => 350000, 'base_salary_max' => 500000],
+            ['title' => 'Chef de Division — Éducation & Prévention',           'code' => 'P-EPR',   'department_id' => $dpsrc->id, 'base_salary_min' => 350000, 'base_salary_max' => 500000],
+            ['title' => 'Chargé de Coopération',                               'code' => 'P-COOP',  'department_id' => $ddc->id,   'base_salary_min' => 280000, 'base_salary_max' => 420000],
+            ['title' => 'Chargé de Déploiement territorial',                   'code' => 'P-DT',    'department_id' => $ddc->id,   'base_salary_min' => 280000, 'base_salary_max' => 420000],
+            ['title' => 'Responsable des Finances',                            'code' => 'P-FIN',   'department_id' => $daf->id,   'base_salary_min' => 320000, 'base_salary_max' => 480000],
+            ['title' => 'Responsable des Ressources Humaines',                 'code' => 'P-RH',    'department_id' => $daf->id,   'base_salary_min' => 320000, 'base_salary_max' => 480000],
+            ['title' => 'Chargé d\'Études',                                    'code' => 'P-CE',    'department_id' => $dep->id,   'base_salary_min' => 250000, 'base_salary_max' => 380000],
+            ['title' => 'Chargé de Communication',                             'code' => 'P-CC',    'department_id' => $dpsrc->id, 'base_salary_min' => 250000, 'base_salary_max' => 380000],
+            ['title' => 'Assistante de Direction',                             'code' => 'P-AD',    'department_id' => $dg->id,    'base_salary_min' => 200000, 'base_salary_max' => 300000],
         ];
 
         $pos = [];
@@ -128,18 +277,26 @@ class DatabaseSeeder extends Seeder
             LeaveType::firstOrCreate(['code' => $lt['code']], $lt);
         }
 
-        // ── Employees ───────────────────────────────────────────────────────
+        // ── Employees ANASER ────────────────────────────────────────────────
         $employeesData = [
-            ['first_name' => 'Marie',    'last_name' => 'Dupont',  'dept' => 'RH',  'pos' => 'RH01', 'salary' => 4200, 'email' => 'rh@niidpro.com',       'hire' => '2020-03-15'],
-            ['first_name' => 'Jean',     'last_name' => 'Martin',  'dept' => 'IT',  'pos' => 'IT01', 'salary' => 5500, 'email' => 'manager@niidpro.com',   'hire' => '2019-06-01'],
-            ['first_name' => 'Sophie',   'last_name' => 'Bernard', 'dept' => 'IT',  'pos' => 'IT02', 'salary' => 4000, 'hire' => '2021-09-01'],
-            ['first_name' => 'Pierre',   'last_name' => 'Moreau',  'dept' => 'IT',  'pos' => 'IT03', 'salary' => 3800, 'hire' => '2022-01-15'],
-            ['first_name' => 'Isabelle', 'last_name' => 'Laurent', 'dept' => 'FIN', 'pos' => 'FIN01','salary' => 6000, 'hire' => '2018-04-10'],
-            ['first_name' => 'Thomas',   'last_name' => 'Simon',   'dept' => 'FIN', 'pos' => 'FIN02','salary' => 3200, 'hire' => '2022-07-01'],
-            ['first_name' => 'Camille',  'last_name' => 'Michel',  'dept' => 'COM', 'pos' => 'COM01','salary' => 3800, 'hire' => '2021-03-20'],
-            ['first_name' => 'Antoine',  'last_name' => 'Garcia',  'dept' => 'COM', 'pos' => 'COM02','salary' => 2900, 'hire' => '2023-02-01'],
-            ['first_name' => 'Lucie',    'last_name' => 'Petit',   'dept' => 'RH',  'pos' => 'RH02', 'salary' => 2800, 'hire' => '2023-05-15'],
-            ['first_name' => 'Nicolas',  'last_name' => 'Roux',    'dept' => 'IT',  'pos' => 'IT02', 'salary' => 4200, 'hire' => '2020-11-01'],
+            ['first_name' => 'Moussa',    'last_name' => 'Diallo',    'dept' => 'DG',    'pos' => 'P-DG',    'salary' => 900000, 'email' => 'manager@niidpro.com',  'hire' => '2018-01-15'],
+            ['first_name' => 'Aminata',   'last_name' => 'Ndiaye',    'dept' => 'DG',    'pos' => 'P-AD',    'salary' => 250000, 'email' => 'rh@niidpro.com',        'hire' => '2019-03-01'],
+            ['first_name' => 'Ibrahima',  'last_name' => 'Sow',       'dept' => 'SG',    'pos' => 'P-SG',    'salary' => 700000, 'hire' => '2018-06-01'],
+            ['first_name' => 'Fatou',     'last_name' => 'Diop',      'dept' => 'DEP',   'pos' => 'P-DEP',   'salary' => 580000, 'hire' => '2019-09-15'],
+            ['first_name' => 'Cheikh',    'last_name' => 'Fall',      'dept' => 'DEP',   'pos' => 'P-CE',    'salary' => 320000, 'hire' => '2021-02-01'],
+            ['first_name' => 'Marième',   'last_name' => 'Ba',        'dept' => 'DAC',   'pos' => 'P-DAC',   'salary' => 580000, 'hire' => '2019-11-10'],
+            ['first_name' => 'Ousmane',   'last_name' => 'Sarr',      'dept' => 'DAC',   'pos' => 'P-DAHI',  'salary' => 420000, 'hire' => '2020-04-01'],
+            ['first_name' => 'Rokhaya',   'last_name' => 'Mbaye',     'dept' => 'DPSRC', 'pos' => 'P-DPSRC', 'salary' => 580000, 'hire' => '2020-01-15'],
+            ['first_name' => 'Pape',      'last_name' => 'Niang',     'dept' => 'DPSRC', 'pos' => 'P-CC',    'salary' => 310000, 'hire' => '2022-03-01'],
+            ['first_name' => 'Ndèye',     'last_name' => 'Gueye',     'dept' => 'DDC',   'pos' => 'P-DDC',   'salary' => 580000, 'hire' => '2019-07-01'],
+            ['first_name' => 'Alioune',   'last_name' => 'Diagne',    'dept' => 'DDC',   'pos' => 'P-COOP',  'salary' => 360000, 'hire' => '2021-06-15'],
+            ['first_name' => 'Seynabou',  'last_name' => 'Thiaw',     'dept' => 'DAF',   'pos' => 'P-DAF',   'salary' => 580000, 'hire' => '2018-09-01'],
+            ['first_name' => 'Modou',     'last_name' => 'Faye',      'dept' => 'DAF',   'pos' => 'P-FIN',   'salary' => 430000, 'hire' => '2020-06-01'],
+            ['first_name' => 'Adja',      'last_name' => 'Konaté',    'dept' => 'DAF',   'pos' => 'P-RH',    'salary' => 430000, 'hire' => '2021-01-10'],
+            ['first_name' => 'Serigne',   'last_name' => 'Diallo',    'dept' => 'DEP',   'pos' => 'P-ODSR',  'salary' => 390000, 'hire' => '2022-05-01'],
+            ['first_name' => 'Khady',     'last_name' => 'Sène',      'dept' => 'DPSRC', 'pos' => 'P-EPR',   'salary' => 390000, 'hire' => '2022-09-01'],
+            ['first_name' => 'Babacar',   'last_name' => 'Touré',     'dept' => 'DAC',   'pos' => 'P-CH',    'salary' => 390000, 'hire' => '2023-01-15'],
+            ['first_name' => 'Aïssatou',  'last_name' => 'Cissé',     'dept' => 'DDC',   'pos' => 'P-DT',    'salary' => 360000, 'hire' => '2023-04-01'],
         ];
 
         $createdEmployees = [];
@@ -183,7 +340,7 @@ class DatabaseSeeder extends Seeder
 
         // ── Today's Attendances ─────────────────────────────────────────────
         $today    = Carbon::today();
-        $statuses = ['present', 'present', 'present', 'present', 'present', 'present', 'late', 'present', 'on_leave', 'absent'];
+        $statuses = ['present', 'present', 'present', 'present', 'late', 'present', 'present', 'present', 'present', 'present', 'late', 'present', 'present', 'on_leave', 'present', 'present', 'absent', 'present'];
         foreach ($createdEmployees as $i => $emp) {
             Attendance::firstOrCreate(['employee_id' => $emp->id, 'date' => $today->toDateString()], [
                 'check_in'       => !in_array($statuses[$i], ['absent', 'on_leave'])
@@ -219,6 +376,9 @@ class DatabaseSeeder extends Seeder
             'status'     => 'pending',
             'reason'     => 'Congé été',
         ]);
+
+        // ── Document Templates ──────────────────────────────────────────────
+        $this->call(DocumentTemplateSeeder::class);
 
         $this->command->info('NiidPro database seeded successfully!');
         $this->command->table(

@@ -1,10 +1,12 @@
 <?php
 
 use App\Http\Controllers\Api\AttendanceController;
+use App\Http\Controllers\Api\AvailabilityController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\ContractController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\DepartmentController;
+use App\Http\Controllers\Api\DocumentController;
 use App\Http\Controllers\Api\EmployeeController;
 use App\Http\Controllers\Api\LeaveController;
 use App\Http\Controllers\Api\SettingsController;
@@ -59,4 +61,21 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/leaves/{leave}/approve', [LeaveController::class, 'approve']);
     Route::post('/leaves/{leave}/reject', [LeaveController::class, 'reject']);
     Route::apiResource('leaves', LeaveController::class);
+
+    // Availabilities
+    Route::patch('/availabilities/{availability}/approve', [AvailabilityController::class, 'approve']);
+    Route::apiResource('availabilities', AvailabilityController::class);
+
+    // Documents de service
+    Route::prefix('documents')->group(function () {
+        Route::get('/templates',               [DocumentController::class, 'templates']);
+        Route::post('/templates',              [DocumentController::class, 'storeTemplate']);
+        Route::get('/templates/{template}',    [DocumentController::class, 'showTemplate']);
+        Route::put('/templates/{template}',    [DocumentController::class, 'updateTemplate']);
+        Route::delete('/templates/{template}', [DocumentController::class, 'destroyTemplate']);
+        Route::post('/generate',               [DocumentController::class, 'generate']);
+        Route::get('/generated',               [DocumentController::class, 'generated']);
+        Route::get('/generated/{document}',    [DocumentController::class, 'showGenerated']);
+        Route::delete('/generated/{document}', [DocumentController::class, 'destroyGenerated']);
+    });
 });

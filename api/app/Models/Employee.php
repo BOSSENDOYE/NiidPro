@@ -97,4 +97,9 @@ class Employee extends Model
     {
         return $this->hasMany(Payslip::class);
     }
+
+    public function availabilities()
+    {
+        return $this->hasMany(Availability::class);
+    }
 }

@@ -239,25 +239,27 @@ const MODE_CONFIG: Record<ModalMode, { label: string; color: string; bg: string;
   view:   { label: 'Consultation',     color: '#059669', bg: 'rgba(5,150,105,0.15)',   icon: <RemoveRedEye sx={{ fontSize: 22 }} /> },
 };
 
-/* Construit les defaultValues du formulaire depuis un Employee existant */
+/* Construit les valeurs du formulaire depuis un Employee existant */
 function empToForm(e: Employee): FormData {
   return {
-    first_name:         e.first_name        ?? '',
-    last_name:          e.last_name         ?? '',
-    professional_email: e.professional_email ?? '',
-    phone:              e.phone             ?? '',
-    hire_date:          (e.hire_date        ?? '').slice(0, 10),
-    birth_date:         '',
-    nationality:        '',
-    gender:             '',
-    base_salary:        Number(e.base_salary)      || 0,
-    department_id:      Number(e.department_id)    || 0,
-    status:             (e.status as FormData['status']) ?? 'active',
+    first_name:         e.first_name                                   ?? '',
+    last_name:          e.last_name                                    ?? '',
+    professional_email: e.professional_email                           ?? '',
+    phone:              e.phone_personal ?? e.phone_professional ?? e.phone ?? '',
+    hire_date:          (e.hire_date ?? '').slice(0, 10),
+    birth_date:         (e.birth_date ?? '').slice(0, 10),
+    nationality:        e.nationality   ?? '',
+    gender:             e.gender        ?? '',
+    base_salary:        Number(e.base_salary)       || 0,
+    department_id:      Number(e.department_id)     || 0,
+    status:             (['active','inactive','suspended'].includes(e.status)
+                          ? e.status
+                          : 'active') as FormData['status'],
     annual_leave_days:  Number(e.annual_leave_days) || 30,
-    employee_number:    e.employee_number   ?? '',
-    city:               e.city             ?? '',
-    country:            e.country          ?? '',
-    birth_place:        '',
+    employee_number:    e.employee_number ?? '',
+    city:               e.city           ?? '',
+    country:            e.country        ?? '',
+    birth_place:        e.birth_place    ?? '',
   };
 }
 
@@ -295,12 +297,38 @@ export default function EmployeeCreateModal({ open, onClose, mode = 'create', em
     }),
   });
 
-  /* ── Formulaire : defaultValues calculés immédiatement depuis employee ── */
+  /* ── Formulaire ── */
+  /*
+   * `values` (option react-hook-form ≥ v7.28) synchronise les valeurs à chaque rendu.
+   * Comme le parent force key={modalKey} à chaque ouverture, le composant est
+   * toujours remonté proprement → values est appliqué dès le premier rendu,
+   * sans conflit avec zodResolver (le resolver ne valide qu'au submit).
+   */
+  const formValues: FormData = employee && mode !== 'create'
+    ? empToForm(employee)
+    : { status: 'active', annual_leave_days: 30, base_salary: 0, department_id: 0,
+        first_name: '', last_name: '', professional_email: '', phone: '',
+        hire_date: '', birth_date: '', nationality: '', gender: '',
+        employee_number: '', city: '', country: '', birth_place: '' };
+
   const { register, handleSubmit, control, watch, reset, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema),
-    defaultValues: employee && mode !== 'create' ? empToForm(employee) : { status: 'active', annual_leave_days: 30, base_salary: 0 },
+    values: formValues,
     mode: 'onSubmit',
   });
+
+  /*
+   * MUI TextField forwardRef pointe sur la div racine, PAS sur le <input> natif.
+   * RHF fait element.value = '...' pour remplir les champs : ça ne fonctionne
+   * que sur un vrai <input>. On extrait donc le ref et on le passe via inputRef.
+   */
+  const ri = (
+    name: Parameters<typeof register>[0],
+    opts?: Parameters<typeof register>[1],
+  ) => {
+    const { ref, ...rest } = register(name, opts as Parameters<typeof register>[1]);
+    return { ...rest, inputRef: ref };
+  };
 
   const uploadPhoto = async (employeeId: number) => {
     if (!photoFile) return;
@@ -454,15 +482,15 @@ export default function EmployeeCreateModal({ open, onClose, mode = 'create', em
                     </Grid>
                     <Grid item xs={4} sm={2}>
                       <Typography variant="caption" sx={labelSx}>Matricule</Typography>
-                      <SF {...register('employee_number')} placeholder="EMP-001" disabled={isView} />
+                      <SF {...ri('employee_number')} placeholder="EMP-001" disabled={isView} />
                     </Grid>
                     <Grid item xs={4} sm={2}>
                       <Typography variant="caption" sx={labelSx}>Prénom *</Typography>
-                      <SF {...register('first_name')} error={!!errors.first_name} helperText={errors.first_name?.message} placeholder="Prénom" disabled={isView} />
+                      <SF {...ri('first_name')} error={!!errors.first_name} helperText={errors.first_name?.message} placeholder="Prénom" disabled={isView} />
                     </Grid>
                     <Grid item xs={6} sm={2}>
                       <Typography variant="caption" sx={labelSx}>Nom *</Typography>
-                      <SF {...register('last_name')} error={!!errors.last_name} helperText={errors.last_name?.message} placeholder="Nom" disabled={isView} />
+                      <SF {...ri('last_name')} error={!!errors.last_name} helperText={errors.last_name?.message} placeholder="Nom" disabled={isView} />
                     </Grid>
                     <Grid item xs={6} sm={2}>
                       <Typography variant="caption" sx={labelSx}>Sexe</Typography>
@@ -493,7 +521,7 @@ export default function EmployeeCreateModal({ open, onClose, mode = 'create', em
                   <Grid container spacing={1.25} mb={1.25}>
                     <Grid item xs={6} sm={2.5}>
                       <Typography variant="caption" sx={labelSx}>Date naissance</Typography>
-                      <SF {...register('birth_date')} type="date" InputLabelProps={{ shrink: true }} disabled={isView} />
+                      <SF {...ri('birth_date')} type="date" InputLabelProps={{ shrink: true }} disabled={isView} />
                     </Grid>
                     <Grid item xs={3} sm={1}>
                       <Typography variant="caption" sx={labelSx}>Âge</Typography>
@@ -502,15 +530,15 @@ export default function EmployeeCreateModal({ open, onClose, mode = 'create', em
                     </Grid>
                     <Grid item xs={9} sm={2.5}>
                       <Typography variant="caption" sx={labelSx}>Lieu naissance</Typography>
-                      <SF {...register('birth_place')} placeholder="Dakar" disabled={isView} />
+                      <SF {...ri('birth_place')} placeholder="Dakar" disabled={isView} />
                     </Grid>
                     <Grid item xs={6} sm={3}>
                       <Typography variant="caption" sx={labelSx}>Nationalité</Typography>
-                      <SF {...register('nationality')} placeholder="Sénégalaise" disabled={isView} />
+                      <SF {...ri('nationality')} placeholder="Sénégalaise" disabled={isView} />
                     </Grid>
                     <Grid item xs={6} sm={3}>
                       <Typography variant="caption" sx={labelSx}>Email professionnel *</Typography>
-                      <SF {...register('professional_email')} type="email" placeholder="prenom.nom@org.sn"
+                      <SF {...ri('professional_email')} type="email" placeholder="prenom.nom@org.sn"
                         error={!!errors.professional_email} helperText={errors.professional_email?.message} disabled={isView} />
                     </Grid>
                   </Grid>
@@ -612,11 +640,11 @@ export default function EmployeeCreateModal({ open, onClose, mode = 'create', em
                 <Grid container spacing={2}>
                   <Grid item xs={12}>
                     <Grid container spacing={1.25}>
-                      <Grid item xs={6} sm={2.5}><Typography variant="caption" sx={labelSx}>Téléphone fixe</Typography><SF {...register('phone')} placeholder="+221 33 000 00 00" disabled={isView} /></Grid>
+                      <Grid item xs={6} sm={2.5}><Typography variant="caption" sx={labelSx}>Téléphone fixe</Typography><SF {...ri('phone')} placeholder="+221 33 000 00 00" disabled={isView} /></Grid>
                       <Grid item xs={3} sm={1.5}><Typography variant="caption" sx={labelSx}>CP</Typography><SF placeholder="10000" disabled={isView} /></Grid>
                       <Grid item xs={3} sm={2}><Typography variant="caption" sx={labelSx}>Cellulaire</Typography><SF placeholder="+221 77 …" disabled={isView} /></Grid>
-                      <Grid item xs={12} sm={3}><Typography variant="caption" sx={labelSx}>Adresse</Typography><SF {...register('city')} placeholder="Rue, Dakar" disabled={isView} /></Grid>
-                      <Grid item xs={12} sm={3}><Typography variant="caption" sx={labelSx}>Pays</Typography><SF {...register('country')} placeholder="Sénégal" disabled={isView} /></Grid>
+                      <Grid item xs={12} sm={3}><Typography variant="caption" sx={labelSx}>Adresse</Typography><SF {...ri('city')} placeholder="Rue, Dakar" disabled={isView} /></Grid>
+                      <Grid item xs={12} sm={3}><Typography variant="caption" sx={labelSx}>Pays</Typography><SF {...ri('country')} placeholder="Sénégal" disabled={isView} /></Grid>
                     </Grid>
                   </Grid>
                   <Grid item xs={12} md={6}>
@@ -636,7 +664,7 @@ export default function EmployeeCreateModal({ open, onClose, mode = 'create', em
                     <SectionBox title="Contrat" color="#2563EB" icon={<AccountBalance />}>
                       <Grid container spacing={1.25}>
                         <Grid item xs={6}><Typography variant="caption" sx={labelSx}>Date début *</Typography>
-                          <SF {...register('hire_date')} type="date" InputLabelProps={{ shrink: true }} error={!!errors.hire_date} helperText={errors.hire_date?.message} disabled={isView} />
+                          <SF {...ri('hire_date')} type="date" InputLabelProps={{ shrink: true }} error={!!errors.hire_date} helperText={errors.hire_date?.message} disabled={isView} />
                         </Grid>
                         <Grid item xs={6}><Typography variant="caption" sx={labelSx}>Date fin</Typography><SF type="date" InputLabelProps={{ shrink: true }} disabled={isView} /></Grid>
                         <Grid item xs={4}><Typography variant="caption" sx={labelSx}>Âge retraite</Typography><SF type="number" disabled={isView} /></Grid>
@@ -645,12 +673,12 @@ export default function EmployeeCreateModal({ open, onClose, mode = 'create', em
                         <Grid item xs={6}><Typography variant="caption" sx={labelSx}>Ancienneté</Typography><SF disabled defaultValue={0} sx={{ bgcolor: '#F1F5F9' }} /></Grid>
                         <Grid item xs={6}>
                           <Typography variant="caption" sx={labelSx}>Salaire de base *</Typography>
-                          <SF {...register('base_salary', { valueAsNumber: true })} type="number" error={!!errors.base_salary} helperText={errors.base_salary?.message} disabled={isView}
+                          <SF {...ri('base_salary', { valueAsNumber: true })} type="number" error={!!errors.base_salary} helperText={errors.base_salary?.message} disabled={isView}
                             InputProps={{ endAdornment: <InputAdornment position="end"><Typography variant="caption" sx={{ color: '#94A3B8', fontSize: 10 }}>FCFA</Typography></InputAdornment> }} />
                         </Grid>
                         <Grid item xs={6}>
                           <Typography variant="caption" sx={labelSx}>Jours congé / an</Typography>
-                          <SF {...register('annual_leave_days', { valueAsNumber: true })} type="number" disabled={isView}
+                          <SF {...ri('annual_leave_days', { valueAsNumber: true })} type="number" disabled={isView}
                             InputProps={{ endAdornment: <InputAdornment position="end"><Typography variant="caption" sx={{ color: '#94A3B8', fontSize: 10 }}>j</Typography></InputAdornment> }} />
                         </Grid>
                       </Grid>

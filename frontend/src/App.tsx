@@ -26,6 +26,7 @@ import ContractsPage from './pages/contracts/ContractsPage';
 // Pointage
 import AttendancesPage from './pages/attendances/AttendancesPage';
 import AttendanceVisualPage from './pages/attendances/AttendanceVisualPage';
+import AttendanceScannerPage from './pages/attendances/AttendanceScannerPage';
 
 // Congés
 import LeavesPage from './pages/leaves/LeavesPage';
@@ -47,6 +48,12 @@ import SchemaPage from './pages/schema/SchemaPage';
 
 // Portail agent
 import AgentPortalPage from './pages/agent-portal/AgentPortalPage';
+
+// Organigramme
+import OrganigrammePage from './pages/organigramme/OrganigrammePage';
+
+// Documents de service
+import DocumentsPage from './pages/documents/DocumentsPage';
 
 // Profil
 import ProfilePage from './pages/profile/ProfilePage';
@@ -91,15 +98,20 @@ export default function App() {
 
               <Route path="attendances" element={<AttendancesPage />} />
               <Route path="attendance-visual" element={<AttendanceVisualPage />} />
+              <Route path="attendance-scanner" element={<AttendanceScannerPage />} />
 
               <Route path="leaves" element={<LeavesPage />} />
               <Route path="justifications" element={<JustificationsPage />} />
 
               {/* Organisation */}
+              <Route path="organigramme" element={<OrganigrammePage />} />
               <Route path="departments" element={<DepartmentsPage />} />
               <Route path="tasks" element={<TasksPage />} />
               <Route path="payroll" element={<PayrollPage />} />
               <Route path="social-report" element={<SocialReportPage />} />
+
+              {/* Documents de service */}
+              <Route path="documents" element={<DocumentsPage />} />
 
               {/* Configuration */}
               <Route path="schema" element={<SchemaPage />} />

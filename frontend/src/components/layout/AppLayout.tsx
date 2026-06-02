@@ -3,14 +3,13 @@ import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import {
   Box, Drawer, AppBar, Toolbar, Typography, IconButton, List, ListItemButton,
   ListItemIcon, ListItemText, Avatar, Menu, MenuItem, Divider, Tooltip, Badge,
-  Chip,
 } from '@mui/material';
 import {
   ChevronLeft, ChevronRight, Logout, Person, Settings,
   NotificationsNone, Dashboard, Groups, Description, AccessTime,
   CameraAlt, BeachAccess, AssignmentLate, AccountTree, CheckBox,
   Payments, BarChart, Storage, PhoneAndroid, KeyboardArrowDown,
-  Circle,
+  Article, QrCodeScanner,
 } from '@mui/icons-material';
 import { useAuthStore } from '../../store/auth.store';
 import { authApi } from '../../api/auth';
@@ -34,27 +33,39 @@ const NAV: NavSection[] = [
   {
     label: 'VUE D\'ENSEMBLE',
     items: [
-      { path: '/dashboard',         label: 'Tableau de bord',   icon: <Dashboard />,      color: '#60A5FA' },
+      { path: '/dashboard', label: 'Tableau de bord', icon: <Dashboard />, color: '#60A5FA' },
     ],
   },
   {
     label: 'GESTION RH',
     items: [
-      { path: '/employees',         label: 'Agents',            icon: <Groups />,         color: '#F97316' },
-      { path: '/contracts',         label: 'Contrats',          icon: <Description />,    color: '#A78BFA', badge: 3 },
-      { path: '/attendances',       label: 'Pointage',          icon: <AccessTime />,     color: '#34D399' },
-      { path: '/attendance-visual', label: 'Pointage visuel',   icon: <CameraAlt />,      color: '#67E8F9' },
-      { path: '/leaves',            label: 'Congés & Absences', icon: <BeachAccess />,    color: '#FCD34D', badge: 4 },
-      { path: '/justifications',    label: 'Justifications',    icon: <AssignmentLate />, color: '#F87171', badge: 2 },
+      { path: '/employees',     label: 'Agents',            icon: <Groups />,         color: '#F97316' },
+      { path: '/contracts',     label: 'Contrats',          icon: <Description />,    color: '#A78BFA', badge: 3 },
+      { path: '/leaves',        label: 'Congés & Absences', icon: <BeachAccess />,    color: '#FCD34D', badge: 4 },
+      { path: '/justifications',label: 'Justifications',    icon: <AssignmentLate />, color: '#F87171', badge: 2 },
+    ],
+  },
+  {
+    label: 'GESTION PRÉSENCES',
+    items: [
+      { path: '/attendances',        label: 'Présences du jour',  icon: <AccessTime />,    color: '#34D399' },
+      { path: '/attendance-scanner', label: 'Terminal QR',        icon: <QrCodeScanner />, color: '#7C3AED' },
+      { path: '/attendance-visual',  label: 'Calendrier mensuel', icon: <CameraAlt />,     color: '#67E8F9' },
     ],
   },
   {
     label: 'ORGANISATION',
     items: [
-      { path: '/departments',  label: 'Organigramme',   icon: <AccountTree />, color: '#818CF8' },
-      { path: '/tasks',        label: 'Tâches',         icon: <CheckBox />,    color: '#4ADE80' },
-      { path: '/payroll',      label: 'Paie & Bulletins', icon: <Payments />, color: '#FBBF24' },
-      { path: '/social-report', label: 'Bilan social',  icon: <BarChart />,   color: '#38BDF8' },
+      { path: '/departments',   label: 'Directions & Services', icon: <AccountTree />, color: '#818CF8' },
+      { path: '/tasks',         label: 'Tâches',                icon: <CheckBox />,    color: '#4ADE80' },
+      { path: '/payroll',       label: 'Paie & Bulletins',      icon: <Payments />,    color: '#FBBF24' },
+      { path: '/social-report', label: 'Bilan social',          icon: <BarChart />,    color: '#38BDF8' },
+    ],
+  },
+  {
+    label: 'DOCUMENTS',
+    items: [
+      { path: '/documents', label: 'Documents de Service', icon: <Article />, color: '#0EA5E9' },
     ],
   },
   {
@@ -76,14 +87,17 @@ const PAGE_LABELS: Record<string, string> = {
   '/dashboard':         'Tableau de bord',
   '/employees':         'Gestion des Agents',
   '/contracts':         'Contrats & Alertes',
-  '/attendances':       'Pointage',
-  '/attendance-visual': 'Pointage Visuel',
+  '/attendances':        'Pointage — Tableau de bord',
+  '/attendance-scanner': 'Terminal de Badgeage QR',
+  '/attendance-visual':  'Pointage — Calendrier',
   '/leaves':            'Congés & Absences',
   '/justifications':    'Justifications',
-  '/departments':       'Organigramme',
+  '/organigramme':      'Organigramme ANASER',
+  '/departments':       'Directions',
   '/tasks':             'Gestion des Tâches',
   '/payroll':           'Paie & Bulletins',
   '/social-report':     'Bilan Social',
+  '/documents':         'Documents de Service',
   '/schema':            'Schéma SQL',
   '/agent-portal':      'Portail Agent',
   '/profile':           'Mon Profil',
@@ -365,92 +379,226 @@ export default function AppLayout() {
           position="static"
           elevation={0}
           sx={{
-            bgcolor: '#FFFFFF',
-            borderBottom: '1px solid #E8EDF2',
+            background: 'linear-gradient(180deg,#FFFFFF 0%,#F8FAFD 100%)',
+            borderBottom: '1px solid #E2E8F0',
             color: 'text.primary',
             backgroundImage: 'none',
+            boxShadow: '0 1px 12px rgba(15,23,42,0.06)',
           }}
         >
-          <Toolbar sx={{ minHeight: '58px !important', px: { xs: 2, md: 3 }, gap: 2 }}>
-            {/* Page title */}
-            <Box sx={{ flexGrow: 1 }}>
-              <Typography
-                variant="h6"
-                sx={{ fontWeight: 700, fontSize: 16, color: '#0F172A', letterSpacing: '-0.3px', lineHeight: 1.2 }}
-              >
-                {currentLabel}
-              </Typography>
-              <Typography variant="caption" sx={{ color: '#94A3B8', fontSize: 11 }}>
-                NiidPro · Ressources Humaines
-              </Typography>
-            </Box>
+          <Toolbar sx={{ minHeight: '66px !important', px: { xs: 2, md: 3 }, gap: 2 }}>
 
-            {/* Notification */}
-            <Tooltip title="Notifications">
-              <IconButton size="small"
-                sx={{
-                  color: '#64748B', bgcolor: '#F8FAFC',
-                  border: '1px solid #E2E8F0', borderRadius: '9px',
-                  width: 36, height: 36,
-                  '&:hover': { bgcolor: '#F1F5F9', color: '#0F172A' },
-                  transition: 'all 0.15s',
-                }}
-              >
-                <Badge
-                  badgeContent={totalBadges}
-                  sx={{ '& .MuiBadge-badge': { bgcolor: '#EF4444', color: '#fff', fontSize: 9, minWidth: 15, height: 15, padding: '0 3px' } }}
-                >
-                  <NotificationsNone sx={{ fontSize: 19 }} />
-                </Badge>
-              </IconButton>
-            </Tooltip>
+            {/* ════ GAUCHE : Badge ANASER + Fil d'Ariane + Titre ════ */}
+            <Box sx={{ flexGrow: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 1.75 }}>
 
-            {/* Status dot */}
-            <Tooltip title="Système opérationnel">
-              <Chip
-                icon={<Circle sx={{ fontSize: '8px !important', color: '#10B981 !important' }} />}
-                label="En ligne"
-                size="small"
-                sx={{
-                  bgcolor: 'rgba(16,185,129,0.08)', color: '#059669',
-                  border: '1px solid rgba(16,185,129,0.2)',
-                  fontSize: 11, fontWeight: 600, height: 26,
-                  display: { xs: 'none', sm: 'flex' },
-                }}
-              />
-            </Tooltip>
-
-            <Box sx={{ width: 1, height: 22, bgcolor: '#E8EDF2' }} />
-
-            {/* User profile */}
-            <Box
-              onClick={(e) => setAnchorEl(e.currentTarget)}
-              sx={{
-                display: 'flex', alignItems: 'center', gap: 1.25,
-                px: 1.25, py: 0.625, borderRadius: '10px', cursor: 'pointer',
-                border: '1px solid #E8EDF2',
-                '&:hover': { bgcolor: '#F8FAFC', borderColor: '#CBD5E1' },
-                transition: 'all 0.15s',
-              }}
-            >
-              <Avatar sx={{
-                width: 30, height: 30,
-                background: 'linear-gradient(135deg, #2563EB, #7C3AED)',
-                fontSize: 11, fontWeight: 800,
-                boxShadow: '0 2px 6px rgba(37,99,235,0.3)',
+              {/* Badge ANASER gradient */}
+              <Box sx={{
+                display: { xs: 'none', md: 'flex' },
+                alignItems: 'center', gap: 0.75, flexShrink: 0,
+                px: 1.5, py: 0.65,
+                borderRadius: '10px',
+                background: 'linear-gradient(135deg,#1E40AF 0%,#4F46E5 100%)',
+                boxShadow: '0 4px 14px rgba(37,99,235,0.30), inset 0 1px 0 rgba(255,255,255,0.15)',
               }}>
-                {userInitials}
-              </Avatar>
-              <Box sx={{ display: { xs: 'none', sm: 'block' } }}>
-                <Typography sx={{ fontSize: 12.5, fontWeight: 700, lineHeight: 1.2, color: '#0F172A' }}>
-                  {user?.name}
-                </Typography>
-                <Typography sx={{ fontSize: 10.5, color: '#64748B', lineHeight: 1.2 }}>
-                  {userRole}
+                {/* Petite icône route stylisée */}
+                <Box sx={{
+                  width: 16, height: 16, borderRadius: '4px', flexShrink: 0,
+                  background: 'rgba(255,255,255,0.25)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>
+                  <Box sx={{ width: 8, height: 2, bgcolor: '#fff', borderRadius: 1 }} />
+                </Box>
+                <Typography sx={{
+                  fontSize: 13, fontWeight: 900, color: '#fff',
+                  letterSpacing: '0.05em', fontStyle: 'italic', lineHeight: 1,
+                }}>
+                  ANASER
                 </Typography>
               </Box>
-              <KeyboardArrowDown sx={{ fontSize: 15, color: '#94A3B8', display: { xs: 'none', sm: 'block' } }} />
+
+              {/* Séparateur + fil d'ariane + titre */}
+              <Box sx={{ minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                {/* Fil d'ariane */}
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.15 }}>
+                  <Typography sx={{ fontSize: 10, color: '#94A3B8', fontWeight: 600, letterSpacing: '0.04em', whiteSpace: 'nowrap' }}>
+                    Agence Nationale de Sécurité Routière
+                  </Typography>
+                  <Typography sx={{ fontSize: 10, color: '#CBD5E1', mx: 0.25 }}>›</Typography>
+                  <Typography sx={{ fontSize: 10, color: '#60A5FA', fontWeight: 700, letterSpacing: '0.04em', whiteSpace: 'nowrap' }}>
+                    Gestion RH
+                  </Typography>
+                </Box>
+                {/* Titre de la page */}
+                <Typography sx={{
+                  fontWeight: 800, fontSize: 15.5, color: '#0F172A',
+                  letterSpacing: '-0.3px', lineHeight: 1.2,
+                  whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                }}>
+                  {currentLabel}
+                </Typography>
+              </Box>
             </Box>
+
+            {/* ════ CENTRE-DROITE : Date ════ */}
+            <Box sx={{
+              display: { xs: 'none', lg: 'flex' },
+              alignItems: 'center', gap: 0.75,
+              px: 1.5, py: 0.6,
+              borderRadius: '9px',
+              bgcolor: '#F1F5F9',
+              border: '1px solid #E2E8F0',
+            }}>
+              <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: '#3B82F6', flexShrink: 0 }} />
+              <Typography sx={{ fontSize: 11.5, color: '#475569', fontWeight: 600, whiteSpace: 'nowrap', letterSpacing: '0.01em' }}>
+                {new Date().toLocaleDateString('fr-FR', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' })}
+              </Typography>
+            </Box>
+
+            {/* ════ Système en ligne ════ */}
+            <Tooltip title="Système opérationnel" arrow>
+              <Box sx={{
+                display: { xs: 'none', sm: 'flex' }, alignItems: 'center', gap: 0.7,
+                px: 1.25, py: 0.55,
+                borderRadius: '9px',
+                bgcolor: 'rgba(16,185,129,0.08)',
+                border: '1px solid rgba(16,185,129,0.20)',
+                cursor: 'default',
+              }}>
+                <Box sx={{
+                  width: 7, height: 7, borderRadius: '50%', bgcolor: '#10B981',
+                  boxShadow: '0 0 0 3px rgba(16,185,129,0.25)',
+                  animation: 'blink 2.5s ease-in-out infinite',
+                  '@keyframes blink': {
+                    '0%,100%': { boxShadow: '0 0 0 3px rgba(16,185,129,0.25)' },
+                    '50%':     { boxShadow: '0 0 0 5px rgba(16,185,129,0.08)' },
+                  },
+                }} />
+                <Typography sx={{ fontSize: 11.5, color: '#059669', fontWeight: 700, letterSpacing: '0.01em' }}>
+                  En ligne
+                </Typography>
+              </Box>
+            </Tooltip>
+
+            {/* ════ Séparateur vertical ════ */}
+            <Box sx={{ width: 1, height: 32, bgcolor: '#E2E8F0', mx: 0.25 }} />
+
+            {/* ════ DROITE : Cloche + Profil (groupés) ════ */}
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+
+              {/* ── Cloche ── */}
+              <Tooltip title={totalBadges > 0 ? `${totalBadges} alertes en attente` : 'Aucune notification'} arrow>
+                <IconButton
+                  size="small"
+                  sx={{
+                    width: 40, height: 40, borderRadius: '11px',
+                    color:   totalBadges > 0 ? '#2563EB' : '#64748B',
+                    bgcolor: totalBadges > 0 ? '#EFF6FF'  : '#F1F5F9',
+                    border: `1.5px solid ${totalBadges > 0 ? '#BFDBFE' : '#E2E8F0'}`,
+                    boxShadow: totalBadges > 0 ? '0 2px 10px rgba(37,99,235,0.15)' : 'none',
+                    '&:hover': {
+                      bgcolor: totalBadges > 0 ? '#DBEAFE' : '#E2E8F0',
+                      transform: 'translateY(-1px)',
+                      boxShadow: totalBadges > 0 ? '0 4px 16px rgba(37,99,235,0.22)' : '0 2px 8px rgba(0,0,0,0.08)',
+                    },
+                    transition: 'all 0.18s cubic-bezier(.4,0,.2,1)',
+                    animation: totalBadges > 0 ? 'bellShake 4s ease-in-out infinite' : 'none',
+                    '@keyframes bellShake': {
+                      '0%,90%,100%': { transform: 'rotate(0deg)' },
+                      '92%':         { transform: 'rotate(-12deg)' },
+                      '94%':         { transform: 'rotate(12deg)' },
+                      '96%':         { transform: 'rotate(-8deg)' },
+                      '98%':         { transform: 'rotate(8deg)' },
+                    },
+                  }}
+                >
+                  <Badge
+                    badgeContent={totalBadges}
+                    sx={{
+                      '& .MuiBadge-badge': {
+                        background: 'linear-gradient(135deg,#EF4444,#DC2626)',
+                        color: '#fff', fontSize: 9, fontWeight: 800,
+                        minWidth: 17, height: 17, padding: '0 4px',
+                        boxShadow: '0 0 0 2px #fff, 0 2px 6px rgba(239,68,68,0.4)',
+                      },
+                    }}
+                  >
+                    <NotificationsNone sx={{ fontSize: 21 }} />
+                  </Badge>
+                </IconButton>
+              </Tooltip>
+
+              {/* ── Profil utilisateur avec photo ── */}
+              <Box
+                onClick={(e) => setAnchorEl(e.currentTarget)}
+                sx={{
+                  display: 'flex', alignItems: 'center', gap: 1.25,
+                  pl: 0.75, pr: 1.5, py: 0.5,
+                  borderRadius: '12px', cursor: 'pointer',
+                  border: '1.5px solid #E2E8F0',
+                  background: 'linear-gradient(135deg,#FAFBFF 0%,#F1F5F9 100%)',
+                  '&:hover': {
+                    borderColor: '#A5B4FC',
+                    background: 'linear-gradient(135deg,#EEF2FF 0%,#E0E7FF 100%)',
+                    boxShadow: '0 4px 16px rgba(99,102,241,0.12)',
+                    transform: 'translateY(-1px)',
+                  },
+                  transition: 'all 0.18s cubic-bezier(.4,0,.2,1)',
+                }}
+              >
+                {/* Avatar avec anneau coloré + point vert */}
+                <Box sx={{ position: 'relative', flexShrink: 0 }}>
+                  <Box sx={{
+                    width: 36, height: 36, borderRadius: '11px',
+                    background: 'linear-gradient(135deg,#2563EB,#7C3AED)',
+                    p: '2px',
+                    boxShadow: '0 3px 10px rgba(37,99,235,0.30)',
+                  }}>
+                    <Avatar
+                      src={user?.employee?.photo_url ?? undefined}
+                      sx={{
+                        width: 32, height: 32, borderRadius: '9px',
+                        background: 'linear-gradient(135deg,#2563EB 0%,#7C3AED 100%)',
+                        fontSize: 12, fontWeight: 800, color: '#fff',
+                        border: '1.5px solid rgba(255,255,255,0.9)',
+                      }}
+                    >
+                      {userInitials}
+                    </Avatar>
+                  </Box>
+                  {/* Point de présence en ligne */}
+                  <Box sx={{
+                    position: 'absolute', bottom: -1, right: -1,
+                    width: 10, height: 10, borderRadius: '50%',
+                    background: 'linear-gradient(135deg,#10B981,#059669)',
+                    border: '2px solid #fff',
+                    boxShadow: '0 0 6px rgba(16,185,129,0.5)',
+                  }} />
+                </Box>
+
+                {/* Nom + rôle */}
+                <Box sx={{ display: { xs: 'none', sm: 'block' }, minWidth: 0 }}>
+                  <Typography sx={{
+                    fontSize: 13, fontWeight: 700, lineHeight: 1.25,
+                    color: '#0F172A', whiteSpace: 'nowrap', letterSpacing: '-0.1px',
+                  }}>
+                    {user?.name}
+                  </Typography>
+                  <Typography sx={{
+                    fontSize: 10.5, color: '#64748B', lineHeight: 1.2,
+                    whiteSpace: 'nowrap', fontWeight: 500,
+                  }}>
+                    {userRole}
+                  </Typography>
+                </Box>
+
+                <KeyboardArrowDown sx={{
+                  fontSize: 17, color: '#94A3B8',
+                  display: { xs: 'none', sm: 'block' }, flexShrink: 0,
+                  transition: 'transform 0.2s',
+                }} />
+              </Box>
+            </Box>
+
           </Toolbar>
         </AppBar>
 
@@ -474,12 +622,14 @@ export default function AppLayout() {
         onClose={() => setAnchorEl(null)}
         transformOrigin={{ horizontal: 'right', vertical: 'top' }}
         anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
-        PaperProps={{
-          sx: {
-            mt: 1, minWidth: 210, borderRadius: '14px',
-            boxShadow: '0 12px 40px rgba(0,0,0,0.13)',
-            border: '1px solid #E2E8F0',
-            overflow: 'hidden',
+        slotProps={{
+          paper: {
+            sx: {
+              mt: 1, minWidth: 210, borderRadius: '14px',
+              boxShadow: '0 12px 40px rgba(0,0,0,0.13)',
+              border: '1px solid #E2E8F0',
+              overflow: 'hidden',
+            },
           },
         }}
       >
