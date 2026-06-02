@@ -60,7 +60,7 @@ const NAV: NavSection[] = [
     items: [
       { path: '/departments',   label: 'Directions & Services', icon: <AccountTree />, color: '#818CF8' },
       { path: '/tasks',         label: 'Tâches',                icon: <CheckBox />,    color: '#4ADE80' },
-      { path: '/payroll',       label: 'Paie & Bulletins',      icon: <Payments />,    color: '#FBBF24' },
+      { path: '/payroll',       label: 'Gestion de la paie',    icon: <Payments />,    color: '#FBBF24' },
       { path: '/social-report', label: 'Bilan social',          icon: <BarChart />,    color: '#38BDF8' },
     ],
   },

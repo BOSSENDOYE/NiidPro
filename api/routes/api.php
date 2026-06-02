@@ -57,11 +57,17 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/attendances/badge', [AttendanceController::class, 'badge']);
     Route::apiResource('attendances', AttendanceController::class)->only(['index', 'store']);
 
-    // Leaves
-    Route::get('/leaves/pending', [LeaveController::class, 'pending']);
-    Route::get('/leaves/types', [LeaveController::class, 'types']);
-    Route::post('/leaves/{leave}/approve', [LeaveController::class, 'approve']);
-    Route::post('/leaves/{leave}/reject', [LeaveController::class, 'reject']);
+    // Leaves — routes nommées avant apiResource
+    Route::get('/leaves/pending',                [LeaveController::class, 'pending']);
+    Route::get('/leaves/types',                  [LeaveController::class, 'types']);
+    Route::get('/leaves/holidays',               [LeaveController::class, 'holidays']);
+    Route::get('/leaves/planning',               [LeaveController::class, 'plannings']);
+    Route::get('/leaves/balance/{employee}',     [LeaveController::class, 'balance']);
+    Route::post('/leaves/calculate-days',        [LeaveController::class, 'calculateDays']);
+    Route::post('/leaves/planning/generate',     [LeaveController::class, 'generatePlanning']);
+    Route::post('/leaves/{leave}/approve',       [LeaveController::class, 'approve']);
+    Route::post('/leaves/{leave}/reject',        [LeaveController::class, 'reject']);
+    Route::post('/leaves/{leave}/justification', [LeaveController::class, 'submitJustification']);
     Route::apiResource('leaves', LeaveController::class);
 
     // Justifications

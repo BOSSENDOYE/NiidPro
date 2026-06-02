@@ -20,15 +20,21 @@ class Employee extends Model
         'address', 'city', 'postal_code', 'country',
         'hire_date', 'termination_date', 'status',
         'base_salary', 'bank_account', 'annual_leave_days', 'rtt_days',
+        // Congés
+        'nbre_jour_conge', 'nbre_jour_restant', 'date_dernier_calcul_conge',
+        'anciennete_recrutement', 'nombre_enfants_charge', 'a_medaille_travail',
     ];
 
     protected function casts(): array
     {
         return [
-            'birth_date'       => 'date',
-            'hire_date'        => 'date',
-            'termination_date' => 'date',
-            'base_salary'      => 'decimal:2',
+            'birth_date'                  => 'date',
+            'hire_date'                   => 'date',
+            'termination_date'            => 'date',
+            'date_dernier_calcul_conge'   => 'date',
+            'base_salary'                 => 'decimal:2',
+            'nbre_jour_restant'           => 'decimal:1',
+            'a_medaille_travail'          => 'boolean',
         ];
     }
 
