@@ -195,14 +195,6 @@ export default function DashboardPage() {
         />
         <Box sx={{ position: 'relative', display: 'flex', alignItems: { xs: 'flex-start', md: 'center' }, gap: 2, flexDirection: { xs: 'column', md: 'row' } }}>
           <Box sx={{ flex: 1 }}>
-            <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1.25 }}>
-              <Chip
-                icon={<CalendarMonth sx={{ fontSize: '14px !important', color: '#67E8F9 !important' }} />}
-                label={now.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
-                size="small"
-                sx={{ bgcolor: 'rgba(255,255,255,0.08)', color: '#DDFBFF', border: '1px solid rgba(255,255,255,0.14)' }}
-              />
-            </Stack>
             <Typography sx={{ fontSize: { xs: 22, md: 28 }, fontWeight: 850, letterSpacing: '-0.6px', lineHeight: 1.15 }}>
               {greeting}, {firstName}
             </Typography>

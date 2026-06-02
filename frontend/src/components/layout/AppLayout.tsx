@@ -366,7 +366,7 @@ export default function AppLayout() {
                     {user?.name}
                   </Typography>
                   <Typography sx={{ fontSize: 10.5, color: SB.sectionLabel, lineHeight: 1.3 }} noWrap>
-                    {userRole}
+                    {userRole === user?.name ? (user?.email ?? userRole) : userRole}
                   </Typography>
                 </Box>
                 <KeyboardArrowDown sx={{ fontSize: 16, color: SB.sectionLabel }} />
@@ -405,55 +405,42 @@ export default function AppLayout() {
         >
           <Toolbar sx={{ minHeight: '66px !important', px: { xs: 2, md: 3 }, gap: 2 }}>
 
-            {/* ════ GAUCHE : Badge ANASER + Fil d'Ariane + Titre ════ */}
-            <Box sx={{ flexGrow: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 1.75 }}>
+            {/* ════ GAUCHE : Badge ANASER + Titre ════ */}
+            <Box sx={{ flexGrow: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 1.5 }}>
 
-              {/* Badge ANASER gradient */}
+              {/* Badge ANASER */}
               <Box sx={{
-                display: { xs: 'none', md: 'flex' },
+                display: { xs: 'none', sm: 'flex' },
                 alignItems: 'center', gap: 0.75, flexShrink: 0,
-                px: 1.5, py: 0.65,
-                borderRadius: '10px',
+                px: 1.25, py: 0.55,
+                borderRadius: '9px',
                 background: 'linear-gradient(135deg,#1E40AF 0%,#4F46E5 100%)',
-                boxShadow: '0 4px 14px rgba(37,99,235,0.30), inset 0 1px 0 rgba(255,255,255,0.15)',
+                boxShadow: '0 3px 10px rgba(37,99,235,0.28)',
               }}>
-                {/* Petite icône route stylisée */}
                 <Box sx={{
-                  width: 16, height: 16, borderRadius: '4px', flexShrink: 0,
+                  width: 14, height: 14, borderRadius: '3px', flexShrink: 0,
                   background: 'rgba(255,255,255,0.25)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                 }}>
-                  <Box sx={{ width: 8, height: 2, bgcolor: '#fff', borderRadius: 1 }} />
+                  <Box sx={{ width: 7, height: 2, bgcolor: '#fff', borderRadius: 1 }} />
                 </Box>
-                <Typography sx={{
-                  fontSize: 13, fontWeight: 900, color: '#fff',
-                  letterSpacing: '0.05em', fontStyle: 'italic', lineHeight: 1,
-                }}>
+                <Typography sx={{ fontSize: 12, fontWeight: 900, color: '#fff', letterSpacing: '0.06em', fontStyle: 'italic', lineHeight: 1 }}>
                   ANASER
                 </Typography>
               </Box>
 
-              {/* Séparateur + fil d'ariane + titre */}
-              <Box sx={{ minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                {/* Fil d'ariane */}
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.15 }}>
-                  <Typography sx={{ fontSize: 10, color: '#94A3B8', fontWeight: 600, letterSpacing: '0.04em', whiteSpace: 'nowrap' }}>
-                    Agence Nationale de Sécurité Routière
-                  </Typography>
-                  <Typography sx={{ fontSize: 10, color: '#CBD5E1', mx: 0.25 }}>›</Typography>
-                  <Typography sx={{ fontSize: 10, color: '#60A5FA', fontWeight: 700, letterSpacing: '0.04em', whiteSpace: 'nowrap' }}>
-                    Gestion RH
-                  </Typography>
-                </Box>
-                {/* Titre de la page */}
-                <Typography sx={{
-                  fontWeight: 800, fontSize: 15.5, color: '#0F172A',
-                  letterSpacing: '-0.3px', lineHeight: 1.2,
-                  whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-                }}>
-                  {currentLabel}
-                </Typography>
-              </Box>
+              {/* Séparateur */}
+              <Box sx={{ display: { xs: 'none', sm: 'block' }, width: 1, height: 24, bgcolor: '#E2E8F0', flexShrink: 0 }} />
+
+              {/* Titre de la page */}
+              <Typography sx={{
+                fontWeight: 800, fontSize: 15, color: '#0F172A',
+                letterSpacing: '-0.3px', lineHeight: 1,
+                whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                minWidth: 0,
+              }}>
+                {currentLabel}
+              </Typography>
             </Box>
 
             {/* ════ CENTRE-DROITE : Date ════ */}
@@ -464,6 +451,7 @@ export default function AppLayout() {
               borderRadius: '9px',
               bgcolor: '#F1F5F9',
               border: '1px solid #E2E8F0',
+              flexShrink: 0,
             }}>
               <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: '#3B82F6', flexShrink: 0 }} />
               <Typography sx={{ fontSize: 11.5, color: '#475569', fontWeight: 600, whiteSpace: 'nowrap', letterSpacing: '0.01em' }}>
@@ -480,6 +468,7 @@ export default function AppLayout() {
                 bgcolor: 'rgba(16,185,129,0.08)',
                 border: '1px solid rgba(16,185,129,0.20)',
                 cursor: 'default',
+                flexShrink: 0,
               }}>
                 <Box sx={{
                   width: 7, height: 7, borderRadius: '50%', bgcolor: '#10B981',
@@ -604,7 +593,7 @@ export default function AppLayout() {
                     fontSize: 10.5, color: '#64748B', lineHeight: 1.2,
                     whiteSpace: 'nowrap', fontWeight: 500,
                   }}>
-                    {userRole}
+                    {userRole === user?.name ? (user?.email ?? userRole) : userRole}
                   </Typography>
                 </Box>
 

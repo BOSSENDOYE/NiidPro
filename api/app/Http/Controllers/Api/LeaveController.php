@@ -159,7 +159,7 @@ class LeaveController extends Controller
     // ─── Refuser ────────────────────────────────────────────────────
     public function reject(Request $request, Leave $leave)
     {
-        $request->validate(['rejection_reason' => ['required', 'string']]);
+        $request->validate(['comment' => ['nullable', 'string']]);
 
         if ($leave->status !== 'pending') {
             return response()->json(['message' => 'Cette demande ne peut plus être rejetée.'], 422);
