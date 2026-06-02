@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { leavesApi } from '../../api/leaves';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import {
   Box, Drawer, AppBar, Toolbar, Typography, IconButton, List, ListItemButton,
@@ -40,9 +42,9 @@ const NAV: NavSection[] = [
     label: 'GESTION RH',
     items: [
       { path: '/employees',     label: 'Agents',            icon: <Groups />,         color: '#F97316' },
-      { path: '/contracts',     label: 'Contrats',          icon: <Description />,    color: '#A78BFA', badge: 3 },
-      { path: '/leaves',        label: 'Congés & Absences', icon: <BeachAccess />,    color: '#FCD34D', badge: 4 },
-      { path: '/justifications',label: 'Justifications',    icon: <AssignmentLate />, color: '#F87171', badge: 2 },
+      { path: '/contracts',     label: 'Contrats',          icon: <Description />,    color: '#A78BFA' },
+      { path: '/leaves',        label: 'Congés & Absences', icon: <BeachAccess />,    color: '#FCD34D' },
+      { path: '/justifications',label: 'Justifications',    icon: <AssignmentLate />, color: '#F87171' },
     ],
   },
   {
@@ -123,6 +125,16 @@ export default function AppLayout() {
   const navigate                = useNavigate();
   const location                = useLocation();
 
+  const { data: pendingLeaves = [] } = useQuery({
+    queryKey: ['leaves', 'pending'],
+    queryFn: () => leavesApi.pending().then((r) => r.data),
+    refetchInterval: 60_000,
+  });
+
+  const dynamicBadges: Record<string, number> = {
+    '/leaves': pendingLeaves.length,
+  };
+
   const handleLogout = async () => {
     try { await authApi.logout(); } catch { /* ignore */ }
     logout();
@@ -150,7 +162,9 @@ export default function AppLayout() {
     return 'NiidPro';
   })();
 
-  const totalBadges = NAV.flatMap((s) => s.items).reduce((acc, i) => acc + (i.badge ?? 0), 0);
+  const totalBadges = NAV.flatMap((s) => s.items).reduce(
+    (acc, i) => acc + (i.badge ?? dynamicBadges[i.path] ?? 0), 0
+  );
 
   return (
     <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: '#F1F5F9' }}>
@@ -280,22 +294,25 @@ export default function AppLayout() {
                                   noWrap: true, letterSpacing: '-0.1px',
                                 }}
                               />
-                              {item.badge !== undefined && (
-                                <Box sx={{
-                                  minWidth: 18, height: 18, borderRadius: '9px',
-                                  bgcolor: SB.badge,
-                                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                  px: 0.5,
-                                }}>
-                                  <Typography sx={{ fontSize: 9.5, fontWeight: 800, color: '#fff', lineHeight: 1 }}>
-                                    {item.badge}
-                                  </Typography>
-                                </Box>
-                              )}
+                              {(() => {
+                                const b = item.badge ?? dynamicBadges[item.path];
+                                return b !== undefined && b > 0 ? (
+                                  <Box sx={{
+                                    minWidth: 18, height: 18, borderRadius: '9px',
+                                    bgcolor: SB.badge,
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                    px: 0.5,
+                                  }}>
+                                    <Typography sx={{ fontSize: 9.5, fontWeight: 800, color: '#fff', lineHeight: 1 }}>
+                                      {b}
+                                    </Typography>
+                                  </Box>
+                                ) : null;
+                              })()}
                             </>
                           )}
 
-                          {!open && item.badge !== undefined && (
+                          {!open && (item.badge ?? dynamicBadges[item.path] ?? 0) > 0 && (
                             <Box sx={{
                               position: 'absolute', top: 4, right: 4,
                               width: 6, height: 6, borderRadius: '50%',

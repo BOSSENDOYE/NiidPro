@@ -12,7 +12,6 @@ import {
   EventBusy, CheckCircle, Cancel, HourglassBottom,
   Block, CalendarMonth, DescriptionOutlined,
   ThumbUp, ThumbDown, Notifications,
-  ChevronLeft, ChevronRight, ViewList, CalendarViewMonth,
 } from '@mui/icons-material';
 import { useForm, Controller } from 'react-hook-form';
 import { z } from 'zod';
@@ -395,7 +394,7 @@ interface CalendarProps {
   onEditLeave: (l: Leave) => void;
 }
 
-function LeaveCalendar({ leaves, leaveTypes, year, month, onEditLeave }: CalendarProps) {
+export function LeaveCalendar({ leaves, leaveTypes, year, month, onEditLeave }: CalendarProps) {
   const today = new Date();
   const todayStr = dateStr(today.getFullYear(), today.getMonth(), today.getDate());
 
@@ -575,11 +574,6 @@ function LeaveCalendar({ leaves, leaveTypes, year, month, onEditLeave }: Calenda
 export default function LeaveTab() {
   const qc = useQueryClient();
 
-  const now = new Date();
-  const [calYear,  setCalYear]  = useState(now.getFullYear());
-  const [calMonth, setCalMonth] = useState(now.getMonth());
-  const [viewMode, setViewMode] = useState<'calendar' | 'table'>('calendar');
-
   const [search, setSearch]               = useState('');
   const [typeFilter, setTypeFilter]       = useState<number | 'all'>('all');
   const [statusFilter, setStatusFilter]   = useState<Leave['status'] | 'all'>('all');
@@ -626,16 +620,6 @@ export default function LeaveTab() {
 
   const openCreate = () => { setEditLeave(undefined); setModalOpen(true); };
   const openEdit   = (l: Leave) => { setEditLeave(l); setModalOpen(true); };
-
-  /* ── Navigation mois ── */
-  const prevMonth = () => {
-    if (calMonth === 0) { setCalYear(y => y - 1); setCalMonth(11); }
-    else setCalMonth(m => m - 1);
-  };
-  const nextMonth = () => {
-    if (calMonth === 11) { setCalYear(y => y + 1); setCalMonth(0); }
-    else setCalMonth(m => m + 1);
-  };
 
   /* ── Filtrage table ── */
   const filtered = leaves.filter(l => {
@@ -754,7 +738,7 @@ export default function LeaveTab() {
         </Box>
       )}
 
-      {/* ════ EN-TÊTE DU CALENDRIER ════ */}
+      {/* ════ EN-TÊTE VUE LISTE ════ */}
       <Box sx={{
         px: 2, py: 1.25, mt: pending.length > 0 ? 2 : 0,
         background: 'linear-gradient(135deg, #0F172A 0%, #14532D 60%, #1E293B 100%)',
@@ -766,74 +750,19 @@ export default function LeaveTab() {
         },
       }}>
         <Stack direction="row" alignItems="center" justifyContent="space-between">
-          {/* Navigation mois (visible en mode calendrier) */}
-          <Stack direction="row" alignItems="center" spacing={1}>
-            {viewMode === 'calendar' && (
-              <>
-                <IconButton size="small" onClick={prevMonth}
-                  sx={{ color: '#94A3B8', borderRadius: '8px', '&:hover': { color: '#fff', bgcolor: 'rgba(255,255,255,0.08)' } }}>
-                  <ChevronLeft fontSize="small" />
-                </IconButton>
-                <Box sx={{ textAlign: 'center', minWidth: 140 }}>
-                  <Typography sx={{ color: '#F8FAFC', fontWeight: 800, fontSize: 15, letterSpacing: '-0.3px' }}>
-                    {MONTH_FR[calMonth]} {calYear}
-                  </Typography>
-                  <Typography sx={{ color: '#64748B', fontSize: 11 }}>
-                    {leaves.filter(l => {
-                      const m = String(calMonth + 1).padStart(2, '0');
-                      return l.start_date.startsWith(`${calYear}-${m}`) || l.end_date.startsWith(`${calYear}-${m}`) ||
-                        (l.start_date <= `${calYear}-${m}-01` && l.end_date >= `${calYear}-${m}-28`);
-                    }).length} congé(s) ce mois
-                  </Typography>
-                </Box>
-                <IconButton size="small" onClick={nextMonth}
-                  sx={{ color: '#94A3B8', borderRadius: '8px', '&:hover': { color: '#fff', bgcolor: 'rgba(255,255,255,0.08)' } }}>
-                  <ChevronRight fontSize="small" />
-                </IconButton>
-              </>
-            )}
-            {viewMode === 'table' && (
-              <Stack direction="row" alignItems="center" spacing={1.5}>
-                <Box sx={{ width: 34, height: 34, borderRadius: '9px',
-                  background: `linear-gradient(135deg, ${ACCENT}, #16A34A)`,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  boxShadow: `0 4px 12px ${alpha(ACCENT, 0.4)}` }}>
-                  <EventBusy sx={{ color: '#fff', fontSize: 17 }} />
-                </Box>
-                <Box>
-                  <Typography sx={{ color: '#F8FAFC', fontWeight: 800, fontSize: 14.5 }}>Congés — Vue liste</Typography>
-                  <Typography sx={{ color: '#64748B', fontSize: 11 }}>{leaves.length} demande{leaves.length > 1 ? 's' : ''} au total</Typography>
-                </Box>
-              </Stack>
-            )}
+          <Stack direction="row" alignItems="center" spacing={1.5}>
+            <Box sx={{ width: 34, height: 34, borderRadius: '9px',
+              background: `linear-gradient(135deg, ${ACCENT}, #16A34A)`,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              boxShadow: `0 4px 12px ${alpha(ACCENT, 0.4)}` }}>
+              <EventBusy sx={{ color: '#fff', fontSize: 17 }} />
+            </Box>
+            <Box>
+              <Typography sx={{ color: '#F8FAFC', fontWeight: 800, fontSize: 14.5 }}>Congés — Vue liste</Typography>
+              <Typography sx={{ color: '#64748B', fontSize: 11 }}>{leaves.length} demande{leaves.length > 1 ? 's' : ''} au total</Typography>
+            </Box>
           </Stack>
-
-          {/* Actions droite */}
           <Stack direction="row" spacing={0.75} alignItems="center">
-            {/* Toggle vue */}
-            <Stack direction="row" sx={{ bgcolor: 'rgba(255,255,255,0.07)', borderRadius: '9px', p: '3px', border: '1px solid rgba(255,255,255,0.1)' }}>
-              <Tooltip title="Calendrier" arrow>
-                <IconButton size="small" onClick={() => setViewMode('calendar')}
-                  sx={{ borderRadius: '7px', width: 30, height: 30,
-                    bgcolor: viewMode === 'calendar' ? ACCENT : 'transparent',
-                    color: viewMode === 'calendar' ? '#fff' : '#94A3B8',
-                    '&:hover': { color: '#fff', bgcolor: viewMode === 'calendar' ? ACCENT : 'rgba(255,255,255,0.1)' },
-                    transition: 'all 0.15s' }}>
-                  <CalendarViewMonth sx={{ fontSize: 16 }} />
-                </IconButton>
-              </Tooltip>
-              <Tooltip title="Liste" arrow>
-                <IconButton size="small" onClick={() => setViewMode('table')}
-                  sx={{ borderRadius: '7px', width: 30, height: 30,
-                    bgcolor: viewMode === 'table' ? ACCENT : 'transparent',
-                    color: viewMode === 'table' ? '#fff' : '#94A3B8',
-                    '&:hover': { color: '#fff', bgcolor: viewMode === 'table' ? ACCENT : 'rgba(255,255,255,0.1)' },
-                    transition: 'all 0.15s' }}>
-                  <ViewList sx={{ fontSize: 16 }} />
-                </IconButton>
-              </Tooltip>
-            </Stack>
-
             <Tooltip title="Actualiser" arrow>
               <IconButton size="small" onClick={() => refetch()}
                 sx={{ color: '#64748B', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)',
@@ -879,21 +808,9 @@ export default function LeaveTab() {
       {/* ════ CONTENU PRINCIPAL ════ */}
       {isLoading ? (
         <Box sx={{ p: 2 }}>
-          <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: '3px' }}>
-            {Array.from({ length: 35 }).map((_, i) => (
-              <Skeleton key={i} variant="rectangular" height={90} sx={{ borderRadius: '8px' }} />
-            ))}
-          </Box>
-        </Box>
-      ) : viewMode === 'calendar' ? (
-        <Box sx={{ bgcolor: '#F1F5F9', pt: 1.5 }}>
-          <LeaveCalendar
-            leaves={leaves}
-            leaveTypes={leaveTypes}
-            year={calYear}
-            month={calMonth}
-            onEditLeave={openEdit}
-          />
+          {Array.from({ length: 5 }).map((_, i) => (
+            <Skeleton key={i} height={48} sx={{ mb: 0.5, borderRadius: '8px' }} />
+          ))}
         </Box>
       ) : (
         /* ── Vue liste ── */

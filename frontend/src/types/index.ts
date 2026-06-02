@@ -218,6 +218,26 @@ export interface GeneratedDocument {
   created_at: string;
 }
 
+export interface Sanction {
+  id: number;
+  employee_id: number;
+  employee?: Employee;
+  type: 'avertissement' | 'blame' | 'mise_a_pied' | 'retrogradation' | 'licenciement' | 'autre';
+  reason: string;
+  sanction_date: string;
+  start_date?: string;
+  end_date?: string;
+  duration_days?: number;
+  decided_by?: string;
+  reference?: string;
+  status: 'active' | 'lifted';
+  notes?: string;
+  document_path?: string;
+  file_url?: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface PaginatedResponse<T> {
   data: T[];
   current_page: number;

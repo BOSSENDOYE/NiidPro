@@ -8,7 +8,9 @@ use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\DepartmentController;
 use App\Http\Controllers\Api\DocumentController;
 use App\Http\Controllers\Api\EmployeeController;
+use App\Http\Controllers\Api\JustificationController;
 use App\Http\Controllers\Api\LeaveController;
+use App\Http\Controllers\Api\SanctionController;
 use App\Http\Controllers\Api\SettingsController;
 use Illuminate\Support\Facades\Route;
 
@@ -61,6 +63,15 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/leaves/{leave}/approve', [LeaveController::class, 'approve']);
     Route::post('/leaves/{leave}/reject', [LeaveController::class, 'reject']);
     Route::apiResource('leaves', LeaveController::class);
+
+    // Justifications
+    Route::get('/justifications/pending', [JustificationController::class, 'pending']);
+    Route::post('/justifications/{justification}/approve', [JustificationController::class, 'approve']);
+    Route::post('/justifications/{justification}/reject',  [JustificationController::class, 'reject']);
+    Route::apiResource('justifications', JustificationController::class)->only(['index', 'show', 'store']);
+
+    // Sanctions
+    Route::apiResource('sanctions', SanctionController::class);
 
     // Availabilities
     Route::patch('/availabilities/{availability}/approve', [AvailabilityController::class, 'approve']);

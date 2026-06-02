@@ -9,17 +9,17 @@ import {
 import {
   Visibility, Edit, Delete, Email, Badge as BadgeIcon,
   Print, PersonAdd, Groups, CheckCircle, Block,
-  EventBusy, Gavel, Assignment, Assessment,
+  Gavel, Assignment, Assessment,
   Phone, Event, Refresh, AccessTime, EmojiEvents, Search,
 } from '@mui/icons-material';
 import { employeesApi } from '../../api/employees';
 import { formatDate } from '../../utils/format';
 import EmployeeCreateModal from '../../components/employees/EmployeeCreateModal';
 import ContractTab from '../../components/employees/ContractTab';
-import LeaveTab from '../../components/employees/LeaveTab';
 import EvaluationTab from '../../components/employees/EvaluationTab';
 import AvailabilityTab from '../../components/employees/AvailabilityTab';
 import DistinctionTab from '../../components/employees/DistinctionTab';
+import SanctionTab from '../../components/employees/SanctionTab';
 import EmployeeBadgeCard from '../../components/employees/EmployeeBadgeCard';
 import type { Employee } from '../../types';
 
@@ -27,7 +27,6 @@ const TAB_CONFIG = [
   { label: 'Agents',        icon: <Groups fontSize="small" />,      color: '#F97316' },
   { label: 'Disponibilité', icon: <AccessTime fontSize="small" />,  color: '#06B6D4' },
   { label: 'Distinction',   icon: <EmojiEvents fontSize="small" />, color: '#A855F7' },
-  { label: 'Congé',         icon: <EventBusy fontSize="small" />,   color: '#22C55E' },
   { label: 'Sanction',      icon: <Gavel fontSize="small" />,       color: '#EF4444' },
   { label: 'Contrat',       icon: <Assignment fontSize="small" />,  color: '#3B82F6' },
   { label: 'Évaluation',    icon: <Assessment fontSize="small" />,  color: '#F59E0B' },
@@ -666,12 +665,12 @@ export default function EmployeesPage() {
           /* ── ONGLET DISTINCTION ── */
           <DistinctionTab />
         ) : activeTab === 3 ? (
-          /* ── ONGLET CONGÉ ── */
-          <LeaveTab />
-        ) : activeTab === 5 ? (
+          /* ── ONGLET SANCTION ── */
+          <SanctionTab />
+        ) : activeTab === 4 ? (
           /* ── ONGLET CONTRAT ── */
           <ContractTab />
-        ) : activeTab === 6 ? (
+        ) : activeTab === 5 ? (
           /* ── ONGLET ÉVALUATION ── */
           <EvaluationTab />
         ) : (
