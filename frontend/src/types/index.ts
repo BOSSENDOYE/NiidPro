@@ -187,6 +187,7 @@ export interface DocumentTemplateSettings {
   signataire_title?: string;
   ampliations?:      string[];
   objet?:            string;
+  document_title?:   string;
 }
 
 export interface DocumentTemplate {

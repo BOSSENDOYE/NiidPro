@@ -42,12 +42,39 @@ function buildAnaserPrintHtml(docs: GeneratedDocument[], template: DocumentTempl
   const sigName     = s.signataire_name  ?? '';
   const sigTitle    = s.signataire_title ?? 'Le Directeur Général';
   const ampliations = s.ampliations      ?? [];
-  const typeLabel   = template.type === 'attestation' ? 'ATTESTATION' : 'NOTE DE SERVICE';
+  const typeLabel   = s.document_title ?? (template.type === 'attestation' ? 'ATTESTATION' : 'NOTE DE SERVICE');
+  const objet       = s.objet ?? null;
+  const letterFormat = !!objet;
+  const logoUrl = `${window.location.origin}/image.png`;
 
   const pages = docs.map((doc) => {
     const dateDoc = new Date(doc.created_at).toLocaleDateString('fr-FR', {
       day: '2-digit', month: 'long', year: 'numeric',
     });
+
+    const civility = doc.employee?.gender === 'F' ? 'Madame' : 'Monsieur';
+    const empName  = doc.employee?.full_name ?? `${doc.employee?.first_name ?? ''} ${doc.employee?.last_name ?? ''}`.trim();
+    const empFn    = (doc.employee as Employee & { position?: { title: string } })?.position?.title ?? '';
+    const empDept  = (doc.employee as Employee & { department?: { name: string } })?.department?.name ?? '';
+
+    const sigBlock = letterFormat
+      ? `<div class="sig-block">
+          <p class="paraph">/-/</p>
+          <br>
+          <p class="addr-intro">À ${civility}</p>
+          <p class="addr-name">${empName}</p>
+          ${empFn   ? `<p class="addr-fn">${empFn}</p>` : ''}
+          ${empDept ? `<p class="addr-dept">${empDept}</p>` : ''}
+        </div>`
+      : `<div class="sig-block">
+          <p>${sigTitle}</p>
+          <br><br><br><br>
+          <p class="sig-name">${sigName}</p>
+        </div>`;
+
+    const bodyHeader = letterFormat
+      ? `<p class="objet"><u><strong>Objet :</strong></u> ${objet}</p>`
+      : `<div class="doc-title"><strong><u>${typeLabel}</u></strong></div>`;
 
     return `
     <div class="page">
@@ -58,13 +85,7 @@ function buildAnaserPrintHtml(docs: GeneratedDocument[], template: DocumentTempl
           <p class="sep">------</p>
           <p class="ministry">${ministry}</p>
           <div class="logo-block">
-            <svg width="60" height="60" viewBox="0 0 60 60" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <circle cx="30" cy="30" r="28" stroke="#003366" stroke-width="2"/>
-              <text x="30" y="38" text-anchor="middle" font-family="Arial" font-weight="900"
-                font-size="24" fill="#003366" font-style="italic">A</text>
-            </svg>
-            <p class="logo-name">ANASER</p>
-            <p class="logo-sub">Sénégal — AGENCE NATIONALE<br>DE SÉCURITÉ ROUTIÈRE</p>
+            <img src="${logoUrl}" width="70" height="70" style="display:block; object-fit:contain;" alt="ANASER" />
           </div>
         </div>
         <div class="header-right">
@@ -74,19 +95,16 @@ function buildAnaserPrintHtml(docs: GeneratedDocument[], template: DocumentTempl
         </div>
       </div>
 
-      <p class="signataire"><strong>Le Directeur général,</strong></p>
+      <p class="signataire"><strong>${sigTitle},</strong></p>
 
-      <div class="doc-title">
-        <strong><u>${typeLabel}</u></strong>
-      </div>
+      ${bodyHeader}
 
-      <div class="doc-body">${doc.content_final.replace(/<script[^>]*>.*?<\/script>/gi, '')}</div>
+      ${template.type === 'note_service' && !letterFormat
+        ? `<div class="content-box"><div class="doc-body">${doc.content_final.replace(/<script[^>]*>.*?<\/script>/gi, '')}</div></div>`
+        : `<div class="doc-body">${doc.content_final.replace(/<script[^>]*>.*?<\/script>/gi, '')}</div>`
+      }
 
-      <div class="sig-block">
-        <p>${sigTitle}</p>
-        <br><br><br><br>
-        <p class="sig-name">${sigName}</p>
-      </div>
+      ${sigBlock}
 
       ${ampliations.length > 0 ? `
       <div class="ampliations">
@@ -104,56 +122,66 @@ function buildAnaserPrintHtml(docs: GeneratedDocument[], template: DocumentTempl
   <meta charset="UTF-8"/>
   <title>Documents ANASER</title>
   <style>
-    @page { margin: 1.8cm 2cm; size: A4 portrait; }
+    @page { margin: 1.2cm 1.8cm; size: A4 portrait; }
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: 'Times New Roman', Times, serif; font-size: 12pt; color: #000; }
-    .page { position: relative; min-height: 240mm; page-break-after: always; padding-bottom: 40px; }
+    body { font-family: 'Times New Roman', Times, serif; font-size: 11pt; color: #000; }
+    .page { page-break-after: always; display: flex; flex-direction: column; }
     .page:last-child { page-break-after: avoid; }
 
     /* Header */
-    .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 28px; }
-    .header-left { flex: 0 0 48%; }
-    .header-right { flex: 0 0 46%; text-align: right; }
-    .republic { font-weight: bold; font-size: 11pt; }
-    .motto { font-size: 10pt; margin-top: 2px; }
-    .sep { margin: 4px 0; }
-    .ministry { font-size: 10pt; font-weight: bold; margin: 6px 0; }
-    .logo-block { margin: 8px 0 0 10px; display: inline-block; text-align: center; }
-    .logo-name { font-size: 9pt; font-weight: 900; letter-spacing: 3px; color: #003366; margin-top: 3px; }
-    .logo-sub { font-size: 7pt; color: #444; line-height: 1.3; }
-    .ref { font-size: 12pt; margin-bottom: 6px; }
-    .date { font-size: 12pt; }
+    .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; }
+    .header-left { flex: 0 0 52%; }
+    .header-right { flex: 0 0 44%; text-align: right; }
+    .republic { font-weight: bold; font-size: 10pt; }
+    .motto { font-size: 9pt; margin-top: 1px; }
+    .sep { margin: 2px 0; font-size: 9pt; }
+    .ministry { font-size: 9.5pt; font-weight: bold; margin: 4px 0; }
+    .logo-block { margin: 5px 0 0 8px; display: inline-block; }
+    .ref { font-size: 11pt; margin-bottom: 3px; }
+    .date { font-size: 11pt; }
 
     /* Body */
-    .signataire { font-weight: bold; font-size: 13pt; margin: 20px 0 36px; }
+    .signataire { font-weight: bold; font-size: 12pt; margin: 10px 0 10px; }
+    .objet { font-size: 11pt; margin: 0 0 12px; }
     .doc-title {
-      text-align: center; font-size: 14pt; letter-spacing: 2px;
-      text-transform: uppercase; margin: 0 auto 36px; padding-bottom: 2px;
+      text-align: center; font-size: 13pt; letter-spacing: 1.5px;
+      text-transform: uppercase; margin: 0 auto 18px;
     }
-    .doc-body { text-align: justify; line-height: 1.85; margin-bottom: 50px; }
-    .doc-body p { margin-bottom: 12px; }
-    .doc-body ul { padding-left: 30px; margin: 8px 0 12px; }
-    .doc-body li { margin: 5px 0; }
+    .doc-body { text-align: justify; line-height: 1.6; margin-bottom: 16px; }
+    .doc-body p { margin-bottom: 8px; }
+    .doc-body ul { padding-left: 22px; margin: 5px 0 8px; }
+    .doc-body li { margin: 3px 0; }
     .doc-body strong { font-weight: bold; }
     .doc-body em { font-style: italic; }
     .doc-body u { text-decoration: underline; }
 
-    /* Signature */
-    .sig-block { float: right; text-align: center; width: 42%; margin: 0 10px 20px; }
-    .sig-name { font-weight: bold; font-size: 12pt; text-transform: uppercase; }
+    /* Bloc encadré – notes de service */
+    .content-box { border: 1px solid #000; padding: 14px 18px; margin: 6px 0 16px; min-height: 90px; }
+    .content-box .doc-body { margin-bottom: 0; }
+
+    /* Signature — standard */
+    .sig-block { float: right; text-align: center; width: 42%; margin: 0 8px 12px; }
+    .sig-name { font-weight: bold; font-size: 11pt; text-transform: uppercase; }
+
+    /* Signature — format lettre */
+    .paraph { font-size: 11pt; margin-bottom: 4px; }
+    .addr-intro { font-size: 10.5pt; margin-top: 6px; text-align: left; }
+    .addr-name { font-weight: bold; font-size: 10.5pt; text-align: left; }
+    .addr-fn   { font-size: 10.5pt; text-align: left; }
+    .addr-dept { font-size: 10.5pt; font-style: italic; text-align: left; }
 
     /* Ampliations */
-    .ampliations { clear: both; margin-top: 50px; }
-    .ampliations ul { list-style: none; padding-left: 16px; margin-top: 4px; }
+    .ampliations { clear: both; margin-top: 18px; }
+    .ampliations p { font-size: 10.5pt; }
+    .ampliations ul { list-style: none; padding-left: 12px; margin-top: 2px; }
     .ampliations li::before { content: "- "; }
-    .ampliations li { margin: 2px 0; font-size: 11pt; }
+    .ampliations li { margin: 1px 0; font-size: 10.5pt; }
 
     /* Footer */
     .footer {
-      position: absolute; bottom: 0; left: 0; right: 0;
-      text-align: center; font-size: 8pt; color: #333;
-      border-top: 3px solid #003399; padding-top: 5px;
-      background: #fff;
+      margin-top: 14px;
+      text-align: center; font-size: 7.5pt; color: #333;
+      border-top: 2px solid #003399; padding-top: 4px;
     }
   </style>
 </head>
@@ -227,15 +255,23 @@ function TemplateModal({ open, onClose, template, type }: TemplateModalProps) {
   const [varError, setVarError]       = useState('');
   const [showSettings, setShowSettings] = useState(false);
 
-  const { handleSubmit, reset, control, formState: { errors } } =
-    useForm<TemplateFormValues>({
-      defaultValues: {
-        name: '', description: '', content: '',
-        ministry:         'Ministère des Infrastructures, des Transports terrestres et Aériens (MITTA)',
+  const defaultsByType: Partial<TemplateFormValues> = type === 'note_service'
+    ? {
+        ministry:         'Ministère des Transports terrestres et aériens',
+        signataire_name:  'ATOUMANE SY',
+        signataire_title: 'Le Directeur Général',
+        ampliations_text: 'SG\nDAF/RH\nCCG',
+      }
+    : {
+        ministry:         'Ministère des Transports terrestres et aériens',
         signataire_name:  'ATOUMANE SY',
         signataire_title: 'Le Directeur Général',
         ampliations_text: 'DG\nSG\nDAF/RH\nIntéressé(e)',
-      },
+      };
+
+  const { handleSubmit, reset, control, formState: { errors } } =
+    useForm<TemplateFormValues>({
+      defaultValues: { name: '', description: '', content: '', ...defaultsByType },
     });
 
   /* Pré-remplissage au montage (key sur TemplateModal force un remontage frais à chaque ouverture) */
@@ -305,9 +341,9 @@ function TemplateModal({ open, onClose, template, type }: TemplateModalProps) {
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth
-      PaperProps={{ sx: { borderRadius: '16px', overflow: 'hidden' } }}>
+      PaperProps={{ sx: { borderRadius: '16px', display: 'flex', flexDirection: 'column', maxHeight: '92vh' } }}>
       <DialogTitle sx={{
-        display: 'flex', alignItems: 'center', gap: 1.5,
+        display: 'flex', alignItems: 'center', gap: 1.5, flexShrink: 0,
         bgcolor: cfg.bg, borderBottom: `1px solid ${cfg.border}`, py: 2, px: 3,
       }}>
         <Box sx={{
@@ -328,7 +364,7 @@ function TemplateModal({ open, onClose, template, type }: TemplateModalProps) {
       </DialogTitle>
 
       <form onSubmit={handleSubmit(onSubmit)}>
-        <DialogContent sx={{ p: 3, display: 'flex', flexDirection: 'column', gap: 2.5 }}>
+        <DialogContent sx={{ p: 3, display: 'flex', flexDirection: 'column', gap: 2.5, overflowY: 'auto', flex: 1 }}>
 
           {/* Name + description */}
           <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
@@ -602,7 +638,7 @@ function GenerateModal({ open, onClose, template }: GenerateModalProps) {
 
   return (
     <Dialog open={open} onClose={handleClose} maxWidth="md" fullWidth
-      PaperProps={{ sx: { borderRadius: '16px', overflow: 'hidden', maxHeight: '90vh' } }}>
+      PaperProps={{ sx: { borderRadius: '16px', display: 'flex', flexDirection: 'column', maxHeight: '90vh' } }}>
       <DialogTitle sx={{
         display: 'flex', alignItems: 'center', gap: 1.5,
         bgcolor: cfg.bg, borderBottom: `1px solid ${cfg.border}`, py: 2, px: 3,
@@ -633,7 +669,7 @@ function GenerateModal({ open, onClose, template }: GenerateModalProps) {
         <IconButton size="small" onClick={handleClose} sx={{ ml: 1 }}><Close fontSize="small" /></IconButton>
       </DialogTitle>
 
-      <DialogContent sx={{ p: 3 }}>
+      <DialogContent sx={{ p: 3, overflowY: 'auto', flex: 1 }}>
 
         {/* ── STEP 1 : SELECT EMPLOYEES ── */}
         {step === 'select' && (
@@ -812,24 +848,18 @@ function HistoryModal({ open, onClose, type }: HistoryModalProps) {
   const rows: GeneratedDocument[] = (data as { data?: GeneratedDocument[] })?.data ?? [];
 
   const handlePrint = (doc: GeneratedDocument) => {
-    const win = window.open('', '_blank');
+    if (!doc.template) return;
+    const html = buildAnaserPrintHtml([doc], doc.template);
+    const win  = window.open('', '_blank');
     if (!win) return;
-    win.document.write(`
-      <!DOCTYPE html><html><head><meta charset="UTF-8"/>
-      <style>@page{margin:2cm}body{font-family:Arial,sans-serif;font-size:13px;line-height:1.9}
-      .ref{color:#666;font-size:11px;margin-bottom:20px}.body{white-space:pre-wrap;text-align:justify}</style>
-      </head><body>
-      <div class="ref">Réf: ${doc.reference}</div>
-      <div class="body">${doc.content_final.replace(/<script[^>]*>.*?<\/script>/gi, '')}</div>
-      </body></html>
-    `);
+    win.document.write(html);
     win.document.close();
-    setTimeout(() => { win.print(); win.close(); }, 300);
+    setTimeout(() => { win.print(); win.close(); }, 400);
   };
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="lg" fullWidth
-      PaperProps={{ sx: { borderRadius: '16px', overflow: 'hidden', maxHeight: '85vh' } }}>
+      PaperProps={{ sx: { borderRadius: '16px', display: 'flex', flexDirection: 'column', maxHeight: '85vh' } }}>
       <DialogTitle sx={{
         display: 'flex', alignItems: 'center', gap: 1.5,
         bgcolor: cfg.bg, borderBottom: `1px solid ${cfg.border}`, py: 2, px: 3,
@@ -853,7 +883,7 @@ function HistoryModal({ open, onClose, type }: HistoryModalProps) {
         <IconButton size="small" onClick={onClose} sx={{ ml: 1 }}><Close fontSize="small" /></IconButton>
       </DialogTitle>
 
-      <DialogContent sx={{ p: 0 }}>
+      <DialogContent sx={{ p: 0, overflowY: 'auto', flex: 1 }}>
         {isLoading ? (
           <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}>
             <CircularProgress />
@@ -941,51 +971,63 @@ function TemplateCard({ template, onEdit, onGenerate, onDelete }: TemplateCardPr
 
   return (
     <Card sx={{
-      borderRadius: '14px', border: `1px solid ${archived ? '#E2E8F0' : cfg.border}`,
-      boxShadow: archived ? 'none' : '0 2px 12px rgba(0,0,0,0.06)',
-      transition: 'all 0.2s', opacity: archived ? 0.65 : 1,
-      '&:hover': { boxShadow: archived ? 'none' : '0 6px 24px rgba(0,0,0,0.10)', transform: archived ? 'none' : 'translateY(-2px)' },
+      borderRadius: '16px',
+      border: `1px solid ${archived ? '#E2E8F0' : cfg.border}`,
+      boxShadow: archived ? 'none' : '0 2px 12px rgba(0,0,0,0.05)',
+      transition: 'all 0.2s', opacity: archived ? 0.6 : 1,
+      display: 'flex', flexDirection: 'column',
+      '&:hover': { boxShadow: archived ? 'none' : '0 8px 28px rgba(0,0,0,0.10)', transform: archived ? 'none' : 'translateY(-2px)' },
     }}>
-      {/* Header band */}
-      <Box sx={{ height: 5, bgcolor: archived ? '#CBD5E1' : cfg.color, borderRadius: '14px 14px 0 0' }} />
+      {/* Bande couleur */}
+      <Box sx={{ height: 6, bgcolor: archived ? '#CBD5E1' : cfg.color, borderRadius: '16px 16px 0 0', flexShrink: 0 }} />
 
-      <CardContent sx={{ pb: 1.5 }}>
-        <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5, mb: 1.5 }}>
+      <CardContent sx={{ p: 2.5, pb: '16px !important', flex: 1 }}>
+        {/* Icône + badge archivé */}
+        <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', mb: 2 }}>
           <Box sx={{
-            width: 38, height: 38, borderRadius: '10px', flexShrink: 0,
+            width: 44, height: 44, borderRadius: '12px', flexShrink: 0,
             bgcolor: archived ? '#F1F5F9' : cfg.bg,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             color: archived ? '#94A3B8' : cfg.color,
+            border: `1px solid ${archived ? '#E2E8F0' : cfg.border}`,
           }}>
-            {cfg.icon}
-          </Box>
-          <Box sx={{ flex: 1, minWidth: 0 }}>
-            <Typography sx={{ fontWeight: 700, fontSize: 14, color: '#0F172A', lineHeight: 1.3 }} noWrap>
-              {template.name}
-            </Typography>
-            {template.description && (
-              <Typography sx={{ fontSize: 12, color: '#64748B', mt: 0.25 }} noWrap>
-                {template.description}
-              </Typography>
-            )}
+            <Box sx={{ fontSize: 22 }}>{cfg.icon}</Box>
           </Box>
           {archived && (
-            <Chip label="Archivé" size="small" icon={<Archive sx={{ fontSize: '14px !important' }} />}
-              sx={{ bgcolor: '#F1F5F9', color: '#64748B', fontSize: 10, fontWeight: 600 }} />
+            <Chip label="Archivé" size="small"
+              sx={{ bgcolor: '#F1F5F9', color: '#64748B', fontSize: 10, fontWeight: 700 }} />
           )}
         </Box>
 
+        {/* Nom */}
+        <Typography sx={{
+          fontWeight: 700, fontSize: 14, color: '#0F172A', lineHeight: 1.4, mb: 0.75,
+          display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
+        }}>
+          {template.name}
+        </Typography>
+
+        {/* Description */}
+        {template.description && (
+          <Typography sx={{
+            fontSize: 12, color: '#64748B', lineHeight: 1.5, mb: 1.5,
+            display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
+          }}>
+            {template.description}
+          </Typography>
+        )}
+
         {/* Stats */}
-        <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap' }}>
+        <Box sx={{ display: 'flex', gap: 2, mt: 'auto' }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-            <Article sx={{ fontSize: 14, color: '#94A3B8' }} />
-            <Typography sx={{ fontSize: 12, color: '#64748B' }}>
+            <Article sx={{ fontSize: 13, color: '#94A3B8' }} />
+            <Typography sx={{ fontSize: 11, color: '#94A3B8', fontWeight: 600 }}>
               {count} génération{count !== 1 ? 's' : ''}
             </Typography>
           </Box>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-            <AccessTime sx={{ fontSize: 14, color: '#94A3B8' }} />
-            <Typography sx={{ fontSize: 12, color: '#64748B' }}>
+            <AccessTime sx={{ fontSize: 13, color: '#94A3B8' }} />
+            <Typography sx={{ fontSize: 11, color: '#94A3B8' }}>
               {new Date(template.created_at).toLocaleDateString('fr-FR')}
             </Typography>
           </Box>
@@ -994,46 +1036,47 @@ function TemplateCard({ template, onEdit, onGenerate, onDelete }: TemplateCardPr
 
       <Divider />
 
-      <CardActions sx={{ px: 1.5, py: 1, gap: 0.5 }}>
-        <Tooltip title="Modifier le modèle">
-          <IconButton size="small" onClick={() => onEdit(template)}
-            sx={{ color: '#475569', '&:hover': { color: cfg.color, bgcolor: cfg.bg } }}>
-            <Edit sx={{ fontSize: 17 }} />
-          </IconButton>
-        </Tooltip>
-
-        <Tooltip title="Dupliquer">
-          <IconButton size="small"
-            sx={{ color: '#475569', '&:hover': { color: '#F97316', bgcolor: '#FFF7ED' } }}>
-            <ContentCopy sx={{ fontSize: 17 }} />
-          </IconButton>
-        </Tooltip>
-
-        {!archived && (
-          <Tooltip title={archived ? 'Archivé' : 'Archiver'}>
-            <IconButton size="small"
-              sx={{ color: '#475569', '&:hover': { color: '#64748B', bgcolor: '#F1F5F9' } }}>
-              <Archive sx={{ fontSize: 17 }} />
+      {/* Actions : icônes secondaires à gauche, Générer à droite */}
+      <CardActions sx={{ px: 2, py: 1.25, gap: 0 }}>
+        <Stack direction="row" spacing={0.25}>
+          <Tooltip title="Modifier">
+            <IconButton size="small" onClick={() => onEdit(template)}
+              sx={{ color: '#94A3B8', '&:hover': { color: cfg.color, bgcolor: cfg.bg } }}>
+              <Edit sx={{ fontSize: 16 }} />
             </IconButton>
           </Tooltip>
-        )}
+          <Tooltip title="Dupliquer">
+            <IconButton size="small"
+              sx={{ color: '#94A3B8', '&:hover': { color: '#F97316', bgcolor: '#FFF7ED' } }}>
+              <ContentCopy sx={{ fontSize: 16 }} />
+            </IconButton>
+          </Tooltip>
+          {!archived && (
+            <Tooltip title="Archiver">
+              <IconButton size="small"
+                sx={{ color: '#94A3B8', '&:hover': { color: '#64748B', bgcolor: '#F1F5F9' } }}>
+                <Archive sx={{ fontSize: 16 }} />
+              </IconButton>
+            </Tooltip>
+          )}
+          <Tooltip title="Supprimer">
+            <IconButton size="small" onClick={() => onDelete(template.id)}
+              sx={{ color: '#94A3B8', '&:hover': { color: '#EF4444', bgcolor: '#FEE2E2' } }}>
+              <Delete sx={{ fontSize: 16 }} />
+            </IconButton>
+          </Tooltip>
+        </Stack>
 
         <Box sx={{ flexGrow: 1 }} />
 
-        <Tooltip title="Supprimer">
-          <IconButton size="small" onClick={() => onDelete(template.id)}
-            sx={{ color: '#94A3B8', '&:hover': { color: '#EF4444', bgcolor: '#FEE2E2' } }}>
-            <Delete sx={{ fontSize: 17 }} />
-          </IconButton>
-        </Tooltip>
-
         {!archived && (
-          <Button size="small" variant="contained" startIcon={<PlayArrow sx={{ fontSize: 15 }} />}
+          <Button size="small" variant="contained"
+            startIcon={<PlayArrow sx={{ fontSize: 14 }} />}
             onClick={() => onGenerate(template)}
             sx={{
               borderRadius: '8px', textTransform: 'none', fontWeight: 700, fontSize: 12,
-              bgcolor: cfg.color, px: 1.5, py: 0.5,
-              '&:hover': { bgcolor: cfg.color, opacity: 0.9 },
+              bgcolor: cfg.color, px: 2, py: 0.75,
+              '&:hover': { bgcolor: cfg.color, opacity: 0.88 },
             }}>
             Générer
           </Button>
@@ -1125,8 +1168,9 @@ function DocTabPanel({ type, active }: TabPanelProps) {
       ) : (
         <Box sx={{
           display: 'grid',
-          gridTemplateColumns: { xs: '1fr', sm: 'repeat(2,1fr)', md: 'repeat(3,1fr)', lg: 'repeat(4,1fr)' },
-          gap: 2,
+          gridTemplateColumns: { xs: '1fr', sm: 'repeat(2,1fr)', lg: 'repeat(3,1fr)' },
+          gap: 2.5,
+          alignItems: 'stretch',
         }}>
           {filtered.map((t) => (
             <TemplateCard
