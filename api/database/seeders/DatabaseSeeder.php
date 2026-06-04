@@ -2,16 +2,11 @@
 
 namespace Database\Seeders;
 
-use App\Models\Attendance;
-use App\Models\Contract;
 use App\Models\Department;
-use App\Models\Employee;
-use App\Models\Leave;
 use App\Models\LeaveType;
 use App\Models\Position;
 use App\Models\User;
 use Illuminate\Database\Seeder;
-use Illuminate\Support\Carbon;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 
@@ -221,18 +216,6 @@ class DatabaseSeeder extends Seeder
             'is_active'   => true,
         ]);
 
-        // Map raccourci pour la suite du seeder
-        $depts = [
-            'CS'    => $cs,
-            'DG'    => $dg,
-            'SG'    => $sg,
-            'DEP'   => $dep,
-            'DAC'   => $dac,
-            'DPSRC' => $dpsrc,
-            'DDC'   => $ddc,
-            'DAF'   => $daf,
-        ];
-
         // ── Positions ANASER ─────────────────────────────────────────────────
         $positions = [
             ['title' => 'Directeur Général',                                   'code' => 'P-DG',    'department_id' => $dg->id,    'base_salary_min' => 700000, 'base_salary_max' => 1000000],
@@ -276,106 +259,6 @@ class DatabaseSeeder extends Seeder
         foreach ($leaveTypes as $lt) {
             LeaveType::firstOrCreate(['code' => $lt['code']], $lt);
         }
-
-        // ── Employees ANASER ────────────────────────────────────────────────
-        $employeesData = [
-            ['first_name' => 'Moussa',    'last_name' => 'Diallo',    'dept' => 'DG',    'pos' => 'P-DG',    'salary' => 900000, 'email' => 'manager@niidpro.com',  'hire' => '2018-01-15'],
-            ['first_name' => 'Aminata',   'last_name' => 'Ndiaye',    'dept' => 'DG',    'pos' => 'P-AD',    'salary' => 250000, 'email' => 'rh@niidpro.com',        'hire' => '2019-03-01'],
-            ['first_name' => 'Ibrahima',  'last_name' => 'Sow',       'dept' => 'SG',    'pos' => 'P-SG',    'salary' => 700000, 'hire' => '2018-06-01'],
-            ['first_name' => 'Fatou',     'last_name' => 'Diop',      'dept' => 'DEP',   'pos' => 'P-DEP',   'salary' => 580000, 'hire' => '2019-09-15'],
-            ['first_name' => 'Cheikh',    'last_name' => 'Fall',      'dept' => 'DEP',   'pos' => 'P-CE',    'salary' => 320000, 'hire' => '2021-02-01'],
-            ['first_name' => 'Marième',   'last_name' => 'Ba',        'dept' => 'DAC',   'pos' => 'P-DAC',   'salary' => 580000, 'hire' => '2019-11-10'],
-            ['first_name' => 'Ousmane',   'last_name' => 'Sarr',      'dept' => 'DAC',   'pos' => 'P-DAHI',  'salary' => 420000, 'hire' => '2020-04-01'],
-            ['first_name' => 'Rokhaya',   'last_name' => 'Mbaye',     'dept' => 'DPSRC', 'pos' => 'P-DPSRC', 'salary' => 580000, 'hire' => '2020-01-15'],
-            ['first_name' => 'Pape',      'last_name' => 'Niang',     'dept' => 'DPSRC', 'pos' => 'P-CC',    'salary' => 310000, 'hire' => '2022-03-01'],
-            ['first_name' => 'Ndèye',     'last_name' => 'Gueye',     'dept' => 'DDC',   'pos' => 'P-DDC',   'salary' => 580000, 'hire' => '2019-07-01'],
-            ['first_name' => 'Alioune',   'last_name' => 'Diagne',    'dept' => 'DDC',   'pos' => 'P-COOP',  'salary' => 360000, 'hire' => '2021-06-15'],
-            ['first_name' => 'Seynabou',  'last_name' => 'Thiaw',     'dept' => 'DAF',   'pos' => 'P-DAF',   'salary' => 580000, 'hire' => '2018-09-01'],
-            ['first_name' => 'Modou',     'last_name' => 'Faye',      'dept' => 'DAF',   'pos' => 'P-FIN',   'salary' => 430000, 'hire' => '2020-06-01'],
-            ['first_name' => 'Adja',      'last_name' => 'Konaté',    'dept' => 'DAF',   'pos' => 'P-RH',    'salary' => 430000, 'hire' => '2021-01-10'],
-            ['first_name' => 'Serigne',   'last_name' => 'Diallo',    'dept' => 'DEP',   'pos' => 'P-ODSR',  'salary' => 390000, 'hire' => '2022-05-01'],
-            ['first_name' => 'Khady',     'last_name' => 'Sène',      'dept' => 'DPSRC', 'pos' => 'P-EPR',   'salary' => 390000, 'hire' => '2022-09-01'],
-            ['first_name' => 'Babacar',   'last_name' => 'Touré',     'dept' => 'DAC',   'pos' => 'P-CH',    'salary' => 390000, 'hire' => '2023-01-15'],
-            ['first_name' => 'Aïssatou',  'last_name' => 'Cissé',     'dept' => 'DDC',   'pos' => 'P-DT',    'salary' => 360000, 'hire' => '2023-04-01'],
-        ];
-
-        $createdEmployees = [];
-        foreach ($employeesData as $i => $e) {
-            $num = 'EMP' . str_pad($i + 1, 4, '0', STR_PAD_LEFT);
-            $emp = Employee::firstOrCreate(['employee_number' => $num], [
-                'first_name'         => $e['first_name'],
-                'last_name'          => $e['last_name'],
-                'department_id'      => $depts[$e['dept']]->id,
-                'position_id'        => $pos[$e['pos']]->id,
-                'professional_email' => $e['email'] ?? strtolower($e['first_name'] . '.' . $e['last_name'] . '@niidpro.com'),
-                'hire_date'          => $e['hire'],
-                'base_salary'        => $e['salary'],
-                'status'             => 'active',
-                'annual_leave_days'  => 25,
-                'country'            => 'France',
-                'city'               => 'Paris',
-            ]);
-
-            if (isset($e['email'])) {
-                $user = User::where('email', $e['email'])->first();
-                if ($user && !$emp->user_id) {
-                    $emp->update(['user_id' => $user->id]);
-                }
-            }
-
-            $createdEmployees[] = $emp;
-        }
-
-        // ── Contracts ───────────────────────────────────────────────────────
-        foreach ($createdEmployees as $i => $emp) {
-            Contract::firstOrCreate(['employee_id' => $emp->id, 'is_active' => true], [
-                'type'       => $i < 8 ? 'CDI' : 'CDD',
-                'start_date' => $emp->hire_date,
-                'end_date'   => $i >= 8 ? Carbon::parse($emp->hire_date)->addYear()->toDateString() : null,
-                'salary'     => $emp->base_salary,
-                'working_hours_per_week' => 35,
-                'is_active'  => true,
-            ]);
-        }
-
-        // ── Today's Attendances ─────────────────────────────────────────────
-        $today    = Carbon::today();
-        $statuses = ['present', 'present', 'present', 'present', 'late', 'present', 'present', 'present', 'present', 'present', 'late', 'present', 'present', 'on_leave', 'present', 'present', 'absent', 'present'];
-        foreach ($createdEmployees as $i => $emp) {
-            Attendance::firstOrCreate(['employee_id' => $emp->id, 'date' => $today->toDateString()], [
-                'check_in'       => !in_array($statuses[$i], ['absent', 'on_leave'])
-                    ? $today->copy()->setTime($statuses[$i] === 'late' ? 9 : 8, rand(0, 30))->toDateTimeString()
-                    : null,
-                'status'         => $statuses[$i],
-                'source'         => 'web',
-                'worked_minutes' => in_array($statuses[$i], ['present', 'late']) ? rand(440, 520) : null,
-            ]);
-        }
-
-        // ── Pending Leaves ──────────────────────────────────────────────────
-        $cpType  = LeaveType::where('code', 'CP')->first();
-        $rttType = LeaveType::where('code', 'RTT')->first();
-
-        Leave::firstOrCreate(['employee_id' => $createdEmployees[2]->id, 'leave_type_id' => $cpType->id, 'start_date' => Carbon::now()->addDays(5)->toDateString()], [
-            'end_date'   => Carbon::now()->addDays(9)->toDateString(),
-            'days_count' => 5,
-            'status'     => 'pending',
-            'reason'     => 'Vacances annuelles',
-        ]);
-
-        Leave::firstOrCreate(['employee_id' => $createdEmployees[4]->id, 'leave_type_id' => $rttType->id, 'start_date' => Carbon::now()->addDays(2)->toDateString()], [
-            'end_date'   => Carbon::now()->addDays(3)->toDateString(),
-            'days_count' => 2,
-            'status'     => 'pending',
-            'reason'     => 'RTT',
-        ]);
-
-        Leave::firstOrCreate(['employee_id' => $createdEmployees[7]->id, 'leave_type_id' => $cpType->id, 'start_date' => Carbon::now()->addDays(10)->toDateString()], [
-            'end_date'   => Carbon::now()->addDays(19)->toDateString(),
-            'days_count' => 10,
-            'status'     => 'pending',
-            'reason'     => 'Congé été',
-        ]);
 
         // ── Document Templates ──────────────────────────────────────────────
         $this->call(DocumentTemplateSeeder::class);

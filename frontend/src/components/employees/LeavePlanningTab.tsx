@@ -228,10 +228,11 @@ export default function LeavePlanningTab() {
                   />
                 )}
                 renderOption={(props, emp) => {
+                  const { key, ...optProps } = props as typeof props & { key: React.Key };
                   const hue = (emp.first_name.charCodeAt(0) + emp.last_name.charCodeAt(0)) % 360;
                   const initials = `${emp.first_name[0]}${emp.last_name[0]}`.toUpperCase();
                   return (
-                    <Box component="li" {...props} key={emp.id}
+                    <Box key={key} component="li" {...optProps}
                       sx={{ display: 'flex', alignItems: 'center', gap: 1.25, py: '6px !important', px: '12px !important' }}>
                       <Avatar sx={{ width: 30, height: 30, fontSize: 11, fontWeight: 700, flexShrink: 0, bgcolor: `hsl(${hue},50%,44%)` }}>
                         {initials}

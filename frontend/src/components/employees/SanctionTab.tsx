@@ -186,8 +186,10 @@ function SanctionModal({ open, onClose, sanction, employees }: {
                   }}
                   onChange={(_, val) => field.onChange(val ? val.id : null)}
                   noOptionsText="Aucun agent trouvé"
-                  renderOption={(props, emp) => (
-                    <Box component="li" {...props} sx={{ py: '8px !important' }}>
+                  renderOption={(props, emp) => {
+                    const { key, ...optProps } = props as typeof props & { key: React.Key };
+                    return (
+                    <Box key={key} component="li" {...optProps} sx={{ py: '8px !important' }}>
                       <Stack direction="row" alignItems="center" spacing={1.5}>
                         <Avatar sx={{ width: 30, height: 30, fontSize: 11, fontWeight: 800,
                           background: 'linear-gradient(135deg,#2563EB,#7C3AED)', flexShrink: 0 }}>
@@ -203,7 +205,8 @@ function SanctionModal({ open, onClose, sanction, employees }: {
                         </Box>
                       </Stack>
                     </Box>
-                  )}
+                    );
+                  }}
                   renderInput={params => (
                     <TextField {...params} size="small" placeholder="Taper un nom ou un matricule…"
                       error={!!errors.employee_id} helperText={errors.employee_id?.message} sx={inputSx} />

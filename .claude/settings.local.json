@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//c/Users/5340/OneDrive/Desktop/PROJET/niidpro/frontend/**)",
+      "Bash(npx tsc:*)"
+    ]
+  }
+}

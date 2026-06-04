@@ -22,6 +22,7 @@ import DepartmentsPage from './pages/departments/DepartmentsPage';
 
 // Contrats
 import ContractsPage from './pages/contracts/ContractsPage';
+import ContractArchivePage from './pages/contracts/ContractArchivePage';
 
 // Pointage
 import AttendancesPage from './pages/attendances/AttendancesPage';
@@ -95,6 +96,7 @@ export default function App() {
               <Route path="employees/:id/edit" element={<EmployeeFormPage />} />
 
               <Route path="contracts" element={<ContractsPage />} />
+              <Route path="contracts/archives" element={<ContractArchivePage />} />
 
               <Route path="attendances" element={<AttendancesPage />} />
               <Route path="attendance-visual" element={<AttendanceVisualPage />} />

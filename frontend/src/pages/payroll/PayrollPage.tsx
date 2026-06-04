@@ -97,54 +97,7 @@ function ModeleFicheTab() {
         </Stack>
       </Box>
 
-      {/* Aperçu bulletin — maquette visuelle */}
       <Box sx={{ p: 3, display: 'flex', gap: 3, flexWrap: 'wrap' }}>
-
-        {/* Miniature modèle 1 */}
-        {['Modèle Standard ANASER', 'Modèle Simplifié'].map((nom, i) => (
-          <Box key={i} sx={{
-            width: 280, border: `2px solid ${i === 0 ? ACT : '#E2E8F0'}`,
-            borderRadius: '10px', overflow: 'hidden', cursor: 'pointer',
-            boxShadow: i === 0 ? `0 4px 16px ${ACT}30` : '0 2px 8px rgba(0,0,0,0.06)',
-            '&:hover': { borderColor: ACT },
-            transition: 'border-color 0.15s',
-          }}>
-            {/* Header miniature */}
-            <Box sx={{ bgcolor: NAV, px: 2, py: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <Typography sx={{ color: '#fff', fontSize: 11, fontWeight: 700 }}>{nom}</Typography>
-              {i === 0 && <Chip label="Actif" size="small" sx={{ bgcolor: '#059669', color: '#fff', fontSize: 9, height: 16, fontWeight: 700 }} />}
-            </Box>
-
-            {/* Corps miniature */}
-            <Box sx={{ p: 1.5, bgcolor: '#fff' }}>
-              {/* En-tête bulletin maquette */}
-              <Box sx={{ bgcolor: '#F1F5F9', borderRadius: '6px', p: 1, mb: 1 }}>
-                <Box sx={{ width: '60%', height: 6, bgcolor: '#CBD5E1', borderRadius: 2, mb: 0.5 }} />
-                <Box sx={{ width: '40%', height: 4, bgcolor: '#E2E8F0', borderRadius: 2 }} />
-              </Box>
-              {/* Lignes paie maquette */}
-              {Array.from({ length: 6 }).map((_, j) => (
-                <Box key={j} sx={{ display: 'flex', justifyContent: 'space-between', py: 0.3, borderBottom: j < 5 ? '1px solid #F8FAFC' : 'none' }}>
-                  <Box sx={{ width: `${45 + j * 5}%`, height: 5, bgcolor: '#E2E8F0', borderRadius: 2 }} />
-                  <Box sx={{ width: '18%', height: 5, bgcolor: '#CBD5E1', borderRadius: 2 }} />
-                </Box>
-              ))}
-              {/* Total maquette */}
-              <Box sx={{ mt: 1, bgcolor: NAV, borderRadius: '5px', p: 0.75, display: 'flex', justifyContent: 'space-between' }}>
-                <Box sx={{ width: '35%', height: 6, bgcolor: 'rgba(255,255,255,0.4)', borderRadius: 2 }} />
-                <Box sx={{ width: '22%', height: 6, bgcolor: 'rgba(255,255,255,0.6)', borderRadius: 2 }} />
-              </Box>
-            </Box>
-
-            {/* Actions */}
-            <Box sx={{ display: 'flex', gap: 0.5, px: 1.5, py: 1, bgcolor: '#F8FAFC', borderTop: '1px solid #E2E8F0' }}>
-              <Tooltip title="Aperçu"><IconButton size="small"><Visibility sx={{ fontSize: 15, color: '#64748B' }} /></IconButton></Tooltip>
-              <Tooltip title="Modifier"><IconButton size="small"><Edit sx={{ fontSize: 15, color: '#2563EB' }} /></IconButton></Tooltip>
-              <Tooltip title="Imprimer"><IconButton size="small"><Print sx={{ fontSize: 15, color: '#64748B' }} /></IconButton></Tooltip>
-            </Box>
-          </Box>
-        ))}
-
         {/* Ajouter modèle */}
         <Box sx={{
           width: 280, border: '2px dashed #CBD5E1', borderRadius: '10px',
@@ -168,13 +121,7 @@ function BulletinPaieTab() {
   const MONTHS = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
   const now = new Date();
 
-  const mockRows = [
-    { num: 'EMP0001', nom: 'Moussa Diallo',   dept: 'DG',  brut: '900 000', emp: '− 90 000', pat: '108 000', net: '810 000', statut: 'validé' },
-    { num: 'EMP0002', nom: 'Aminata Ndiaye',  dept: 'DG',  brut: '250 000', emp: '− 25 000', pat: '30 000',  net: '225 000', statut: 'brouillon' },
-    { num: 'EMP0003', nom: 'Ibrahima Sow',    dept: 'SG',  brut: '700 000', emp: '− 70 000', pat: '84 000',  net: '630 000', statut: 'payé' },
-    { num: 'EMP0004', nom: 'Fatou Diop',      dept: 'DEP', brut: '580 000', emp: '− 58 000', pat: '69 600',  net: '522 000', statut: 'validé' },
-    { num: 'EMP0005', nom: 'Cheikh Fall',     dept: 'DEP', brut: '320 000', emp: '− 32 000', pat: '38 400',  net: '288 000', statut: 'brouillon' },
-  ];
+  const rows: { num: string; nom: string; dept: string; brut: string; emp: string; pat: string; net: string; statut: string }[] = [];
 
   const statusColor: Record<string, { color: string; bg: string }> = {
     brouillon: { color: '#D97706', bg: '#FFFBEB' },
@@ -206,12 +153,12 @@ function BulletinPaieTab() {
 
       {/* Stats */}
       <Box sx={{ display: 'flex', gap: 1.5, p: 2.5, flexWrap: 'wrap' }}>
-        <MiniStat label="Bulletins"         value="18"           color="#2563EB" bg="#EFF6FF" />
-        <MiniStat label="Masse brute"       value="8 450 000 F"  color="#059669" bg="#ECFDF5" />
-        <MiniStat label="Masse nette"       value="7 605 000 F"  color="#7C3AED" bg="#F5F3FF" />
-        <MiniStat label="Charges patronales"value="1 014 000 F"  color="#D97706" bg="#FFFBEB" />
-        <MiniStat label="Validés"           value="12"           color="#059669" bg="#ECFDF5" />
-        <MiniStat label="En attente"        value="6"            color="#DC2626" bg="#FEF2F2" />
+        <MiniStat label="Bulletins"         value="0"      color="#2563EB" bg="#EFF6FF" />
+        <MiniStat label="Masse brute"       value="0 F"    color="#059669" bg="#ECFDF5" />
+        <MiniStat label="Masse nette"       value="0 F"    color="#7C3AED" bg="#F5F3FF" />
+        <MiniStat label="Charges patronales"value="0 F"    color="#D97706" bg="#FFFBEB" />
+        <MiniStat label="Validés"           value="0"      color="#059669" bg="#ECFDF5" />
+        <MiniStat label="En attente"        value="0"      color="#DC2626" bg="#FEF2F2" />
       </Box>
 
       {/* Table */}
@@ -231,37 +178,46 @@ function BulletinPaieTab() {
               </TableRow>
             </TableHead>
             <TableBody>
-              {mockRows.map((row, i) => {
-                const sc = statusColor[row.statut] ?? { color: '#64748B', bg: '#F1F5F9' };
-                return (
-                  <TableRow key={i} hover sx={{ bgcolor: i % 2 === 0 ? '#fff' : '#F8FAFC' }}>
-                    <TableCell sx={{ fontSize: 11, fontFamily: 'monospace', fontWeight: 600, color: '#1E3A5F' }}>{row.num}</TableCell>
-                    <TableCell sx={{ py: 0.75 }}>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <Avatar sx={{ width: 26, height: 26, fontSize: 9, fontWeight: 700, bgcolor: '#1E3A5F' }}>
-                          {row.nom.split(' ').map((n) => n[0]).join('').slice(0, 2)}
-                        </Avatar>
-                        <Typography sx={{ fontSize: 12, fontWeight: 600 }}>{row.nom}</Typography>
-                      </Box>
-                    </TableCell>
-                    <TableCell><Chip label={row.dept} size="small" sx={{ fontSize: 10, height: 18, fontWeight: 700, bgcolor: '#EEF2FF', color: '#4338CA' }} /></TableCell>
-                    <TableCell sx={{ fontSize: 12, fontWeight: 600, color: '#0F172A' }}>{row.brut} F</TableCell>
-                    <TableCell sx={{ fontSize: 12, color: '#DC2626' }}>{row.emp} F</TableCell>
-                    <TableCell sx={{ fontSize: 12, color: '#D97706' }}>{row.pat} F</TableCell>
-                    <TableCell sx={{ fontSize: 13, fontWeight: 800, color: '#059669' }}>{row.net} F</TableCell>
-                    <TableCell>
-                      <Chip label={row.statut} size="small" sx={{ fontSize: 10, height: 20, fontWeight: 700, bgcolor: sc.bg, color: sc.color, border: `1px solid ${sc.color}30` }} />
-                    </TableCell>
-                    <TableCell>
-                      <Stack direction="row" spacing={0.25}>
-                        <Tooltip title="Voir le bulletin"><IconButton size="small"><Visibility sx={{ fontSize: 14, color: '#64748B' }} /></IconButton></Tooltip>
-                        <Tooltip title="Valider"><IconButton size="small"><CheckCircle sx={{ fontSize: 14, color: '#059669' }} /></IconButton></Tooltip>
-                        <Tooltip title="Imprimer"><IconButton size="small"><Print sx={{ fontSize: 14, color: '#2563EB' }} /></IconButton></Tooltip>
-                      </Stack>
+              {rows.length === 0
+                ? (
+                  <TableRow>
+                    <TableCell colSpan={9} sx={{ border: 'none', p: 0 }}>
+                      <EmptySlot icon={<ReceiptLong />} title="Aucun bulletin généré" subtitle="Sélectionnez un mois et cliquez sur « Générer la paie »" />
                     </TableCell>
                   </TableRow>
-                );
-              })}
+                )
+                : rows.map((row, i) => {
+                  const sc = statusColor[row.statut] ?? { color: '#64748B', bg: '#F1F5F9' };
+                  return (
+                    <TableRow key={i} hover sx={{ bgcolor: i % 2 === 0 ? '#fff' : '#F8FAFC' }}>
+                      <TableCell sx={{ fontSize: 11, fontFamily: 'monospace', fontWeight: 600, color: '#1E3A5F' }}>{row.num}</TableCell>
+                      <TableCell sx={{ py: 0.75 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <Avatar sx={{ width: 26, height: 26, fontSize: 9, fontWeight: 700, bgcolor: '#1E3A5F' }}>
+                            {row.nom.split(' ').map((n) => n[0]).join('').slice(0, 2)}
+                          </Avatar>
+                          <Typography sx={{ fontSize: 12, fontWeight: 600 }}>{row.nom}</Typography>
+                        </Box>
+                      </TableCell>
+                      <TableCell><Chip label={row.dept} size="small" sx={{ fontSize: 10, height: 18, fontWeight: 700, bgcolor: '#EEF2FF', color: '#4338CA' }} /></TableCell>
+                      <TableCell sx={{ fontSize: 12, fontWeight: 600, color: '#0F172A' }}>{row.brut} F</TableCell>
+                      <TableCell sx={{ fontSize: 12, color: '#DC2626' }}>{row.emp} F</TableCell>
+                      <TableCell sx={{ fontSize: 12, color: '#D97706' }}>{row.pat} F</TableCell>
+                      <TableCell sx={{ fontSize: 13, fontWeight: 800, color: '#059669' }}>{row.net} F</TableCell>
+                      <TableCell>
+                        <Chip label={row.statut} size="small" sx={{ fontSize: 10, height: 20, fontWeight: 700, bgcolor: sc.bg, color: sc.color, border: `1px solid ${sc.color}30` }} />
+                      </TableCell>
+                      <TableCell>
+                        <Stack direction="row" spacing={0.25}>
+                          <Tooltip title="Voir le bulletin"><IconButton size="small"><Visibility sx={{ fontSize: 14, color: '#64748B' }} /></IconButton></Tooltip>
+                          <Tooltip title="Valider"><IconButton size="small"><CheckCircle sx={{ fontSize: 14, color: '#059669' }} /></IconButton></Tooltip>
+                          <Tooltip title="Imprimer"><IconButton size="small"><Print sx={{ fontSize: 14, color: '#2563EB' }} /></IconButton></Tooltip>
+                        </Stack>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
+              }
             </TableBody>
           </Table>
         </TableContainer>
@@ -274,19 +230,12 @@ function BulletinPaieTab() {
 //  TAB 2 — Gestion des Indemnités
 // ═══════════════════════════════════════════════════════════════════
 function GestionIndemnitesTab() {
-  const mock = [
-    { code: 'IND-TRP', libelle: 'Indemnité de Transport',        mode: 'Montant fixe',  valeur: '35 000 F',  impose: 'Non', statut: 'actif' },
-    { code: 'IND-LOG', libelle: 'Indemnité de Logement',          mode: 'Montant fixe',  valeur: '75 000 F',  impose: 'Oui', statut: 'actif' },
-    { code: 'IND-REP', libelle: 'Indemnité de Représentation',    mode: '% salaire',     valeur: '10 %',      impose: 'Oui', statut: 'actif' },
-    { code: 'IND-SUJ', libelle: 'Indemnité de Sujétion',          mode: 'Montant fixe',  valeur: '25 000 F',  impose: 'Non', statut: 'actif' },
-    { code: 'IND-RES', libelle: 'Indemnité de Responsabilité',    mode: '% salaire',     valeur: '15 %',      impose: 'Oui', statut: 'inactif' },
-    { code: 'IND-DOC', libelle: 'Indemnité de Documentation',     mode: 'Montant fixe',  valeur: '15 000 F',  impose: 'Non', statut: 'actif' },
-  ];
+  const rows: { code: string; libelle: string; mode: string; valeur: string; impose: string; statut: string }[] = [];
 
   return (
     <Box>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', px: 2.5, py: 1.5, bgcolor: '#F8FAFC', borderBottom: '1px solid #E2E8F0' }}>
-        <Typography sx={{ fontSize: 13, fontWeight: 700, color: TH }}>Types d'indemnités ({mock.length})</Typography>
+        <Typography sx={{ fontSize: 13, fontWeight: 700, color: TH }}>Types d'indemnités ({rows.length})</Typography>
         <Button size="small" variant="contained" startIcon={<Add />}
           sx={{ bgcolor: NAV, '&:hover': { bgcolor: '#0D2A40' }, borderRadius: '7px', fontWeight: 700, fontSize: 12 }}>
           Nouvelle indemnité
@@ -304,34 +253,43 @@ function GestionIndemnitesTab() {
               </TableRow>
             </TableHead>
             <TableBody>
-              {mock.map((row, i) => (
-                <TableRow key={i} hover sx={{ bgcolor: i % 2 === 0 ? '#fff' : '#F8FAFC' }}>
-                  <TableCell sx={{ fontSize: 11, fontFamily: 'monospace', fontWeight: 700, color: '#1E3A5F' }}>{row.code}</TableCell>
-                  <TableCell sx={{ fontSize: 12, fontWeight: 600 }}>{row.libelle}</TableCell>
-                  <TableCell>
-                    <Chip label={row.mode} size="small" sx={{ fontSize: 10, height: 18, bgcolor: '#EEF2FF', color: '#4338CA', fontWeight: 600 }} />
-                  </TableCell>
-                  <TableCell sx={{ fontSize: 12, fontWeight: 700, color: '#059669' }}>{row.valeur}</TableCell>
-                  <TableCell>
-                    <Chip label={row.impose} size="small" sx={{ fontSize: 10, height: 18, fontWeight: 700,
-                      bgcolor: row.impose === 'Oui' ? '#FEF2F2' : '#ECFDF5',
-                      color:   row.impose === 'Oui' ? '#DC2626'  : '#059669',
-                    }} />
-                  </TableCell>
-                  <TableCell>
-                    <Chip label={row.statut} size="small" sx={{ fontSize: 10, height: 18, fontWeight: 700,
-                      bgcolor: row.statut === 'actif' ? '#ECFDF5' : '#F1F5F9',
-                      color:   row.statut === 'actif' ? '#059669'  : '#94A3B8',
-                    }} />
-                  </TableCell>
-                  <TableCell>
-                    <Stack direction="row" spacing={0.25}>
-                      <Tooltip title="Modifier"><IconButton size="small"><Edit sx={{ fontSize: 14, color: '#2563EB' }} /></IconButton></Tooltip>
-                      <Tooltip title="Supprimer"><IconButton size="small"><Delete sx={{ fontSize: 14, color: '#EF4444' }} /></IconButton></Tooltip>
-                    </Stack>
-                  </TableCell>
-                </TableRow>
-              ))}
+              {rows.length === 0
+                ? (
+                  <TableRow>
+                    <TableCell colSpan={7} sx={{ border: 'none', p: 0 }}>
+                      <EmptySlot icon={<Payments />} title="Aucune indemnité configurée" subtitle="Cliquez sur « Nouvelle indemnité » pour en ajouter une" />
+                    </TableCell>
+                  </TableRow>
+                )
+                : rows.map((row, i) => (
+                  <TableRow key={i} hover sx={{ bgcolor: i % 2 === 0 ? '#fff' : '#F8FAFC' }}>
+                    <TableCell sx={{ fontSize: 11, fontFamily: 'monospace', fontWeight: 700, color: '#1E3A5F' }}>{row.code}</TableCell>
+                    <TableCell sx={{ fontSize: 12, fontWeight: 600 }}>{row.libelle}</TableCell>
+                    <TableCell>
+                      <Chip label={row.mode} size="small" sx={{ fontSize: 10, height: 18, bgcolor: '#EEF2FF', color: '#4338CA', fontWeight: 600 }} />
+                    </TableCell>
+                    <TableCell sx={{ fontSize: 12, fontWeight: 700, color: '#059669' }}>{row.valeur}</TableCell>
+                    <TableCell>
+                      <Chip label={row.impose} size="small" sx={{ fontSize: 10, height: 18, fontWeight: 700,
+                        bgcolor: row.impose === 'Oui' ? '#FEF2F2' : '#ECFDF5',
+                        color:   row.impose === 'Oui' ? '#DC2626'  : '#059669',
+                      }} />
+                    </TableCell>
+                    <TableCell>
+                      <Chip label={row.statut} size="small" sx={{ fontSize: 10, height: 18, fontWeight: 700,
+                        bgcolor: row.statut === 'actif' ? '#ECFDF5' : '#F1F5F9',
+                        color:   row.statut === 'actif' ? '#059669'  : '#94A3B8',
+                      }} />
+                    </TableCell>
+                    <TableCell>
+                      <Stack direction="row" spacing={0.25}>
+                        <Tooltip title="Modifier"><IconButton size="small"><Edit sx={{ fontSize: 14, color: '#2563EB' }} /></IconButton></Tooltip>
+                        <Tooltip title="Supprimer"><IconButton size="small"><Delete sx={{ fontSize: 14, color: '#EF4444' }} /></IconButton></Tooltip>
+                      </Stack>
+                    </TableCell>
+                  </TableRow>
+                ))
+              }
             </TableBody>
           </Table>
         </TableContainer>
@@ -367,11 +325,11 @@ function RapportEtatsTab() {
 
       {/* Cards résumé */}
       <Box sx={{ display: 'flex', gap: 1.5, p: 2.5, flexWrap: 'wrap' }}>
-        <MiniStat label="Total agents payés"    value="18"           color="#2563EB" bg="#EFF6FF" />
-        <MiniStat label="Masse salariale brute" value="8 450 000 F"  color="#059669" bg="#ECFDF5" />
-        <MiniStat label="Total retenues"        value="845 000 F"    color="#DC2626" bg="#FEF2F2" />
-        <MiniStat label="Total charges pat."    value="1 014 000 F"  color="#D97706" bg="#FFFBEB" />
-        <MiniStat label="Masse nette versée"    value="7 605 000 F"  color="#7C3AED" bg="#F5F3FF" />
+        <MiniStat label="Total agents payés"    value="0"    color="#2563EB" bg="#EFF6FF" />
+        <MiniStat label="Masse salariale brute" value="0 F"  color="#059669" bg="#ECFDF5" />
+        <MiniStat label="Total retenues"        value="0 F"  color="#DC2626" bg="#FEF2F2" />
+        <MiniStat label="Total charges pat."    value="0 F"  color="#D97706" bg="#FFFBEB" />
+        <MiniStat label="Masse nette versée"    value="0 F"  color="#7C3AED" bg="#F5F3FF" />
       </Box>
 
       {/* Tableau par direction */}
@@ -381,38 +339,7 @@ function RapportEtatsTab() {
             Récapitulatif par Direction
           </Typography>
         </Box>
-        <TableContainer>
-          <Table size="small">
-            <TableHead>
-              <TableRow sx={{ bgcolor: '#1E3A5F' }}>
-                {['Direction','Nb Agents','Brut Total','Retenues','Charges Pat.','Net Total','% Masse'].map((h) => (
-                  <TableCell key={h} sx={{ color: '#fff', fontWeight: 700, fontSize: 11, py: 1 }}>{h}</TableCell>
-                ))}
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {[
-                ['DG',    '2', '1 150 000 F', '115 000 F', '138 000 F', '1 035 000 F', '13,6 %'],
-                ['SG',    '1', '700 000 F',   '70 000 F',  '84 000 F',  '630 000 F',   '8,3 %'],
-                ['DEP',   '3', '1 220 000 F', '122 000 F', '146 400 F', '1 098 000 F', '14,4 %'],
-                ['DAC',   '2', '1 000 000 F', '100 000 F', '120 000 F', '900 000 F',   '11,8 %'],
-                ['DPSRC', '2', '890 000 F',   '89 000 F',  '106 800 F', '801 000 F',   '10,5 %'],
-                ['DDC',   '2', '940 000 F',   '94 000 F',  '112 800 F', '846 000 F',   '11,1 %'],
-                ['DAF',   '3', '1 550 000 F', '155 000 F', '186 000 F', '1 395 000 F', '18,3 %'],
-              ].map(([dir, nb, brut, ret, ch, net, pct], i) => (
-                <TableRow key={i} hover sx={{ bgcolor: i % 2 === 0 ? '#fff' : '#F8FAFC' }}>
-                  <TableCell><Chip label={dir} size="small" sx={{ fontSize: 10, height: 18, fontWeight: 700, bgcolor: '#EEF2FF', color: '#4338CA' }} /></TableCell>
-                  <TableCell sx={{ fontSize: 12, textAlign: 'center', fontWeight: 600 }}>{nb}</TableCell>
-                  <TableCell sx={{ fontSize: 12, fontWeight: 600 }}>{brut}</TableCell>
-                  <TableCell sx={{ fontSize: 12, color: '#DC2626' }}>{ret}</TableCell>
-                  <TableCell sx={{ fontSize: 12, color: '#D97706' }}>{ch}</TableCell>
-                  <TableCell sx={{ fontSize: 13, fontWeight: 800, color: '#059669' }}>{net}</TableCell>
-                  <TableCell sx={{ fontSize: 11, color: '#64748B' }}>{pct}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </TableContainer>
+        <EmptySlot icon={<BarChart />} title="Aucun rapport disponible" subtitle="Générez la paie du mois puis cliquez sur « Générer rapport »" />
       </Box>
     </Box>
   );
@@ -422,13 +349,7 @@ function RapportEtatsTab() {
 //  TAB 4 — États de Paiement
 // ═══════════════════════════════════════════════════════════════════
 function EtatsPaiementTab() {
-  const mock = [
-    { num: 'EMP0001', nom: 'Moussa Diallo',   net: '810 000 F', mode: 'Virement',  statut: 'payé',      date: '31/05/2026' },
-    { num: 'EMP0002', nom: 'Aminata Ndiaye',  net: '225 000 F', mode: 'Virement',  statut: 'en attente',date: '—' },
-    { num: 'EMP0003', nom: 'Ibrahima Sow',    net: '630 000 F', mode: 'Virement',  statut: 'payé',      date: '31/05/2026' },
-    { num: 'EMP0004', nom: 'Fatou Diop',      net: '522 000 F', mode: 'Chèque',    statut: 'en attente',date: '—' },
-    { num: 'EMP0005', nom: 'Cheikh Fall',     net: '288 000 F', mode: 'Virement',  statut: 'en attente',date: '—' },
-  ];
+  const rows: { num: string; nom: string; net: string; mode: string; statut: string; date: string }[] = [];
 
   return (
     <Box>
@@ -448,9 +369,9 @@ function EtatsPaiementTab() {
       </Box>
 
       <Box sx={{ display: 'flex', gap: 1.5, px: 2.5, py: 2, flexWrap: 'wrap' }}>
-        <MiniStat label="Total à payer"  value="7 605 000 F" color="#2563EB" bg="#EFF6FF" />
-        <MiniStat label="Payés"          value="4 050 000 F" color="#059669" bg="#ECFDF5" />
-        <MiniStat label="En attente"     value="3 555 000 F" color="#D97706" bg="#FFFBEB" />
+        <MiniStat label="Total à payer"  value="0 F" color="#2563EB" bg="#EFF6FF" />
+        <MiniStat label="Payés"          value="0 F" color="#059669" bg="#ECFDF5" />
+        <MiniStat label="En attente"     value="0 F" color="#D97706" bg="#FFFBEB" />
       </Box>
 
       <Box sx={{ border: '1px solid #CBD5E1', borderTop: 'none' }}>
@@ -464,31 +385,40 @@ function EtatsPaiementTab() {
               </TableRow>
             </TableHead>
             <TableBody>
-              {mock.map((row, i) => (
-                <TableRow key={i} hover sx={{ bgcolor: i % 2 === 0 ? '#fff' : '#F8FAFC' }}>
-                  <TableCell sx={{ fontSize: 11, fontFamily: 'monospace', fontWeight: 700, color: '#1E3A5F' }}>{row.num}</TableCell>
-                  <TableCell sx={{ fontSize: 12, fontWeight: 600 }}>{row.nom}</TableCell>
-                  <TableCell sx={{ fontSize: 13, fontWeight: 800, color: '#059669' }}>{row.net}</TableCell>
-                  <TableCell>
-                    <Chip label={row.mode} size="small" sx={{ fontSize: 10, height: 18, bgcolor: '#EEF2FF', color: '#4338CA', fontWeight: 600 }} />
-                  </TableCell>
-                  <TableCell>
-                    <Chip label={row.statut} size="small" sx={{ fontSize: 10, height: 18, fontWeight: 700,
-                      bgcolor: row.statut === 'payé' ? '#ECFDF5' : '#FFFBEB',
-                      color:   row.statut === 'payé' ? '#059669'  : '#D97706',
-                    }} />
-                  </TableCell>
-                  <TableCell sx={{ fontSize: 12, color: '#64748B' }}>{row.date}</TableCell>
-                  <TableCell>
-                    {row.statut !== 'payé' && (
-                      <Button size="small" variant="contained"
-                        sx={{ bgcolor: '#059669', '&:hover': { bgcolor: '#047857' }, borderRadius: '6px', fontSize: 10, fontWeight: 700, py: 0.25, px: 1 }}>
-                        Confirmer
-                      </Button>
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))}
+              {rows.length === 0
+                ? (
+                  <TableRow>
+                    <TableCell colSpan={7} sx={{ border: 'none', p: 0 }}>
+                      <EmptySlot icon={<AccountBalance />} title="Aucun paiement à traiter" subtitle="Générez et validez les bulletins pour voir les états de paiement" />
+                    </TableCell>
+                  </TableRow>
+                )
+                : rows.map((row, i) => (
+                  <TableRow key={i} hover sx={{ bgcolor: i % 2 === 0 ? '#fff' : '#F8FAFC' }}>
+                    <TableCell sx={{ fontSize: 11, fontFamily: 'monospace', fontWeight: 700, color: '#1E3A5F' }}>{row.num}</TableCell>
+                    <TableCell sx={{ fontSize: 12, fontWeight: 600 }}>{row.nom}</TableCell>
+                    <TableCell sx={{ fontSize: 13, fontWeight: 800, color: '#059669' }}>{row.net}</TableCell>
+                    <TableCell>
+                      <Chip label={row.mode} size="small" sx={{ fontSize: 10, height: 18, bgcolor: '#EEF2FF', color: '#4338CA', fontWeight: 600 }} />
+                    </TableCell>
+                    <TableCell>
+                      <Chip label={row.statut} size="small" sx={{ fontSize: 10, height: 18, fontWeight: 700,
+                        bgcolor: row.statut === 'payé' ? '#ECFDF5' : '#FFFBEB',
+                        color:   row.statut === 'payé' ? '#059669'  : '#D97706',
+                      }} />
+                    </TableCell>
+                    <TableCell sx={{ fontSize: 12, color: '#64748B' }}>{row.date}</TableCell>
+                    <TableCell>
+                      {row.statut !== 'payé' && (
+                        <Button size="small" variant="contained"
+                          sx={{ bgcolor: '#059669', '&:hover': { bgcolor: '#047857' }, borderRadius: '6px', fontSize: 10, fontWeight: 700, py: 0.25, px: 1 }}>
+                          Confirmer
+                        </Button>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))
+              }
             </TableBody>
           </Table>
         </TableContainer>
@@ -516,15 +446,7 @@ function SubTab({ label, active, onClick }: { label: string; active: boolean; on
 }
 
 function IndiceTab() {
-  const rows = [
-    { indice: 100, valeur: '50 000 F',  categorie: 'C1', desc: 'Agents d\'exécution' },
-    { indice: 150, valeur: '75 000 F',  categorie: 'C2', desc: 'Agents qualifiés' },
-    { indice: 200, valeur: '100 000 F', categorie: 'B1', desc: 'Agents de maîtrise' },
-    { indice: 250, valeur: '125 000 F', categorie: 'B2', desc: 'Techniciens' },
-    { indice: 300, valeur: '150 000 F', categorie: 'A1', desc: 'Cadres' },
-    { indice: 400, valeur: '200 000 F', categorie: 'A2', desc: 'Cadres supérieurs' },
-    { indice: 500, valeur: '250 000 F', categorie: 'A3', desc: 'Cadres dirigeants' },
-  ];
+  const rows: { indice: number; valeur: string; categorie: string; desc: string }[] = [];
   return (
     <Box>
       <Box sx={{ display: 'flex', justifyContent: 'flex-end', px: 2, py: 1, borderBottom: '1px solid #E2E8F0' }}>
@@ -533,46 +455,43 @@ function IndiceTab() {
           Nouvel indice
         </Button>
       </Box>
-      <TableContainer>
-        <Table size="small">
-          <TableHead>
-            <TableRow sx={{ bgcolor: '#1E3A5F' }}>
-              {['Indice','Valeur de base','Catégorie','Description','Actions'].map((h) => (
-                <TableCell key={h} sx={{ color: '#fff', fontWeight: 700, fontSize: 11, py: 1 }}>{h}</TableCell>
-              ))}
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {rows.map((r, i) => (
-              <TableRow key={i} hover sx={{ bgcolor: i % 2 === 0 ? '#fff' : '#F8FAFC' }}>
-                <TableCell sx={{ fontSize: 13, fontWeight: 800, color: '#1E3A5F' }}>{r.indice}</TableCell>
-                <TableCell sx={{ fontSize: 13, fontWeight: 700, color: '#059669' }}>{r.valeur}</TableCell>
-                <TableCell><Chip label={r.categorie} size="small" sx={{ fontSize: 10, height: 18, fontWeight: 700, bgcolor: '#EEF2FF', color: '#4338CA' }} /></TableCell>
-                <TableCell sx={{ fontSize: 12, color: '#475569' }}>{r.desc}</TableCell>
-                <TableCell>
-                  <Stack direction="row" spacing={0.25}>
-                    <Tooltip title="Modifier"><IconButton size="small"><Edit sx={{ fontSize: 14, color: '#2563EB' }} /></IconButton></Tooltip>
-                    <Tooltip title="Supprimer"><IconButton size="small"><Delete sx={{ fontSize: 14, color: '#EF4444' }} /></IconButton></Tooltip>
-                  </Stack>
-                </TableCell>
+      {rows.length === 0
+        ? <EmptySlot icon={<TableChart />} title="Aucun indice configuré" subtitle="Cliquez sur « Nouvel indice » pour en ajouter un" />
+        : (
+        <TableContainer>
+          <Table size="small">
+            <TableHead>
+              <TableRow sx={{ bgcolor: '#1E3A5F' }}>
+                {['Indice','Valeur de base','Catégorie','Description','Actions'].map((h) => (
+                  <TableCell key={h} sx={{ color: '#fff', fontWeight: 700, fontSize: 11, py: 1 }}>{h}</TableCell>
+                ))}
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </TableContainer>
+            </TableHead>
+            <TableBody>
+              {rows.map((r, i) => (
+                <TableRow key={i} hover sx={{ bgcolor: i % 2 === 0 ? '#fff' : '#F8FAFC' }}>
+                  <TableCell sx={{ fontSize: 13, fontWeight: 800, color: '#1E3A5F' }}>{r.indice}</TableCell>
+                  <TableCell sx={{ fontSize: 13, fontWeight: 700, color: '#059669' }}>{r.valeur}</TableCell>
+                  <TableCell><Chip label={r.categorie} size="small" sx={{ fontSize: 10, height: 18, fontWeight: 700, bgcolor: '#EEF2FF', color: '#4338CA' }} /></TableCell>
+                  <TableCell sx={{ fontSize: 12, color: '#475569' }}>{r.desc}</TableCell>
+                  <TableCell>
+                    <Stack direction="row" spacing={0.25}>
+                      <Tooltip title="Modifier"><IconButton size="small"><Edit sx={{ fontSize: 14, color: '#2563EB' }} /></IconButton></Tooltip>
+                      <Tooltip title="Supprimer"><IconButton size="small"><Delete sx={{ fontSize: 14, color: '#EF4444' }} /></IconButton></Tooltip>
+                    </Stack>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TableContainer>
+        )}
     </Box>
   );
 }
 
 function BaremeTab() {
-  const rows = [
-    { categorie: 'A3', echelon: 1, indice: 500, salaire: '250 000 F', prime: '50 000 F', brut: '300 000 F' },
-    { categorie: 'A2', echelon: 1, indice: 400, salaire: '200 000 F', prime: '40 000 F', brut: '240 000 F' },
-    { categorie: 'A1', echelon: 1, indice: 300, salaire: '150 000 F', prime: '30 000 F', brut: '180 000 F' },
-    { categorie: 'A1', echelon: 2, indice: 320, salaire: '160 000 F', prime: '32 000 F', brut: '192 000 F' },
-    { categorie: 'B2', echelon: 1, indice: 250, salaire: '125 000 F', prime: '25 000 F', brut: '150 000 F' },
-    { categorie: 'B1', echelon: 1, indice: 200, salaire: '100 000 F', prime: '20 000 F', brut: '120 000 F' },
-  ];
+  const rows: { categorie: string; echelon: number; indice: number; salaire: string; prime: string; brut: string }[] = [];
   return (
     <Box>
       <Box sx={{ display: 'flex', justifyContent: 'flex-end', px: 2, py: 1, borderBottom: '1px solid #E2E8F0' }}>
@@ -581,49 +500,45 @@ function BaremeTab() {
           Nouvelle ligne barème
         </Button>
       </Box>
-      <TableContainer>
-        <Table size="small">
-          <TableHead>
-            <TableRow sx={{ bgcolor: '#1E3A5F' }}>
-              {['Catégorie','Échelon','Indice','Salaire de base','Prime de catégorie','Salaire Brut','Actions'].map((h) => (
-                <TableCell key={h} sx={{ color: '#fff', fontWeight: 700, fontSize: 11, py: 1 }}>{h}</TableCell>
-              ))}
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {rows.map((r, i) => (
-              <TableRow key={i} hover sx={{ bgcolor: i % 2 === 0 ? '#fff' : '#F8FAFC' }}>
-                <TableCell><Chip label={r.categorie} size="small" sx={{ fontSize: 10, height: 18, fontWeight: 700, bgcolor: '#EEF2FF', color: '#4338CA' }} /></TableCell>
-                <TableCell sx={{ fontSize: 12, textAlign: 'center', fontWeight: 600 }}>{r.echelon}</TableCell>
-                <TableCell sx={{ fontSize: 12, fontWeight: 700, color: '#1E3A5F' }}>{r.indice}</TableCell>
-                <TableCell sx={{ fontSize: 12, fontWeight: 600 }}>{r.salaire}</TableCell>
-                <TableCell sx={{ fontSize: 12, color: '#7C3AED' }}>{r.prime}</TableCell>
-                <TableCell sx={{ fontSize: 13, fontWeight: 800, color: '#059669' }}>{r.brut}</TableCell>
-                <TableCell>
-                  <Stack direction="row" spacing={0.25}>
-                    <Tooltip title="Modifier"><IconButton size="small"><Edit sx={{ fontSize: 14, color: '#2563EB' }} /></IconButton></Tooltip>
-                    <Tooltip title="Supprimer"><IconButton size="small"><Delete sx={{ fontSize: 14, color: '#EF4444' }} /></IconButton></Tooltip>
-                  </Stack>
-                </TableCell>
+      {rows.length === 0
+        ? <EmptySlot icon={<TableChart />} title="Aucun barème configuré" subtitle="Cliquez sur « Nouvelle ligne barème » pour en ajouter une" />
+        : (
+        <TableContainer>
+          <Table size="small">
+            <TableHead>
+              <TableRow sx={{ bgcolor: '#1E3A5F' }}>
+                {['Catégorie','Échelon','Indice','Salaire de base','Prime de catégorie','Salaire Brut','Actions'].map((h) => (
+                  <TableCell key={h} sx={{ color: '#fff', fontWeight: 700, fontSize: 11, py: 1 }}>{h}</TableCell>
+                ))}
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </TableContainer>
+            </TableHead>
+            <TableBody>
+              {rows.map((r, i) => (
+                <TableRow key={i} hover sx={{ bgcolor: i % 2 === 0 ? '#fff' : '#F8FAFC' }}>
+                  <TableCell><Chip label={r.categorie} size="small" sx={{ fontSize: 10, height: 18, fontWeight: 700, bgcolor: '#EEF2FF', color: '#4338CA' }} /></TableCell>
+                  <TableCell sx={{ fontSize: 12, textAlign: 'center', fontWeight: 600 }}>{r.echelon}</TableCell>
+                  <TableCell sx={{ fontSize: 12, fontWeight: 700, color: '#1E3A5F' }}>{r.indice}</TableCell>
+                  <TableCell sx={{ fontSize: 12, fontWeight: 600 }}>{r.salaire}</TableCell>
+                  <TableCell sx={{ fontSize: 12, color: '#7C3AED' }}>{r.prime}</TableCell>
+                  <TableCell sx={{ fontSize: 13, fontWeight: 800, color: '#059669' }}>{r.brut}</TableCell>
+                  <TableCell>
+                    <Stack direction="row" spacing={0.25}>
+                      <Tooltip title="Modifier"><IconButton size="small"><Edit sx={{ fontSize: 14, color: '#2563EB' }} /></IconButton></Tooltip>
+                      <Tooltip title="Supprimer"><IconButton size="small"><Delete sx={{ fontSize: 14, color: '#EF4444' }} /></IconButton></Tooltip>
+                    </Stack>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TableContainer>
+        )}
     </Box>
   );
 }
 
 function HierarchieTab() {
-  const rows = [
-    { code: 'DG',   libelle: 'Directeur Général',                      niveau: 1, categorie: 'A3', indice: 500 },
-    { code: 'SG',   libelle: 'Secrétaire Général',                     niveau: 2, categorie: 'A3', indice: 480 },
-    { code: 'DIR',  libelle: 'Directeur de service',                    niveau: 3, categorie: 'A2', indice: 400 },
-    { code: 'CDIV', libelle: 'Chef de Division',                       niveau: 4, categorie: 'A1', indice: 320 },
-    { code: 'CAGD', libelle: 'Chargé d\'études / Chargé de mission',   niveau: 5, categorie: 'A1', indice: 300 },
-    { code: 'TECH', libelle: 'Technicien spécialisé',                  niveau: 6, categorie: 'B2', indice: 250 },
-    { code: 'AGEX', libelle: 'Agent d\'exécution',                     niveau: 7, categorie: 'C1', indice: 150 },
-  ];
+  const rows: { code: string; libelle: string; niveau: number; categorie: string; indice: number }[] = [];
   return (
     <Box>
       <Box sx={{ display: 'flex', justifyContent: 'flex-end', px: 2, py: 1, borderBottom: '1px solid #E2E8F0' }}>
@@ -632,34 +547,38 @@ function HierarchieTab() {
           Nouveau niveau
         </Button>
       </Box>
-      <TableContainer>
-        <Table size="small">
-          <TableHead>
-            <TableRow sx={{ bgcolor: '#1E3A5F' }}>
-              {['Ordre','Code','Libellé','Catégorie','Indice de référence','Actions'].map((h) => (
-                <TableCell key={h} sx={{ color: '#fff', fontWeight: 700, fontSize: 11, py: 1 }}>{h}</TableCell>
-              ))}
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {rows.map((r, i) => (
-              <TableRow key={i} hover sx={{ bgcolor: i % 2 === 0 ? '#fff' : '#F8FAFC' }}>
-                <TableCell sx={{ fontSize: 13, fontWeight: 800, color: '#94A3B8', textAlign: 'center', width: 50 }}>{r.niveau}</TableCell>
-                <TableCell sx={{ fontSize: 11, fontFamily: 'monospace', fontWeight: 700, color: '#1E3A5F' }}>{r.code}</TableCell>
-                <TableCell sx={{ fontSize: 12, fontWeight: 600 }}>{r.libelle}</TableCell>
-                <TableCell><Chip label={r.categorie} size="small" sx={{ fontSize: 10, height: 18, fontWeight: 700, bgcolor: '#EEF2FF', color: '#4338CA' }} /></TableCell>
-                <TableCell sx={{ fontSize: 12, fontWeight: 700, color: '#059669' }}>{r.indice}</TableCell>
-                <TableCell>
-                  <Stack direction="row" spacing={0.25}>
-                    <Tooltip title="Modifier"><IconButton size="small"><Edit sx={{ fontSize: 14, color: '#2563EB' }} /></IconButton></Tooltip>
-                    <Tooltip title="Supprimer"><IconButton size="small"><Delete sx={{ fontSize: 14, color: '#EF4444' }} /></IconButton></Tooltip>
-                  </Stack>
-                </TableCell>
+      {rows.length === 0
+        ? <EmptySlot icon={<Tune />} title="Aucune hiérarchie configurée" subtitle="Cliquez sur « Nouveau niveau » pour en ajouter un" />
+        : (
+        <TableContainer>
+          <Table size="small">
+            <TableHead>
+              <TableRow sx={{ bgcolor: '#1E3A5F' }}>
+                {['Ordre','Code','Libellé','Catégorie','Indice de référence','Actions'].map((h) => (
+                  <TableCell key={h} sx={{ color: '#fff', fontWeight: 700, fontSize: 11, py: 1 }}>{h}</TableCell>
+                ))}
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </TableContainer>
+            </TableHead>
+            <TableBody>
+              {rows.map((r, i) => (
+                <TableRow key={i} hover sx={{ bgcolor: i % 2 === 0 ? '#fff' : '#F8FAFC' }}>
+                  <TableCell sx={{ fontSize: 13, fontWeight: 800, color: '#94A3B8', textAlign: 'center', width: 50 }}>{r.niveau}</TableCell>
+                  <TableCell sx={{ fontSize: 11, fontFamily: 'monospace', fontWeight: 700, color: '#1E3A5F' }}>{r.code}</TableCell>
+                  <TableCell sx={{ fontSize: 12, fontWeight: 600 }}>{r.libelle}</TableCell>
+                  <TableCell><Chip label={r.categorie} size="small" sx={{ fontSize: 10, height: 18, fontWeight: 700, bgcolor: '#EEF2FF', color: '#4338CA' }} /></TableCell>
+                  <TableCell sx={{ fontSize: 12, fontWeight: 700, color: '#059669' }}>{r.indice}</TableCell>
+                  <TableCell>
+                    <Stack direction="row" spacing={0.25}>
+                      <Tooltip title="Modifier"><IconButton size="small"><Edit sx={{ fontSize: 14, color: '#2563EB' }} /></IconButton></Tooltip>
+                      <Tooltip title="Supprimer"><IconButton size="small"><Delete sx={{ fontSize: 14, color: '#EF4444' }} /></IconButton></Tooltip>
+                    </Stack>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TableContainer>
+        )}
     </Box>
   );
 }
@@ -698,10 +617,10 @@ export default function PayrollPage() {
 
   const tabs = [
     { label: 'Modèle fiche de paie',   icon: <Description />,   comp: <ModeleFicheTab /> },
-    { label: 'Bulletin de Paie',        icon: <ReceiptLong />,   comp: <BulletinPaieTab />,    badge: 6 },
+    { label: 'Bulletin de Paie',        icon: <ReceiptLong />,   comp: <BulletinPaieTab /> },
     { label: 'Gestion des Indemnités',  icon: <Payments />,      comp: <GestionIndemnitesTab /> },
     { label: 'Rapport des États',       icon: <BarChart />,      comp: <RapportEtatsTab /> },
-    { label: 'États de Paiement',       icon: <AccountBalance />,comp: <EtatsPaiementTab />, badge: 3 },
+    { label: 'États de Paiement',       icon: <AccountBalance />,comp: <EtatsPaiementTab /> },
     { label: 'Paramètres',              icon: <Tune />,          comp: <ParametresTab /> },
   ];
 
@@ -723,10 +642,10 @@ export default function PayrollPage() {
         </Box>
         <Stack direction="row" spacing={2}>
           {[
-            { label: 'Bulletins',   count: 18, color: '#93C5FD' },
-            { label: 'Validés',     count: 12, color: '#6EE7B7' },
-            { label: 'En attente',  count: 6,  color: '#FCD34D' },
-            { label: 'Payés',       count: 9,  color: '#C4B5FD' },
+            { label: 'Bulletins',   count: 0, color: '#93C5FD' },
+            { label: 'Validés',     count: 0, color: '#6EE7B7' },
+            { label: 'En attente',  count: 0, color: '#FCD34D' },
+            { label: 'Payés',       count: 0, color: '#C4B5FD' },
           ].map(({ label, count, color }) => (
             <Stack key={label} direction="row" alignItems="center" spacing={0.75}>
               <Typography sx={{ fontSize: 11, color: 'rgba(255,255,255,0.5)' }}>{label}</Typography>

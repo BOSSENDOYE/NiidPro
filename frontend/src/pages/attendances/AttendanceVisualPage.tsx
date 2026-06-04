@@ -190,10 +190,7 @@ export default function AttendanceVisualPage() {
                           </Box>
                         );
                       }
-                      // Past / today — random mock status (would come from API in reality)
-                      const seed = (emp.id * 31 + d * 7) % 100;
-                      const statusKey = seed < 75 ? 'present' : seed < 82 ? 'late' : seed < 90 ? 'absent' : 'on_leave';
-                      const c = STATUS_COLORS[statusKey];
+                      // Past / today — cellule vide (les données réelles viendraient de l'API)
                       return (
                         <Tooltip
                           key={d}
@@ -203,10 +200,10 @@ export default function AttendanceVisualPage() {
                           <Box sx={{ width: CELL_W, flexShrink: 0, px: 0.25, py: 1, cursor: 'pointer' }}>
                             <Box sx={{
                               height: 22, borderRadius: '5px',
-                              bgcolor: c.bg, border: `1px solid ${c.color}30`,
+                              bgcolor: '#F1F5F9', border: '1px solid #E2E8F0',
                               display: 'flex', alignItems: 'center', justifyContent: 'center',
                             }}>
-                              <Typography sx={{ fontSize: 10, fontWeight: 700, color: c.color }}>
+                              <Typography sx={{ fontSize: 10, fontWeight: 700, color: '#CBD5E1' }}>
                                 {c.label}
                               </Typography>
                             </Box>

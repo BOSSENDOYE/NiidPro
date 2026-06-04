@@ -1,18 +1,19 @@
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Box, Card, Avatar, Typography, IconButton, Tooltip, TextField,
   Skeleton, Stack, Tabs, Tab, Button,
   Chip, Select, FormControl, Grid, Divider, Checkbox, Menu, ListItemIcon, ListItemText,
-  MenuItem,
+  MenuItem, Dialog, DialogTitle, DialogContent, DialogActions,
 } from '@mui/material';
 import {
   Visibility, Edit, Delete, Email, Badge as BadgeIcon,
   Print, PersonAdd, Groups, CheckCircle, Block,
   Gavel, Assignment, Assessment,
-  Phone, Event, Refresh, AccessTime, EmojiEvents, Search,
+  Phone, Event, Refresh, AccessTime, EmojiEvents, Search, AssignmentTurnedIn,
 } from '@mui/icons-material';
 import { employeesApi } from '../../api/employees';
+import { tasksApi } from '../../api/tasks';
 import { formatDate } from '../../utils/format';
 import EmployeeCreateModal from '../../components/employees/EmployeeCreateModal';
 import ContractTab from '../../components/employees/ContractTab';
@@ -54,6 +55,14 @@ export default function EmployeesPage() {
   const [modalEmployee, setModalEmployee] = useState<Employee | undefined>(undefined);
   const [modalKey, setModalKey]         = useState(0);
   const [badgeEmployee, setBadgeEmployee] = useState<Employee | null>(null);
+  const [taskEmp, setTaskEmp]   = useState<Employee | null>(null);
+  const [taskForm, setTaskForm] = useState({ title: '', description: '', priority: 'medium', due_date: '' });
+
+  const qcPage = useQueryClient();
+  const taskMut = useMutation({
+    mutationFn: (data: Record<string, unknown>) => tasksApi.create(data),
+    onSuccess: () => { qcPage.invalidateQueries({ queryKey: ['tasks'] }); setTaskEmp(null); setTaskForm({ title: '', description: '', priority: 'medium', due_date: '' }); },
+  });
 
   const openModal = (mode: 'create'|'edit'|'view', emp?: Employee) => {
     setModalMode(mode);
@@ -495,6 +504,12 @@ export default function EmployeesPage() {
                                   <BadgeIcon sx={{ fontSize: 15 }} />
                                 </IconButton>
                               </Tooltip>
+                              <Tooltip title="Assigner une tâche" arrow>
+                                <IconButton size="small" onClick={e => { e.stopPropagation(); setTaskEmp(emp); }}
+                                  sx={{ width: 32, height: 32, borderRadius: '9px', bgcolor: 'rgba(234,179,8,0.12)', color: '#EAB308', '&:hover': { bgcolor: 'rgba(234,179,8,0.22)', transform: 'scale(1.1)' }, transition: 'all .15s' }}>
+                                  <AssignmentTurnedIn sx={{ fontSize: 15 }} />
+                                </IconButton>
+                              </Tooltip>
                               <Tooltip title="Supprimer" arrow>
                                 <IconButton size="small" onClick={e => e.stopPropagation()}
                                   sx={{ width: 32, height: 32, borderRadius: '9px', bgcolor: 'rgba(225,29,72,0.12)', color: '#FB7185', '&:hover': { bgcolor: 'rgba(225,29,72,0.22)', transform: 'scale(1.1)' }, transition: 'all .15s' }}>
@@ -522,6 +537,75 @@ export default function EmployeesPage() {
                 employee={badgeEmployee}
               />
             )}
+
+            {/* Dialog assignation de tâche */}
+            <Dialog open={!!taskEmp} onClose={() => setTaskEmp(null)} maxWidth="xs" fullWidth
+              PaperProps={{ sx: { borderRadius: '16px' } }}>
+              <DialogTitle sx={{ fontWeight: 700, fontSize: 15, pb: 1 }}>
+                Assigner une tâche
+              </DialogTitle>
+              <DialogContent>
+                <Stack spacing={2} sx={{ pt: 1 }}>
+                  {taskEmp && (
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, p: 1.5, bgcolor: '#F0F9FF', borderRadius: '10px', border: '1px solid #BAE6FD' }}>
+                      <Avatar sx={{ width: 36, height: 36, bgcolor: '#2563EB', fontSize: 13 }}>
+                        {taskEmp.first_name?.[0]}{taskEmp.last_name?.[0]}
+                      </Avatar>
+                      <Box>
+                        <Typography sx={{ fontWeight: 700, fontSize: 13, color: '#0C4A6E' }}>
+                          {taskEmp.first_name} {taskEmp.last_name}
+                        </Typography>
+                        <Typography sx={{ fontSize: 11, color: '#0369A1' }}>
+                          {taskEmp.employee_number} · {taskEmp.position?.title ?? '—'}
+                        </Typography>
+                      </Box>
+                    </Box>
+                  )}
+                  <TextField
+                    label="Titre de la tâche *" size="small" fullWidth
+                    value={taskForm.title}
+                    onChange={(e) => setTaskForm((f) => ({ ...f, title: e.target.value }))}
+                  />
+                  <TextField
+                    label="Description" size="small" fullWidth multiline rows={2}
+                    value={taskForm.description}
+                    onChange={(e) => setTaskForm((f) => ({ ...f, description: e.target.value }))}
+                  />
+                  <Grid container spacing={1.5}>
+                    <Grid item xs={6}>
+                      <TextField
+                        select label="Priorité" size="small" fullWidth
+                        value={taskForm.priority}
+                        onChange={(e) => setTaskForm((f) => ({ ...f, priority: e.target.value }))}
+                      >
+                        <MenuItem value="low">Faible</MenuItem>
+                        <MenuItem value="medium">Moyen</MenuItem>
+                        <MenuItem value="high">Élevé</MenuItem>
+                        <MenuItem value="urgent">Urgent</MenuItem>
+                      </TextField>
+                    </Grid>
+                    <Grid item xs={6}>
+                      <TextField
+                        label="Délai d'exécution" type="date" size="small" fullWidth
+                        InputLabelProps={{ shrink: true }}
+                        value={taskForm.due_date}
+                        onChange={(e) => setTaskForm((f) => ({ ...f, due_date: e.target.value }))}
+                      />
+                    </Grid>
+                  </Grid>
+                </Stack>
+              </DialogContent>
+              <DialogActions sx={{ px: 3, pb: 2.5, gap: 1 }}>
+                <Button onClick={() => setTaskEmp(null)} sx={{ color: '#64748B', textTransform: 'none' }}>Annuler</Button>
+                <Button
+                  variant="contained" disabled={!taskForm.title || taskMut.isPending}
+                  onClick={() => taskMut.mutate({ ...taskForm, assigned_to: taskEmp?.id, status: 'todo' })}
+                  sx={{ textTransform: 'none', fontWeight: 700, bgcolor: '#EAB308', '&:hover': { bgcolor: '#CA8A04' } }}
+                >
+                  {taskMut.isPending ? 'Assignation…' : 'Assigner'}
+                </Button>
+              </DialogActions>
+            </Dialog>
 
             {/* Menu contextuel */}
             <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={() => setAnchorEl(null)}

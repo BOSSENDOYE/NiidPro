@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\AttendanceController;
 use App\Http\Controllers\Api\AvailabilityController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\ContractController;
+use App\Http\Controllers\Api\ContractArchiveController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\DepartmentController;
 use App\Http\Controllers\Api\DocumentController;
@@ -12,6 +13,7 @@ use App\Http\Controllers\Api\JustificationController;
 use App\Http\Controllers\Api\LeaveController;
 use App\Http\Controllers\Api\SanctionController;
 use App\Http\Controllers\Api\SettingsController;
+use App\Http\Controllers\Api\TaskController;
 use Illuminate\Support\Facades\Route;
 
 // Health check
@@ -50,6 +52,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/contracts/expiring', [ContractController::class, 'expiringSoon']);
     Route::apiResource('contracts', ContractController::class);
 
+    // Contract Archives
+    Route::get('/contract-archives/{contractArchive}/download', [ContractArchiveController::class, 'download']);
+    Route::apiResource('contract-archives', ContractArchiveController::class)->only(['index', 'store', 'destroy']);
+
     // Attendance
     Route::get('/attendances/today', [AttendanceController::class, 'today']);
     Route::post('/attendances/check-in', [AttendanceController::class, 'checkIn']);
@@ -82,6 +88,10 @@ Route::middleware('auth:sanctum')->group(function () {
     // Availabilities
     Route::patch('/availabilities/{availability}/approve', [AvailabilityController::class, 'approve']);
     Route::apiResource('availabilities', AvailabilityController::class);
+
+    // Tasks
+    Route::patch('/tasks/{task}/status', [TaskController::class, 'updateStatus']);
+    Route::apiResource('tasks', TaskController::class);
 
     // Documents de service
     Route::prefix('documents')->group(function () {

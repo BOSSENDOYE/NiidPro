@@ -4,7 +4,7 @@ import {
   Box, TextField, Button, Typography,
   Alert, InputAdornment, IconButton, CircularProgress, Stack,
 } from '@mui/material';
-import { Visibility, VisibilityOff, Shield } from '@mui/icons-material';
+import { Visibility, VisibilityOff } from '@mui/icons-material';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -18,11 +18,6 @@ const schema = z.object({
 
 type FormData = z.infer<typeof schema>;
 
-const demoAccounts = [
-  { role: 'Super Admin', email: 'admin@niidpro.com', color: '#7C3AED' },
-  { role: 'Admin RH', email: 'rh@niidpro.com', color: '#2563EB' },
-  { role: 'Manager', email: 'manager@niidpro.com', color: '#059669' },
-];
 
 export default function LoginPage() {
   const [showPwd, setShowPwd] = useState(false);
@@ -218,48 +213,6 @@ export default function LoginPage() {
             </Stack>
           </Box>
 
-          {/* Demo accounts */}
-          <Box sx={{
-            mt: 4, p: 2.5,
-            bgcolor: '#fff',
-            border: '1px solid #E2E8F0',
-            borderRadius: '12px',
-          }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-              <Shield sx={{ fontSize: 14, color: '#64748B' }} />
-              <Typography sx={{ fontSize: 12, fontWeight: 600, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                Comptes de démonstration
-              </Typography>
-            </Box>
-            <Stack spacing={1}>
-              {demoAccounts.map((c) => (
-                <Box
-                  key={c.email}
-                  onClick={() => { setValue('email', c.email); setValue('password', 'password'); }}
-                  sx={{
-                    display: 'flex', alignItems: 'center', gap: 1.5,
-                    p: 1.25, borderRadius: '8px', cursor: 'pointer',
-                    border: '1px solid #F1F5F9',
-                    '&:hover': { bgcolor: '#F8FAFC', borderColor: '#E2E8F0' },
-                    transition: 'all 150ms',
-                  }}
-                >
-                  <Box sx={{
-                    width: 8, height: 8, borderRadius: '50%',
-                    bgcolor: c.color, flexShrink: 0,
-                  }} />
-                  <Box>
-                    <Typography sx={{ fontSize: 12, fontWeight: 600, color: '#334155', lineHeight: 1.2 }}>
-                      {c.role}
-                    </Typography>
-                    <Typography sx={{ fontSize: 11, color: '#94A3B8', lineHeight: 1.3 }}>
-                      {c.email} · password
-                    </Typography>
-                  </Box>
-                </Box>
-              ))}
-            </Stack>
-          </Box>
         </Box>
       </Box>
     </Box>

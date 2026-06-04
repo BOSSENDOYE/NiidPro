@@ -35,6 +35,10 @@ export default function AgentPortalPage() {
       const d = r.data as unknown;
       return Array.isArray(d) ? d : ((d as { data?: unknown[] }).data ?? []);
     }),
+    select: (data: unknown[]) =>
+      user?.employee?.id
+        ? (data as import('../../types').Attendance[]).find((a) => a.employee_id === user.employee!.id) ?? null
+        : (data as import('../../types').Attendance[])[0] ?? null,
   });
 
   const initials = user?.name
@@ -169,21 +173,32 @@ export default function AgentPortalPage() {
                 <Typography sx={{ fontSize: 12, color: '#94A3B8', mb: 1 }}>
                   {new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}
                 </Typography>
-                <StatusChip status="present" size="medium" />
+                {todayAtt
+                  ? <StatusChip status={todayAtt.status} size="medium" />
+                  : <Chip label="Non pointé" size="small" sx={{ bgcolor: '#F1F5F9', color: '#94A3B8', fontWeight: 700 }} />
+                }
               </Box>
 
               <Stack spacing={1.5} sx={{ mt: 2 }}>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
                   <Typography sx={{ fontSize: 13, color: '#64748B' }}>Arrivée</Typography>
-                  <Typography sx={{ fontSize: 13, fontWeight: 700 }}>08:30</Typography>
+                  <Typography sx={{ fontSize: 13, fontWeight: 700 }}>
+                    {todayAtt?.check_in ? todayAtt.check_in.slice(0, 5) : '—'}
+                  </Typography>
                 </Box>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <Typography sx={{ fontSize: 13, color: '#64748B' }}>Départ prévu</Typography>
-                  <Typography sx={{ fontSize: 13, fontWeight: 700 }}>17:30</Typography>
+                  <Typography sx={{ fontSize: 13, color: '#64748B' }}>Départ</Typography>
+                  <Typography sx={{ fontSize: 13, fontWeight: 700 }}>
+                    {todayAtt?.check_out ? todayAtt.check_out.slice(0, 5) : '—'}
+                  </Typography>
                 </Box>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
                   <Typography sx={{ fontSize: 13, color: '#64748B' }}>Temps travaillé</Typography>
-                  <Typography sx={{ fontSize: 13, fontWeight: 700, color: '#059669' }}>En cours...</Typography>
+                  <Typography sx={{ fontSize: 13, fontWeight: 700, color: '#059669' }}>
+                    {todayAtt?.worked_minutes
+                      ? `${Math.floor(todayAtt.worked_minutes / 60)}h${String(todayAtt.worked_minutes % 60).padStart(2, '0')}`
+                      : '—'}
+                  </Typography>
                 </Box>
               </Stack>
             </CardContent>

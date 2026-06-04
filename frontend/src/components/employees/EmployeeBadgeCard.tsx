@@ -90,10 +90,26 @@ function Recto({ emp, cardRef }: { emp: Employee; cardRef?: React.RefObject<HTML
         </Box>
       </Box>
 
+      {/* ── BANDEAU "CARTE PROFESSIONNELLE" ── */}
+      <Box sx={{
+        position: 'absolute',
+        top: 58, left: 0, right: 0,
+        height: 18, bgcolor: '#0D2137',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        zIndex: 6,
+      }}>
+        <Typography sx={{
+          fontSize: 8.5, fontWeight: 900, color: '#fff',
+          letterSpacing: '0.18em', textTransform: 'uppercase',
+        }}>
+          Carte Professionnelle
+        </Typography>
+      </Box>
+
       {/* ── CHAMPS IDENTITÉ (gauche, au-dessus de la bande) ── */}
       <Box sx={{
         position: 'absolute',
-        top: 65, left: 18,
+        top: 80, left: 18,
         zIndex: 6, width: '50%',
       }}>
         {[
@@ -142,30 +158,6 @@ function Recto({ emp, cardRef }: { emp: Employee; cardRef?: React.RefObject<HTML
         transform: 'translateY(-50%) rotate(-26deg)',
         bgcolor: '#E31937', zIndex: 3,
       }} />
-
-      {/* ── TEXTE "CARTE PROFESSIONNELLE" sur la bande ── */}
-      <Box sx={{
-        position: 'absolute',
-        width: '90%',
-        top: '64%',
-        left: '6%',
-        transform: 'translateY(-50%) rotate(-26deg)',
-        zIndex: 4,
-        pointerEvents: 'none',
-      }}>
-        <Typography sx={{
-          fontSize: 22, fontWeight: 900,
-          color: '#fff',
-          letterSpacing: '0.08em',
-          textShadow: '0 1px 4px rgba(0,0,0,0.45)',
-          textTransform: 'uppercase',
-          fontStyle: 'italic',
-          lineHeight: 1,
-          whiteSpace: 'nowrap',
-        }}>
-          CARTE PROFESSIONNELLE
-        </Typography>
-      </Box>
 
       {/* ── PHOTO (bas droite) ── */}
       <Box sx={{

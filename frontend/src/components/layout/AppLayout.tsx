@@ -10,8 +10,8 @@ import {
   ChevronLeft, ChevronRight, Logout, Person, Settings,
   NotificationsNone, Dashboard, Groups, Description, AccessTime,
   CameraAlt, BeachAccess, AssignmentLate, AccountTree, CheckBox,
-  Payments, BarChart, Storage, PhoneAndroid, KeyboardArrowDown,
-  Article, QrCodeScanner,
+  Payments, BarChart, Hub, PhoneAndroid, KeyboardArrowDown,
+  Article, QrCodeScanner, Archive,
 } from '@mui/icons-material';
 import { useAuthStore } from '../../store/auth.store';
 import { authApi } from '../../api/auth';
@@ -25,6 +25,7 @@ interface NavItem {
   icon: React.ReactNode;
   badge?: number;
   color?: string;
+  sub?: boolean;   // sous-menu : indentation + style réduit
 }
 interface NavSection {
   label: string;
@@ -42,7 +43,8 @@ const NAV: NavSection[] = [
     label: 'GESTION RH',
     items: [
       { path: '/employees',     label: 'Agents',            icon: <Groups />,         color: '#F97316' },
-      { path: '/contracts',     label: 'Contrats',          icon: <Description />,    color: '#A78BFA' },
+      { path: '/contracts',          label: 'Contrats',         icon: <Description />, color: '#A78BFA' },
+      { path: '/contracts/archives', label: 'Archive contrat',  icon: <Archive />,     color: '#C4B5FD', sub: true },
       { path: '/leaves',        label: 'Congés & Absences', icon: <BeachAccess />,    color: '#FCD34D' },
       { path: '/justifications',label: 'Justifications',    icon: <AssignmentLate />, color: '#F87171' },
     ],
@@ -59,6 +61,7 @@ const NAV: NavSection[] = [
     label: 'ORGANISATION',
     items: [
       { path: '/departments',   label: 'Directions & Services', icon: <AccountTree />, color: '#818CF8' },
+      { path: '/organigramme',  label: 'Organigramme',          icon: <Hub />,         color: '#38BDF8' },
       { path: '/tasks',         label: 'Tâches',                icon: <CheckBox />,    color: '#4ADE80' },
       { path: '/payroll',       label: 'Gestion de la paie',    icon: <Payments />,    color: '#FBBF24' },
       { path: '/social-report', label: 'Bilan social',          icon: <BarChart />,    color: '#38BDF8' },
@@ -68,12 +71,6 @@ const NAV: NavSection[] = [
     label: 'DOCUMENTS',
     items: [
       { path: '/documents', label: 'Documents de Service', icon: <Article />, color: '#0EA5E9' },
-    ],
-  },
-  {
-    label: 'CONFIGURATION',
-    items: [
-      { path: '/schema', label: 'Schéma SQL', icon: <Storage />, color: '#94A3B8' },
     ],
   },
   {
@@ -88,7 +85,8 @@ const NAV: NavSection[] = [
 const PAGE_LABELS: Record<string, string> = {
   '/dashboard':         'Tableau de bord',
   '/employees':         'Gestion des Agents',
-  '/contracts':         'Contrats & Alertes',
+  '/contracts':          'Contrats & Alertes',
+  '/contracts/archives': 'Archives Contrats',
   '/attendances':        'Pointage — Tableau de bord',
   '/attendance-scanner': 'Terminal de Badgeage QR',
   '/attendance-visual':  'Pointage — Calendrier',
@@ -252,7 +250,7 @@ export default function AppLayout() {
                   {section.items.map((item) => {
                     const active = item.path === '/dashboard'
                       ? location.pathname === item.path
-                      : location.pathname.startsWith(item.path);
+                      : location.pathname === item.path || (item.path !== '/contracts' && location.pathname.startsWith(item.path));
 
                     return (
                       <Tooltip key={item.path} title={!open ? item.label : ''} placement="right" arrow>
@@ -260,21 +258,23 @@ export default function AppLayout() {
                           onClick={() => navigate(item.path)}
                           sx={{
                             borderRadius: '9px', mb: 0.5,
-                            px: open ? 1.5 : 0, py: '7px',
+                            pl: open ? (item.sub ? 3 : 1.5) : 0,
+                            pr: open ? 1.5 : 0,
+                            py: item.sub ? '5px' : '7px',
                             justifyContent: open ? 'flex-start' : 'center',
                             position: 'relative',
                             bgcolor: active ? SB.activeBg : 'transparent',
-                            borderLeft: active ? `2px solid ${SB.activeBorder}` : '2px solid transparent',
+                            borderLeft: active ? `2px solid ${SB.activeBorder}` : item.sub && open ? '2px solid rgba(255,255,255,0.06)' : '2px solid transparent',
                             '&:hover': { bgcolor: active ? SB.activeBg : SB.hoverBg },
                             transition: 'all 150ms ease',
                           }}
                         >
                           <ListItemIcon
                             sx={{
-                              minWidth: open ? 34 : 'unset',
+                              minWidth: open ? (item.sub ? 28 : 34) : 'unset',
                               justifyContent: 'center',
                               '& svg': {
-                                fontSize: 18,
+                                fontSize: item.sub ? 15 : 18,
                                 color: active ? (item.color ?? '#60A5FA') : SB.itemText,
                                 transition: 'color 150ms',
                                 filter: active ? `drop-shadow(0 0 6px ${item.color ?? '#60A5FA'}80)` : 'none',
@@ -289,8 +289,9 @@ export default function AppLayout() {
                               <ListItemText
                                 primary={item.label}
                                 primaryTypographyProps={{
-                                  fontSize: 13, fontWeight: active ? 600 : 400,
-                                  color: active ? SB.itemTextActive : SB.itemText,
+                                  fontSize: item.sub ? 12 : 13,
+                                  fontWeight: active ? 600 : 400,
+                                  color: active ? SB.itemTextActive : item.sub ? '#5A7A90' : SB.itemText,
                                   noWrap: true, letterSpacing: '-0.1px',
                                 }}
                               />

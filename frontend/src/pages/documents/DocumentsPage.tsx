@@ -683,8 +683,10 @@ function GenerateModal({ open, onClose, template }: GenerateModalProps) {
                 setSelectedEmployees(val ? (Array.isArray(val) ? val : [val]) : [])
               }
               getOptionLabel={(o: Employee) => `${o.full_name} — ${o.employee_number}`}
-              renderOption={(props, o: Employee) => (
-                <Box component="li" {...props} sx={{ display: 'flex', alignItems: 'center', gap: 1.5, py: 1 }}>
+              renderOption={(props, o: Employee) => {
+                const { key, ...optProps } = props as typeof props & { key: React.Key };
+                return (
+                <Box key={key} component="li" {...optProps} sx={{ display: 'flex', alignItems: 'center', gap: 1.5, py: 1 }}>
                   <Avatar sx={{ width: 32, height: 32, bgcolor: cfg.color, fontSize: 12, fontWeight: 700 }}>
                     {o.first_name[0]}{o.last_name[0]}
                   </Avatar>
@@ -695,7 +697,8 @@ function GenerateModal({ open, onClose, template }: GenerateModalProps) {
                     </Typography>
                   </Box>
                 </Box>
-              )}
+                );
+              }}
               renderInput={(params) => (
                 <TextField {...params} label={cfg.multi ? 'Agent(s) concerné(s)' : 'Agent concerné'} size="small"
                   InputProps={{ ...params.InputProps, sx: { borderRadius: '10px' } }} />
