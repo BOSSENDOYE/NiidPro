@@ -11,7 +11,7 @@ import {
   NotificationsNone, Dashboard, Groups, Description, AccessTime,
   CameraAlt, BeachAccess, AssignmentLate, AccountTree, CheckBox,
   Payments, BarChart, Hub, PhoneAndroid, KeyboardArrowDown,
-  Article, QrCodeScanner, Archive, School,
+  Article, QrCodeScanner, Archive, School, PersonSearch,
 } from '@mui/icons-material';
 import { useAuthStore } from '../../store/auth.store';
 import { authApi } from '../../api/auth';
@@ -47,6 +47,7 @@ const NAV: NavSection[] = [
       { path: '/contracts/archives', label: 'Archive contrat',  icon: <Archive />,     color: '#C4B5FD', sub: true },
       { path: '/leaves',        label: 'Congés & Absences', icon: <BeachAccess />,    color: '#FCD34D' },
       { path: '/trainings',     label: 'Gestion Formation', icon: <School />,         color: '#8B5CF6' },
+      { path: '/recruitment',   label: 'Recrutements',      icon: <PersonSearch />,   color: '#0EA5E9' },
       { path: '/justifications',label: 'Justifications',    icon: <AssignmentLate />, color: '#F87171' },
     ],
   },
@@ -93,6 +94,7 @@ const PAGE_LABELS: Record<string, string> = {
   '/attendance-visual':  'Pointage — Calendrier',
   '/leaves':            'Congés & Absences',
   '/trainings':         'Gestion des Formations',
+  '/recruitment':       'Gestion des Recrutements',
   '/justifications':    'Justifications',
   '/organigramme':      'Organigramme ANASER',
   '/departments':       'Directions',

@@ -24,8 +24,52 @@ import { formatDate } from '../../utils/format';
 import type { Training } from '../../types';
 
 /* ─── Palette ─── */
-const ACT  = '#8B5CF6';
-const TH   = '#5B21B5';
+const NAV = '#0D2137';
+const ACT = '#E85D04';
+const TH  = '#1A3A5C';
+
+/* ─── NavTab ─── */
+function NavTab({
+  label, icon, active, onClick, badge,
+}: {
+  label: string;
+  icon: React.ReactNode;
+  active: boolean;
+  onClick: () => void;
+  badge?: number;
+}) {
+  return (
+    <Box
+      onClick={onClick}
+      sx={{
+        display: 'flex', alignItems: 'center', gap: '6px',
+        px: 2, py: 1, cursor: 'pointer', borderRadius: '8px 8px 0 0',
+        fontWeight: 700, fontSize: 13, userSelect: 'none',
+        bgcolor:      active ? ACT : '#fff',
+        color:        active ? '#fff' : TH,
+        border:       `1.5px solid ${active ? ACT : '#93C5FD'}`,
+        borderBottom: 'none',
+        boxShadow:    active ? '0 -2px 8px rgba(232,93,4,0.25)' : 'none',
+        transition:   'all 0.15s',
+        '&:hover':    { bgcolor: active ? ACT : '#EFF6FF' },
+        whiteSpace: 'nowrap',
+      }}
+    >
+      <Box sx={{ '& svg': { fontSize: 15 } }}>{icon}</Box>
+      {label}
+      {badge !== undefined && badge > 0 && (
+        <Box sx={{
+          px: 0.9, borderRadius: '10px', fontSize: 11, fontWeight: 800,
+          lineHeight: '20px', minWidth: 20, textAlign: 'center',
+          bgcolor: active ? 'rgba(255,255,255,0.28)' : '#E2E8F0',
+          color:   active ? '#fff' : '#64748B',
+        }}>
+          {badge}
+        </Box>
+      )}
+    </Box>
+  );
+}
 
 /* ─── Tabs config ─── */
 const TABS = [
@@ -332,7 +376,7 @@ export default function TrainingsPage() {
         <Box sx={{ border: '1px solid #CBD5E1', borderTop: tab === 0 ? 'none' : undefined, p: 1.5, bgcolor: '#F8FAFC', display: 'flex', justifyContent: 'flex-end' }}>
           <Button variant="contained" size="small" startIcon={<Add sx={{ fontSize: '16px !important' }} />}
             onClick={() => { resetForm(); setNewOpen(true); }}
-            sx={{ bgcolor: ACT, '&:hover': { bgcolor: '#7C3AED' }, borderRadius: '6px', fontSize: 12, fontWeight: 700 }}>
+            sx={{ bgcolor: ACT, '&:hover': { bgcolor: '#C04A02' }, borderRadius: '6px', fontSize: 12, fontWeight: 700 }}>
             Nouvelle formation
           </Button>
         </Box>
@@ -369,7 +413,7 @@ export default function TrainingsPage() {
                 </TableRow>
               ) : (
                 rows.map((training) => (
-                  <TableRow key={training.id} hover sx={{ '&:hover': { bgcolor: 'rgba(139,92,246,0.05)' } }}>
+                  <TableRow key={training.id} hover sx={{ '&:hover': { bgcolor: 'rgba(30,58,95,0.05)' } }}>
                     <TableCell sx={{ fontSize: 12, fontWeight: 600, color: '#0F172A' }}>{training.title}</TableCell>
                     <TableCell sx={{ fontSize: 11, color: '#64748B' }}>
                       {training.trainingType?.name || '—'}
@@ -428,7 +472,7 @@ export default function TrainingsPage() {
                             </Tooltip>
                             <Tooltip title="Demander des compléments">
                               <IconButton size="small" onClick={() => { setInfoOpen(training); setInfoText(''); }}
-                                sx={{ color: '#7C3AED' }}>
+                                sx={{ color: TH }}>
                                 <HelpOutline sx={{ fontSize: 16 }} />
                               </IconButton>
                             </Tooltip>
@@ -523,33 +567,45 @@ export default function TrainingsPage() {
   };
 
   return (
-    <Box sx={{ bgcolor: '#F8FAFC', minHeight: '100vh' }}>
-      {/* ── Header ── */}
-      <Box sx={{ bgcolor: TH, px: 3, py: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-          <School sx={{ color: '#fff', fontSize: 28 }} />
-          <Box>
-            <Typography sx={{ color: '#fff', fontWeight: 800, fontSize: 20 }}>Gestion des Formations</Typography>
-            <Typography sx={{ color: 'rgba(255,255,255,0.7)', fontSize: 12 }}>Demandes, validations et suivi</Typography>
-          </Box>
+    <Box>
+      {/* ══ En-tête ══ */}
+      <Box sx={{ bgcolor: NAV, px: 3, py: 1.5, borderRadius: '12px 12px 0 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <Box>
+          <Typography sx={{ color: '#fff', fontWeight: 800, fontSize: 18, letterSpacing: '-0.3px' }}>Gestion des Formations</Typography>
+          <Typography sx={{ color: 'rgba(255,255,255,0.45)', fontSize: 11.5, mt: 0.1 }}>Demandes, validations et suivi · ANASER</Typography>
         </Box>
-      </Box>
-
-      {/* ── Tabs ── */}
-      <Box sx={{ bgcolor: '#fff', borderBottom: '1px solid #E2E8F0', px: 3 }}>
-        <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ '& .MuiTab-root': { fontSize: 13, fontWeight: 600, textTransform: 'none', minHeight: 48 } }}>
-          {TABS.map((t, i) => (
-            <Tab key={i} label={t.label} icon={t.icon} iconPosition="start" />
+        <Stack direction="row" spacing={2}>
+          {[
+            { label: 'Total',       count: allTrainings.length,                                         color: '#93C5FD' },
+            { label: 'En attente',  count: pendingTrainings.length,                                     color: '#FCD34D' },
+            { label: 'Approuvées',  count: allTrainings.filter((t) => t.status === 'approved').length,  color: '#6EE7B7' },
+            { label: 'Réalisées',   count: allTrainings.filter((t) => t.status === 'completed').length, color: '#C4B5FD' },
+          ].map(({ label, count, color }) => (
+            <Stack key={label} direction="row" alignItems="center" spacing={0.75}>
+              <Typography sx={{ fontSize: 11, color: 'rgba(255,255,255,0.5)' }}>{label}</Typography>
+              <Box sx={{ px: 1, py: 0.1, borderRadius: '8px', bgcolor: 'rgba(255,255,255,0.12)', minWidth: 24, textAlign: 'center' }}>
+                <Typography sx={{ fontSize: 12, fontWeight: 800, color }}>{count}</Typography>
+              </Box>
+            </Stack>
           ))}
-        </Tabs>
+        </Stack>
       </Box>
 
-      {/* ── Content ── */}
-      {renderContent()}
+      {/* ══ Onglets ══ */}
+      <Box sx={{ bgcolor: '#F1F5F9', px: 2.5, pt: 2, pb: 0, display: 'flex', gap: 1, flexWrap: 'wrap', borderBottom: `2px solid ${NAV}` }}>
+        {TABS.map((t, i) => (
+          <NavTab key={i} label={t.label} icon={t.icon} active={tab === i} onClick={() => setTab(i)} />
+        ))}
+      </Box>
+
+      {/* ══ Contenu ══ */}
+      <Box sx={{ bgcolor: '#fff', border: '1px solid #CBD5E1', borderTop: 'none', borderRadius: '0 0 12px 12px', overflow: 'hidden' }}>
+        {renderContent()}
+      </Box>
 
       {/* ────── DIALOG CRÉATION/MODIFICATION ────── */}
       <Dialog open={newOpen} onClose={() => { setNewOpen(false); resetForm(); }} maxWidth="sm" fullWidth>
-        <DialogTitle sx={{ bgcolor: TH, color: '#fff', fontWeight: 700 }}>
+        <DialogTitle sx={{ bgcolor: NAV, color: '#fff', fontWeight: 700 }}>
           {editTarget ? 'Modifier la formation' : 'Nouvelle formation'}
         </DialogTitle>
         <DialogContent sx={{ pt: 2.5 }}>
@@ -655,7 +711,7 @@ export default function TrainingsPage() {
 
       {/* ────── DIALOG VALIDATION ────── */}
       <Dialog open={!!validateOpen} onClose={() => setValidateOpen(null)} maxWidth="sm" fullWidth>
-        <DialogTitle sx={{ bgcolor: TH, color: '#fff', fontWeight: 700 }}>
+        <DialogTitle sx={{ bgcolor: NAV, color: '#fff', fontWeight: 700 }}>
           {validateOpen?.action === 'approve' ? 'Approuver' : 'Rejeter'} la formation
         </DialogTitle>
         <DialogContent sx={{ pt: 2.5 }}>
@@ -681,7 +737,7 @@ export default function TrainingsPage() {
 
       {/* ────── DIALOG DÉTAILS (avec onglets) ────── */}
       <Dialog open={detailOpen} onClose={() => { setDetailOpen(false); setDetailTab(0); }} maxWidth="md" fullWidth>
-        <DialogTitle sx={{ bgcolor: TH, color: '#fff', fontWeight: 700 }}>
+        <DialogTitle sx={{ bgcolor: NAV, color: '#fff', fontWeight: 700 }}>
           {selectedTraining ? `Formation: ${selectedTraining.title}` : 'Détails'}
         </DialogTitle>
         
@@ -790,7 +846,7 @@ export default function TrainingsPage() {
 
       {/* ────── DIALOG : Demander des compléments ────── */}
       <Dialog open={!!infoOpen} onClose={() => setInfoOpen(null)} maxWidth="sm" fullWidth>
-        <DialogTitle sx={{ bgcolor: TH, color: '#fff', fontWeight: 700 }}>Demander des compléments d'information</DialogTitle>
+        <DialogTitle sx={{ bgcolor: NAV, color: '#fff', fontWeight: 700 }}>Demander des compléments d'information</DialogTitle>
         <DialogContent sx={{ pt: 2.5 }}>
           <TextField label="Informations demandées *" fullWidth multiline rows={4} size="small"
             value={infoText} onChange={(e) => setInfoText(e.target.value)}
@@ -798,7 +854,7 @@ export default function TrainingsPage() {
         </DialogContent>
         <DialogActions sx={{ p: 2 }}>
           <Button onClick={() => setInfoOpen(null)}>Annuler</Button>
-          <Button variant="contained" sx={{ bgcolor: '#7C3AED' }}
+          <Button variant="contained" sx={{ bgcolor: TH }}
             disabled={!infoText.trim() || requestInfoMutation.isPending}
             onClick={() => infoOpen && requestInfoMutation.mutate({ id: infoOpen.id, text: infoText })}>
             Envoyer la demande
@@ -808,7 +864,7 @@ export default function TrainingsPage() {
 
       {/* ────── DIALOG : Planification ────── */}
       <Dialog open={!!planOpen} onClose={() => setPlanOpen(null)} maxWidth="sm" fullWidth>
-        <DialogTitle sx={{ bgcolor: TH, color: '#fff', fontWeight: 700 }}>Planifier la formation</DialogTitle>
+        <DialogTitle sx={{ bgcolor: NAV, color: '#fff', fontWeight: 700 }}>Planifier la formation</DialogTitle>
         <DialogContent sx={{ pt: 2.5 }}>
           <Stack spacing={2}>
             <Stack direction="row" spacing={2}>
@@ -833,7 +889,7 @@ export default function TrainingsPage() {
 
       {/* ────── DIALOG : Clôture (rapport, évaluation, recommandations) ────── */}
       <Dialog open={!!completeOpen} onClose={() => setCompleteOpen(null)} maxWidth="sm" fullWidth>
-        <DialogTitle sx={{ bgcolor: TH, color: '#fff', fontWeight: 700 }}>Clôturer la formation</DialogTitle>
+        <DialogTitle sx={{ bgcolor: NAV, color: '#fff', fontWeight: 700 }}>Clôturer la formation</DialogTitle>
         <DialogContent sx={{ pt: 2.5 }}>
           <Stack spacing={2}>
             <TextField label="Rapport de formation" fullWidth multiline rows={3} size="small"
