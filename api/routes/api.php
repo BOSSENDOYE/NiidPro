@@ -14,6 +14,7 @@ use App\Http\Controllers\Api\LeaveController;
 use App\Http\Controllers\Api\SanctionController;
 use App\Http\Controllers\Api\SettingsController;
 use App\Http\Controllers\Api\TaskController;
+use App\Http\Controllers\Api\TrainingController;
 use Illuminate\Support\Facades\Route;
 
 // Health check
@@ -92,6 +93,57 @@ Route::middleware('auth:sanctum')->group(function () {
     // Tasks
     Route::patch('/tasks/{task}/status', [TaskController::class, 'updateStatus']);
     Route::apiResource('tasks', TaskController::class);
+
+    // Trainings — routes nommées avant apiResource
+    Route::get('/trainings/pending',              [TrainingController::class, 'pending']);
+    Route::get('/trainings/statistics',           [TrainingController::class, 'statistics']);
+
+    // Paramétrage : types
+    Route::get('/trainings/types',                [TrainingController::class, 'types']);
+    Route::post('/trainings/types',               [TrainingController::class, 'storeType']);
+    Route::put('/trainings/types/{type}',         [TrainingController::class, 'updateType']);
+    Route::delete('/trainings/types/{type}',      [TrainingController::class, 'destroyType']);
+
+    // Paramétrage : organismes
+    Route::get('/trainings/providers',            [TrainingController::class, 'providers']);
+    Route::post('/trainings/providers',           [TrainingController::class, 'storeProvider']);
+    Route::put('/trainings/providers/{provider}', [TrainingController::class, 'updateProvider']);
+    Route::delete('/trainings/providers/{provider}', [TrainingController::class, 'destroyProvider']);
+
+    // Paramétrage : budgets
+    Route::get('/trainings/budgets',              [TrainingController::class, 'budgets']);
+    Route::post('/trainings/budgets',             [TrainingController::class, 'storeBudget']);
+    Route::put('/trainings/budgets/{budget}',     [TrainingController::class, 'updateBudget']);
+    Route::delete('/trainings/budgets/{budget}',  [TrainingController::class, 'destroyBudget']);
+
+    // Paramétrage : centres de coûts
+    Route::get('/trainings/cost-centers',                  [TrainingController::class, 'costCenters']);
+    Route::post('/trainings/cost-centers',                 [TrainingController::class, 'storeCostCenter']);
+    Route::put('/trainings/cost-centers/{costCenter}',     [TrainingController::class, 'updateCostCenter']);
+    Route::delete('/trainings/cost-centers/{costCenter}',  [TrainingController::class, 'destroyCostCenter']);
+
+    // Historique par agent
+    Route::get('/trainings/employee/{employeeId}/history', [TrainingController::class, 'employeeHistory']);
+
+    // Workflow & actions sur une formation
+    Route::post('/trainings/{training}/approve',      [TrainingController::class, 'approve']);
+    Route::post('/trainings/{training}/reject',       [TrainingController::class, 'reject']);
+    Route::post('/trainings/{training}/request-info', [TrainingController::class, 'requestInfo']);
+    Route::post('/trainings/{training}/plan',         [TrainingController::class, 'plan']);
+    Route::post('/trainings/{training}/status',       [TrainingController::class, 'setStatus']);
+    Route::post('/trainings/{training}/participants', [TrainingController::class, 'addParticipants']);
+    Route::delete('/trainings/{training}/participants/{employeeId}', [TrainingController::class, 'removeParticipant']);
+    Route::post('/trainings/{training}/attendance',   [TrainingController::class, 'recordAttendance']);
+    Route::get('/trainings/{training}/evaluations',   [TrainingController::class, 'evaluations']);
+    Route::post('/trainings/{training}/evaluate',     [TrainingController::class, 'evaluate']);
+
+    // Documents & attestations
+    Route::get('/trainings/{training}/documents',                 [TrainingController::class, 'documents']);
+    Route::post('/trainings/{training}/documents',                [TrainingController::class, 'uploadDocument']);
+    Route::delete('/trainings/{training}/documents/{document}',   [TrainingController::class, 'deleteDocument']);
+    Route::post('/trainings/{training}/certificates',             [TrainingController::class, 'generateCertificates']);
+
+    Route::apiResource('trainings', TrainingController::class);
 
     // Documents de service
     Route::prefix('documents')->group(function () {

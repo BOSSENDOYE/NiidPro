@@ -32,6 +32,9 @@ import AttendanceScannerPage from './pages/attendances/AttendanceScannerPage';
 // Congés
 import LeavesPage from './pages/leaves/LeavesPage';
 
+// Formations
+import TrainingsPage from './pages/trainings/TrainingsPage';
+
 // Justifications
 import JustificationsPage from './pages/justifications/JustificationsPage';
 
@@ -103,6 +106,7 @@ export default function App() {
               <Route path="attendance-scanner" element={<AttendanceScannerPage />} />
 
               <Route path="leaves" element={<LeavesPage />} />
+              <Route path="trainings" element={<TrainingsPage />} />
               <Route path="justifications" element={<JustificationsPage />} />
 
               {/* Organisation */}

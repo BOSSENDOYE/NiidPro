@@ -263,6 +263,9 @@ class DatabaseSeeder extends Seeder
         // ── Document Templates ──────────────────────────────────────────────
         $this->call(DocumentTemplateSeeder::class);
 
+        // ── Training Module ──────────────────────────────────────────────────
+        $this->call(TrainingSeeder::class);
+
         $this->command->info('NiidPro database seeded successfully!');
         $this->command->table(
             ['Rôle', 'Email', 'Mot de passe'],

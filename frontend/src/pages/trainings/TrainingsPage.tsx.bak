@@ -7,24 +7,20 @@ import {
   DialogTitle, DialogContent, DialogActions, Checkbox,
   Autocomplete, Chip, Alert, CircularProgress,
 } from '@mui/material';
-import { Add, Search, Clear, CheckCircle, Cancel, Print, Description } from '@mui/icons-material';
-import { leavesApi } from '../../api/leaves';
+import { Add, Search, Clear, CheckCircle, Cancel, Description, School, Group, Assessment, TableChart, Event, AttachMoney, PersonAdd } from '@mui/icons-material';
+import { trainingsApi } from '../../api/trainings';
 import { employeesApi } from '../../api/employees';
-import { documentsApi } from '../../api/documents';
 import StatusChip from '../../components/common/StatusChip';
-import LeavePlanningTab from '../../components/employees/LeavePlanningTab';
-import LeaveAttestationTab from '../../components/employees/LeaveAttestationTab';
-import LeaveBalanceTab from '../../components/employees/LeaveBalanceTab';
 import { formatDate } from '../../utils/format';
-import type { Leave, GeneratedDocument } from '../../types';
+import type { Training, TrainingType, TrainingProvider, TrainingBudget, TrainingEvaluation } from '../../types';
 
 /* ─── Palette ─── */
 const NAV  = '#0D2137';
-const ACT  = '#E85D04';
-const TH   = '#1A3A5C';
+const ACT  = '#8B5CF6';
+const TH   = '#5B21B5';
 
 /* ─── Main ─── */
-export default function LeavesPage() {
+export default function TrainingsPage() {
   const qc = useQueryClient();
   const [tab, setTab]         = useState(0);
   const [selectedId, setSelectedId] = useState<number | null>(null);
@@ -37,43 +33,52 @@ export default function LeavesPage() {
   const [dateTo,   setDateTo]   = useState('');
   const [service,  setService]  = useState('');
   const [typeFilter, setTypeFilter] = useState('');
-  const [matricule, setMatricule]   = useState('');
 
   /* dialogs */
   const [newOpen,     setNewOpen]     = useState(false);
   const [detailOpen,  setDetailOpen]  = useState(false);
-  const [validateOpen, setValidateOpen] = useState<{ leave: Leave; action: 'approve' | 'reject' } | null>(null);
+  const [validateOpen, setValidateOpen] = useState<{ training: Training; action: 'approve' | 'reject' } | null>(null);
   const [comment,     setComment]     = useState('');
-  const [attestOpen,  setAttestOpen]  = useState(false);
-  const [attestTemplate, setAttestTemplate] = useState('');
-  const [lastGenerated, setLastGenerated]   = useState<GeneratedDocument | null>(null);
 
-  /* form nouveau congé */
-  const [formEmpId,    setFormEmpId]    = useState<number | null>(null);
-  const [formTypeId,   setFormTypeId]   = useState('');
-  const [formStart,    setFormStart]    = useState('');
-  const [formEnd,      setFormEnd]      = useState('');
-  const [formReason,   setFormReason]   = useState('');
+  /* form nouveau formation */
+  const [formTitle,       setFormTitle]       = useState('');
+  const [formTypeId,      setFormTypeId]      = useState('');
+  const [formIsInternal,  setFormIsInternal]  = useState(true);
+  const [formProviderId,  setFormProviderId]  = useState<number | null>(null);
+  const [formObjectives,  setFormObjectives]  = useState('');
+  const [formJustification, setFormJustification] = useState('');
+  const [formParticipants, setFormParticipants] = useState<number[]>([]);
+  const [formDesiredDate, setFormDesiredDate] = useState('');
+  const [formDuration,    setFormDuration]    = useState('');
+  const [formLocation,    setFormLocation]    = useState('');
+  const [formEstimatedCost, setFormEstimatedCost] = useState('');
+  const [formFundingSource, setFormFundingSource] = useState('');
+  const [formPriority,    setFormPriority]    = useState<'low' | 'medium' | 'high'>('medium');
 
   /* queries */
-  const { data: allLeaves = [], isLoading } = useQuery({
-    queryKey: ['leaves'],
-    queryFn: () => leavesApi.list().then((r) => r.data),
+  const { data: allTrainings = [], isLoading } = useQuery({
+    queryKey: ['trainings'],
+    queryFn: () => trainingsApi.list().then((r) => r.data),
   });
 
-  const { data: pendingLeaves = [] } = useQuery({
-    queryKey: ['leaves', 'pending'],
-    queryFn: () => leavesApi.pending().then((r) => r.data),
+  const { data: pendingTrainings = [] } = useQuery({
+    queryKey: ['trainings', 'pending'],
+    queryFn: () => trainingsApi.pending().then((r) => r.data),
   });
 
-  const { data: leaveTypes = [] } = useQuery({
-    queryKey: ['leaves', 'types'],
-    queryFn: () => leavesApi.types().then((r) => r.data),
+  const { data: trainingTypes = [] } = useQuery({
+    queryKey: ['trainings', 'types'],
+    queryFn: () => trainingsApi.types().then((r) => r.data),
   });
 
-  const { data: attestTemplates = [] } = useQuery({
-    queryKey: ['documents', 'templates', 'attestation'],
-    queryFn: () => documentsApi.listTemplates({ type: 'attestation' }).then((r) => r.data),
+  const { data: providers = [] } = useQuery({
+    queryKey: ['trainings', 'providers'],
+    queryFn: () => trainingsApi.providers().then((r) => r.data),
+  });
+
+  const { data: budgets = [] } = useQuery({
+    queryKey: ['trainings', 'budgets'],
+    queryFn: () => trainingsApi.budgets().then((r) => r.data),
   });
 
   const { data: employeesData } = useQuery({
@@ -84,65 +89,55 @@ export default function LeavesPage() {
 
   /* mutations */
   const createMutation = useMutation({
-    mutationFn: (d: Partial<Leave>) => leavesApi.create(d),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['leaves'] }); setNewOpen(false); resetForm(); },
+    mutationFn: (d: Partial<Training>) => trainingsApi.create(d),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['trainings'] }); setNewOpen(false); resetForm(); },
   });
 
   const approveMutation = useMutation({
-    mutationFn: ({ id, comment }: { id: number; comment: string }) => leavesApi.approve(id, comment),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['leaves'] }); setValidateOpen(null); setComment(''); },
+    mutationFn: ({ id, comment }: { id: number; comment: string }) => trainingsApi.approve(id, comment),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['trainings'] }); setValidateOpen(null); setComment(''); },
   });
 
   const rejectMutation = useMutation({
-    mutationFn: ({ id, comment }: { id: number; comment: string }) => leavesApi.reject(id, comment),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['leaves'] }); setValidateOpen(null); setComment(''); },
-  });
-
-  const generateMutation = useMutation({
-    mutationFn: () => documentsApi.generate(Number(attestTemplate), [selectedLeave!.employee_id]),
-    onSuccess: (r) => {
-      setLastGenerated((r.data as { documents?: GeneratedDocument[] }).documents?.[0] ?? null);
-      qc.invalidateQueries({ queryKey: ['documents', 'generated'] });
-    },
+    mutationFn: ({ id, comment }: { id: number; comment: string }) => trainingsApi.reject(id, comment),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['trainings'] }); setValidateOpen(null); setComment(''); },
   });
 
   const resetForm = () => {
-    setFormEmpId(null); setFormTypeId(''); setFormStart(''); setFormEnd(''); setFormReason('');
+    setFormTitle(''); setFormTypeId(''); setFormIsInternal(true); setFormProviderId(null);
+    setFormObjectives(''); setFormJustification(''); setFormParticipants([]);
+    setFormDesiredDate(''); setFormDuration(''); setFormLocation('');
+    setFormEstimatedCost(''); setFormFundingSource(''); setFormPriority('medium');
   };
 
   /* filtrage */
-  const matchSearch = (l: Leave) => {
+  const matchSearch = (t: Training) => {
     if (!globalSearch) return true;
     const s = globalSearch.toLowerCase();
-    const name = `${l.employee?.first_name ?? ''} ${l.employee?.last_name ?? ''}`.toLowerCase();
-    const mat  = (l.employee?.employee_number ?? '').toLowerCase();
-    const dept = (l.employee?.department?.name ?? '').toLowerCase();
-    return name.includes(s) || mat.includes(s) || dept.includes(s);
+    const name = `${t.title ?? ''}`.toLowerCase();
+    return name.includes(s);
   };
 
   const filtered = useMemo(() => {
-    return allLeaves.filter((l) => {
-      if (!matchSearch(l)) return false;
-      if (dateFrom && l.start_date < dateFrom) return false;
-      if (dateTo   && l.end_date   > dateTo)   return false;
-      if (service  && l.employee?.department?.name?.toLowerCase().indexOf(service.toLowerCase()) === -1) return false;
-      if (typeFilter && String(l.leave_type_id) !== typeFilter) return false;
-      if (matricule && !(l.employee?.employee_number ?? '').toLowerCase().includes(matricule.toLowerCase())) return false;
+    return allTrainings.filter((t) => {
+      if (!matchSearch(t)) return false;
+      if (dateFrom && t.desired_date && t.desired_date < dateFrom) return false;
+      if (dateTo && t.desired_date && t.desired_date > dateTo) return false;
+      if (typeFilter && String(t.training_type_id) !== typeFilter) return false;
       return true;
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [allLeaves, globalSearch, dateFrom, dateTo, service, typeFilter, matricule]);
+  }, [allTrainings, globalSearch, dateFrom, dateTo, typeFilter]);
 
   const filteredPending = useMemo(
-    () => pendingLeaves.filter(matchSearch),
+    () => pendingTrainings.filter(matchSearch),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [pendingLeaves, globalSearch],
+    [pendingTrainings, globalSearch],
   );
 
-  const handleSearch = () => { /* filtrage réactif */ };
-  const handleClear  = () => { setDateFrom(''); setDateTo(''); setService(''); setTypeFilter(''); setMatricule(''); };
+  const handleClear  = () => { setDateFrom(''); setDateTo(''); setTypeFilter(''); };
 
-  const selectedLeave = allLeaves.find((l) => l.id === selectedId) ?? null;
+  const selectedTraining = allTrainings.find((t) => t.id === selectedId) ?? null;
 
   /* ─── render tab content ─── */
   const renderContent = () => {
@@ -709,3 +704,5 @@ export default function LeavesPage() {
     </Box>
   );
 }
+
+

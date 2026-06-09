@@ -11,7 +11,7 @@ import {
   NotificationsNone, Dashboard, Groups, Description, AccessTime,
   CameraAlt, BeachAccess, AssignmentLate, AccountTree, CheckBox,
   Payments, BarChart, Hub, PhoneAndroid, KeyboardArrowDown,
-  Article, QrCodeScanner, Archive,
+  Article, QrCodeScanner, Archive, School,
 } from '@mui/icons-material';
 import { useAuthStore } from '../../store/auth.store';
 import { authApi } from '../../api/auth';
@@ -46,6 +46,7 @@ const NAV: NavSection[] = [
       { path: '/contracts',          label: 'Contrats',         icon: <Description />, color: '#A78BFA' },
       { path: '/contracts/archives', label: 'Archive contrat',  icon: <Archive />,     color: '#C4B5FD', sub: true },
       { path: '/leaves',        label: 'Congés & Absences', icon: <BeachAccess />,    color: '#FCD34D' },
+      { path: '/trainings',     label: 'Gestion Formation', icon: <School />,         color: '#8B5CF6' },
       { path: '/justifications',label: 'Justifications',    icon: <AssignmentLate />, color: '#F87171' },
     ],
   },
@@ -91,6 +92,7 @@ const PAGE_LABELS: Record<string, string> = {
   '/attendance-scanner': 'Terminal de Badgeage QR',
   '/attendance-visual':  'Pointage — Calendrier',
   '/leaves':            'Congés & Absences',
+  '/trainings':         'Gestion des Formations',
   '/justifications':    'Justifications',
   '/organigramme':      'Organigramme ANASER',
   '/departments':       'Directions',

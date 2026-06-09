@@ -61,6 +61,11 @@ export interface Employee {
   city?: string;
   annual_leave_days: number;
   photo_url?: string;
+  nbre_jour_restant?:      number;
+  nbre_jour_conge?:        number;
+  nombre_enfants_charge?:  number;
+  a_medaille_travail?:     boolean;
+  anciennete_recrutement?: string;
 }
 
 export interface Contract {
@@ -237,6 +242,166 @@ export interface Sanction {
   file_url?: string;
   created_at: string;
   updated_at: string;
+}
+
+export interface TrainingType {
+  id: number;
+  name: string;
+  code: string;
+  description?: string;
+}
+
+export interface TrainingProvider {
+  id: number;
+  name: string;
+  contact_person?: string;
+  email?: string;
+  phone?: string;
+  address?: string;
+}
+
+export interface TrainingBudget {
+  id: number;
+  name: string;
+  department_id?: number | null;
+  department?: Department;
+  year: number;
+  amount: number;
+  consumed_amount?: number;
+  remaining_amount?: number;
+}
+
+export interface TrainingCostCenter {
+  id: number;
+  name: string;
+  code: string;
+  department_id?: number | null;
+  department?: Department;
+  description?: string;
+  is_active: boolean;
+}
+
+export interface TrainingDocument {
+  id: number;
+  training_id: number;
+  employee_id?: number | null;
+  employee?: Employee;
+  category: 'piece_jointe' | 'support' | 'certificat' | 'rapport' | 'autre';
+  name: string;
+  file_path: string;
+  url?: string;
+  mime_type?: string;
+  file_size?: number;
+  uploaded_by?: number;
+  created_at: string;
+}
+
+export interface TrainingStatistics {
+  year: number;
+  kpis: {
+    total: number; pending: number; approved: number; planned: number;
+    in_progress: number; completed: number; rejected: number; total_cost: number;
+  };
+  by_service: { service: string; count: number; completed: number; cost: number }[];
+  by_type: { type: string; count: number }[];
+  by_employee: { employee_id: number; name: string; department: string; trainings: number; present: number }[];
+  participation_rate: number;
+  by_year: { year: number; total: number; completed: number; cost: number }[];
+}
+
+export interface TrainingEmployeeHistory {
+  training_id: number;
+  title: string;
+  type?: string;
+  status: string;
+  start_date?: string;
+  end_date?: string;
+  score?: number;
+}
+
+export interface Training {
+  id: number;
+  title: string;
+  training_type_id: number;
+  trainingType?: TrainingType;
+  provider_id?: number | null;
+  provider?: TrainingProvider;
+  is_internal: boolean;
+  objectives: string;
+  justification: string;
+  participants_count: number;
+  desired_date?: string;
+  duration_days: number;
+  location?: string;
+  estimated_cost?: number | null;
+  funding_source?: string;
+  cost_center_id?: number | null;
+  costCenter?: TrainingCostCenter;
+  priority: 'low' | 'medium' | 'high';
+  status: 'pending' | 'needs_info' | 'approved' | 'rejected' | 'planned' | 'in_progress' | 'completed' | 'archived';
+  approved_by?: number;
+  approved_at?: string;
+  start_date?: string;
+  end_date?: string;
+  actual_cost?: number;
+  rejection_reason?: string;
+  info_request?: string;
+  report?: string;
+  recommendations?: string;
+  overall_score?: number;
+  created_by?: number;
+  creator?: User;
+  approver?: User;
+  participants?: TrainingParticipant[];
+  attendances?: TrainingAttendance[];
+  evaluations?: TrainingEvaluation[];
+  documents?: TrainingDocument[];
+  created_at: string;
+}
+
+export interface TrainingParticipant {
+  id: number;
+  training_id: number;
+  employee_id: number;
+  employee?: Employee;
+  status: 'pending' | 'confirmed' | 'cancelled';
+  confirmed_at?: string;
+  notes?: string;
+}
+
+export interface TrainingAttendance {
+  id: number;
+  training_id: number;
+  employee_id: number;
+  employee?: Employee;
+  attendance_date: string;
+  present: boolean;
+  absence_reason?: string;
+}
+
+export interface TrainingRequest {
+  id: number;
+  training_id: number;
+  training?: Training;
+  employee_id: number;
+  employee?: Employee;
+  status: 'pending' | 'approved' | 'rejected';
+  created_at: string;
+}
+
+export interface TrainingEvaluation {
+  id: number;
+  training_id: number;
+  training?: Training;
+  employee_id: number;
+  employee?: Employee;
+  score?: number;
+  feedback?: string;
+  evaluator_name?: string;
+  evaluation_date?: string;
+  recommendations?: string;
+  status?: 'pending' | 'completed';
+  created_at: string;
 }
 
 export interface PaginatedResponse<T> {
