@@ -137,7 +137,7 @@ export default function SchemaPage() {
     <Box>
       <PageHeader
         title="Schéma SQL"
-        subtitle={`${SCHEMA.length} tables · Base de données NiidPro`}
+        subtitle={`${SCHEMA.length} tables · Base de données RH+PAIE`}
       />
 
       <Grid container spacing={2.5}>

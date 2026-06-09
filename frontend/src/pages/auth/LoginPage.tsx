@@ -85,7 +85,7 @@ export default function LoginPage() {
               <Typography sx={{ color: '#fff', fontWeight: 800, fontSize: 18 }}>N</Typography>
             </Box>
             <Typography sx={{ color: '#fff', fontWeight: 800, fontSize: 20, letterSpacing: '-0.5px' }}>
-              NiidPro
+              RH+PAIE
             </Typography>
           </Box>
         </Box>
@@ -147,7 +147,7 @@ export default function LoginPage() {
             }}>
               <Typography sx={{ color: '#fff', fontWeight: 800, fontSize: 16 }}>N</Typography>
             </Box>
-            <Typography sx={{ fontWeight: 800, fontSize: 18, color: '#0F172A' }}>NiidPro</Typography>
+            <Typography sx={{ fontWeight: 800, fontSize: 18, color: '#0F172A' }}>RH+PAIE</Typography>
           </Box>
 
           <Typography sx={{ fontWeight: 800, fontSize: 26, color: '#0F172A', letterSpacing: '-0.5px', mb: 0.5 }}>

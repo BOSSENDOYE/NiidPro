@@ -18,7 +18,7 @@ use App\Http\Controllers\Api\TrainingController;
 use Illuminate\Support\Facades\Route;
 
 // Health check
-Route::get('/health', fn () => response()->json(['status' => 'ok', 'app' => 'NiidPro API v1']));
+Route::get('/health', fn () => response()->json(['status' => 'ok', 'app' => 'RH+PAIE API v1']));
 
 // Paramètres publics (nom entreprise, etc.)
 Route::get('/settings', [SettingsController::class, 'index']);

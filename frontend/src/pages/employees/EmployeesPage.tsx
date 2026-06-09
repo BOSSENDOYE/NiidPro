@@ -133,7 +133,7 @@ export default function EmployeesPage() {
                 Gestion des Agents
               </Typography>
               <Typography variant="caption" sx={{ color: '#64748B' }}>
-                Ressources Humaines · NiidPro Platform
+                Ressources Humaines · RH+PAIE Platform
               </Typography>
             </Box>
           </Stack>

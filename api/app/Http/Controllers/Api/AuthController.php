@@ -43,7 +43,7 @@ class AuthController extends Controller
             'user_agent' => $request->userAgent(),
         ]);
 
-        $token = $user->createToken('api-token')->plainTextToken;
+        $token = $user->createToken('api-token')->plainTextToken;  // mise a jour tocken
 
         return response()->json([
             'user'  => $this->userResource($user),

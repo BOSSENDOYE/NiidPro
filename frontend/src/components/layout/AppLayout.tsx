@@ -159,7 +159,7 @@ export default function AppLayout() {
     for (const [key, label] of Object.entries(PAGE_LABELS)) {
       if (path === key || (key !== '/dashboard' && path.startsWith(key))) return label;
     }
-    return 'NiidPro';
+    return 'RH+PAIE';
   })();
 
   const totalBadges = NAV.flatMap((s) => s.items).reduce(
@@ -212,7 +212,7 @@ export default function AppLayout() {
               <>
                 <Box sx={{ flexGrow: 1, overflow: 'hidden' }}>
                   <Typography sx={{ color: '#F1F5F9', fontWeight: 800, fontSize: 15, letterSpacing: '-0.4px', lineHeight: 1.2 }}>
-                    NiidPro
+                    RH+PAIE
                   </Typography>
                   <Typography sx={{ color: SB.sectionLabel, fontSize: 9, letterSpacing: '0.1em', textTransform: 'uppercase' }}>
                     Ressources Humaines
