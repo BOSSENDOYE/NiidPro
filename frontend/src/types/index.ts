@@ -404,6 +404,217 @@ export interface TrainingEvaluation {
   created_at: string;
 }
 
+// ─── RECRUTEMENT ──────────────────────────────────────────────────────────────
+
+export interface RecruitmentRequest {
+  id: number;
+  department_id: number;
+  department?: Department;
+  position_title: string;
+  number_of_positions: number;
+  contract_type: 'CDI' | 'CDD' | 'Stage' | 'Consultant' | 'Freelance' | 'Autre';
+  desired_start_date?: string;
+  justification: string;
+  hierarchical_level?: string;
+  budget?: number;
+  requested_by: number;
+  requester?: User;
+  status: 'draft' | 'pending_rh' | 'approved' | 'rejected' | 'in_progress' | 'closed';
+  rejection_reason?: string;
+  approved_by?: number;
+  approver?: User;
+  approved_at?: string;
+  job_postings?: JobPosting[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface JobPosting {
+  id: number;
+  recruitment_request_id?: number;
+  recruitment_request?: RecruitmentRequest;
+  department_id: number;
+  department?: Department;
+  title: string;
+  location?: string;
+  supervisor_id?: number;
+  supervisor?: Employee;
+  description?: string;
+  missions?: string;
+  responsibilities?: string;
+  education_level?: string;
+  required_diplomas?: string;
+  required_experience_years?: number;
+  technical_skills?: string[];
+  behavioral_skills?: string[];
+  required_certifications?: string;
+  required_languages?: string[];
+  publication_type: 'internal' | 'external' | 'both';
+  status: 'draft' | 'published' | 'closed' | 'archived';
+  published_at?: string;
+  closing_date?: string;
+  created_by: number;
+  creator?: User;
+  criteria?: JobPostingCriterion[];
+  applications?: JobApplication[];
+  applications_count?: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface JobPostingCriterion {
+  id: number;
+  job_posting_id: number;
+  name: string;
+  weight: number;
+  minimum_level: number;
+  is_eliminatory: boolean;
+  created_at: string;
+}
+
+export interface JobApplication {
+  id: number;
+  job_posting_id: number;
+  job_posting?: JobPosting;
+  application_number: string;
+  first_name: string;
+  last_name: string;
+  full_name?: string;
+  email: string;
+  phone?: string;
+  application_date: string;
+  status: 'received' | 'pre_selected' | 'rejected_pre' | 'convoked' | 'interviewed' | 'rejected' | 'selected' | 'hired';
+  cv_path?: string;
+  cover_letter_path?: string;
+  overall_score?: number;
+  notes?: string;
+  is_internal: boolean;
+  employee_id?: number;
+  employee?: Employee;
+  documents?: ApplicationDocument[];
+  interviews?: Interview[];
+  created_at: string;
+}
+
+export interface ApplicationDocument {
+  id: number;
+  application_id: number;
+  type: 'cv' | 'lettre_motivation' | 'diplome' | 'certificat' | 'autre';
+  name: string;
+  file_path: string;
+  mime_type?: string;
+  file_size?: number;
+  created_at: string;
+}
+
+export interface Interview {
+  id: number;
+  job_posting_id: number;
+  job_posting?: JobPosting;
+  application_id: number;
+  application?: JobApplication;
+  scheduled_at: string;
+  location?: string;
+  type: 'entretien' | 'test_technique' | 'test_psychotechnique';
+  status: 'scheduled' | 'completed' | 'cancelled';
+  result: 'pending' | 'admitted' | 'rejected';
+  notes?: string;
+  created_by: number;
+  creator?: User;
+  evaluations?: InterviewEvaluation[];
+  created_at: string;
+}
+
+export interface InterviewEvaluation {
+  id: number;
+  interview_id: number;
+  evaluator_id: number;
+  evaluator?: User;
+  criterion_id?: number;
+  criterion?: JobPostingCriterion;
+  criterion_name?: string;
+  score: number;
+  comment?: string;
+  created_at: string;
+}
+
+// ─── PARAMÈTRES RECRUTEMENT ───────────────────────────────────────────────────
+
+export interface RecruitmentIndice {
+  id: number;
+  code: string;
+  hierarchy_id?: number | null;
+  hierarchy?: RecruitmentHierarchy;
+  classe?: string;
+  echelon_label?: string;
+  valeur_point?: number | null;
+  valeur: number;
+  solde_mensuelle?: number | null;
+  garde?: string;
+  description?: string;
+  is_active: boolean;
+  augmentations?: RecruitmentAugmentation[];
+  created_at: string;
+}
+
+export interface RecruitmentHierarchy {
+  id: number;
+  code: string;
+  libelle: string;
+  description?: string;
+  ordre: number;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface RecruitmentAugmentation {
+  id: number;
+  libelle: string;
+  type: 'indiciaire' | 'indemnitaire' | 'prime' | 'autre';
+  taux: number;
+  unite: 'pourcentage' | 'montant';
+  date_effet?: string;
+  description?: string;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface RecruitmentBareme {
+  id: number;
+  hierarchy_id?: number | null;
+  hierarchy?: RecruitmentHierarchy;
+  indice_id?: number | null;
+  indice?: RecruitmentIndice;
+  echelon?: number;
+  salaire_base?: number;
+  date_application?: string;
+  is_active: boolean;
+  revenu_brut?: number;
+  trimf_pers?: number;
+  part_1?: number;
+  part_1_5?: number;
+  part_2?: number;
+  part_2_5?: number;
+  part_3?: number;
+  part_3_5?: number;
+  part_4?: number;
+  part_4_5?: number;
+  part_5?: number;
+  id_bareme?: string;
+  created_at: string;
+}
+
+export interface RecruitmentStatistics {
+  requests: {
+    total: number; draft: number; pending_rh: number;
+    approved: number; in_progress: number; closed: number;
+  };
+  postings: { total: number; draft: number; published: number; closed: number };
+  applications: { total: number; received: number; pre_selected: number; hired: number };
+  interviews: { total: number; scheduled: number; completed: number };
+  by_department: { department_id: number; total: number; department?: Department }[];
+}
+
 export interface PaginatedResponse<T> {
   data: T[];
   current_page: number;

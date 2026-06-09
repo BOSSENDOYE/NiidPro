@@ -15,6 +15,8 @@ use App\Http\Controllers\Api\SanctionController;
 use App\Http\Controllers\Api\SettingsController;
 use App\Http\Controllers\Api\TaskController;
 use App\Http\Controllers\Api\TrainingController;
+use App\Http\Controllers\Api\RecruitmentController;
+use App\Http\Controllers\Api\RecruitmentParamsController;
 use Illuminate\Support\Facades\Route;
 
 // Health check
@@ -144,6 +146,70 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/trainings/{training}/certificates',             [TrainingController::class, 'generateCertificates']);
 
     Route::apiResource('trainings', TrainingController::class);
+
+    // ── Recrutement ──────────────────────────────────────────────────────────
+    Route::get('/recruitment/statistics',                        [RecruitmentController::class, 'statistics']);
+    Route::get('/recruitment/pending',                           [RecruitmentController::class, 'pending']);
+
+    // Demandes de recrutement
+    Route::post('/recruitment/{recruitmentRequest}/approve',     [RecruitmentController::class, 'approve']);
+    Route::post('/recruitment/{recruitmentRequest}/reject',      [RecruitmentController::class, 'reject']);
+    Route::apiResource('recruitment', RecruitmentController::class);
+
+    // Offres d'emploi (fiches de poste)
+    Route::get('/job-postings',                                  [RecruitmentController::class, 'jobPostings']);
+    Route::post('/job-postings',                                 [RecruitmentController::class, 'storeJobPosting']);
+    Route::get('/job-postings/{jobPosting}',                     [RecruitmentController::class, 'showJobPosting']);
+    Route::put('/job-postings/{jobPosting}',                     [RecruitmentController::class, 'updateJobPosting']);
+    Route::delete('/job-postings/{jobPosting}',                  [RecruitmentController::class, 'destroyJobPosting']);
+    Route::post('/job-postings/{jobPosting}/publish',            [RecruitmentController::class, 'publishJobPosting']);
+    Route::post('/job-postings/{jobPosting}/close',              [RecruitmentController::class, 'closeJobPosting']);
+
+    // Critères d'évaluation
+    Route::get('/job-postings/{jobPosting}/criteria',            [RecruitmentController::class, 'criteria']);
+    Route::post('/job-postings/{jobPosting}/criteria',           [RecruitmentController::class, 'storeCriterion']);
+    Route::put('/job-postings/{jobPosting}/criteria/{criterion}',  [RecruitmentController::class, 'updateCriterion']);
+    Route::delete('/job-postings/{jobPosting}/criteria/{criterion}',[RecruitmentController::class, 'destroyCriterion']);
+
+    // Candidatures
+    Route::get('/applications',                                  [RecruitmentController::class, 'allApplications']);
+    Route::get('/job-postings/{jobPosting}/applications',        [RecruitmentController::class, 'applications']);
+    Route::post('/job-postings/{jobPosting}/applications',       [RecruitmentController::class, 'storeApplication']);
+    Route::get('/applications/{application}',                    [RecruitmentController::class, 'showApplication']);
+    Route::patch('/applications/{application}/status',           [RecruitmentController::class, 'updateApplicationStatus']);
+    Route::post('/applications/{application}/documents',         [RecruitmentController::class, 'uploadApplicationDocument']);
+
+    // Entretiens
+    Route::get('/interviews',                                    [RecruitmentController::class, 'interviews']);
+    Route::post('/interviews',                                   [RecruitmentController::class, 'storeInterview']);
+    Route::put('/interviews/{interview}',                        [RecruitmentController::class, 'updateInterview']);
+    Route::delete('/interviews/{interview}',                     [RecruitmentController::class, 'destroyInterview']);
+    Route::post('/interviews/{interview}/evaluate',              [RecruitmentController::class, 'evaluate']);
+
+    // ── Paramètres Recrutement ───────────────────────────────────────────────
+    // Indices
+    Route::get('/recruitment-params/indices',                    [RecruitmentParamsController::class, 'indices']);
+    Route::post('/recruitment-params/indices',                   [RecruitmentParamsController::class, 'storeIndice']);
+    Route::put('/recruitment-params/indices/{indice}',           [RecruitmentParamsController::class, 'updateIndice']);
+    Route::delete('/recruitment-params/indices/{indice}',        [RecruitmentParamsController::class, 'destroyIndice']);
+
+    // Hiérarchies
+    Route::get('/recruitment-params/hierarchies',                [RecruitmentParamsController::class, 'hierarchies']);
+    Route::post('/recruitment-params/hierarchies',               [RecruitmentParamsController::class, 'storeHierarchy']);
+    Route::put('/recruitment-params/hierarchies/{hierarchy}',    [RecruitmentParamsController::class, 'updateHierarchy']);
+    Route::delete('/recruitment-params/hierarchies/{hierarchy}', [RecruitmentParamsController::class, 'destroyHierarchy']);
+
+    // Augmentations
+    Route::get('/recruitment-params/augmentations',                      [RecruitmentParamsController::class, 'augmentations']);
+    Route::post('/recruitment-params/augmentations',                     [RecruitmentParamsController::class, 'storeAugmentation']);
+    Route::put('/recruitment-params/augmentations/{augmentation}',       [RecruitmentParamsController::class, 'updateAugmentation']);
+    Route::delete('/recruitment-params/augmentations/{augmentation}',    [RecruitmentParamsController::class, 'destroyAugmentation']);
+
+    // Barèmes
+    Route::get('/recruitment-params/baremes',                    [RecruitmentParamsController::class, 'baremes']);
+    Route::post('/recruitment-params/baremes',                   [RecruitmentParamsController::class, 'storeBareme']);
+    Route::put('/recruitment-params/baremes/{bareme}',           [RecruitmentParamsController::class, 'updateBareme']);
+    Route::delete('/recruitment-params/baremes/{bareme}',        [RecruitmentParamsController::class, 'destroyBareme']);
 
     // Documents de service
     Route::prefix('documents')->group(function () {

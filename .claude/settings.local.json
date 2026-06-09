@@ -2,7 +2,22 @@
   "permissions": {
     "allow": [
       "Read(//c/Users/5340/OneDrive/Desktop/PROJET/niidpro/frontend/**)",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Bash(grep -E \"\\\\.\\(md|txt\\)$\")",
+      "Bash(cd \"/c/Users/5340/OneDrive/Desktop/PROJET/niidpro/api\" && php artisan route:list --path=recruitment --columns=method,uri 2>&1 | head -20)",
+      "Read(//c/Users/5340/OneDrive/Desktop/PROJET/niidpro/api/**)",
+      "Bash(cd \"/c/Users/5340/OneDrive/Desktop/PROJET/niidpro/api\" && php artisan route:list --path=recruitment 2>&1 | head -40)",
+      "Bash(cd \"/c/Users/5340/OneDrive/Desktop/PROJET/niidpro/frontend\" && cat package.json | grep -E \"tanstack|react-query\" 2>&1)",
+      "Bash(cd \"/c/Users/5340/OneDrive/Desktop/PROJET/niidpro/frontend\" && npx tsc --noEmit 2>&1 | head -30)",
+      "Bash(cd \"/c/Users/5340/OneDrive/Desktop/PROJET/niidpro/frontend\" && npx tsc --noEmit 2>&1)",
+      "Bash(npx vite *)",
+      "Bash(ls \"/c/Users/5340/OneDrive/Desktop/PROJET/niidpro/api/database/migrations/\" | grep recruitment)",
+      "Read(//c/Users/5340/OneDrive/Desktop/PROJET/niidpro/api/database/migrations//**)",
+      "Bash(ls \"/c/Users/5340/OneDrive/Desktop/PROJET/niidpro/api/database/migrations/\" | grep -E \"1000\")",
+      "Bash(cd \"/c/Users/5340/OneDrive/Desktop/PROJET/niidpro/api\" && php artisan migrate 2>&1)",
+      "Bash(cd \"/c/Users/5340/OneDrive/Desktop/PROJET/niidpro/frontend\" && npx vite build 2>&1 | tail -8)",
+      "Bash(cd \"/c/Users/5340/OneDrive/Desktop/PROJET/niidpro/frontend\" && npx vite build 2>&1 | tail -5)",
+      "Bash(cd \"/c/Users/5340/OneDrive/Desktop/PROJET/niidpro/api\" && php artisan make:migration add_fields_to_recruitment_indices_table --table=recruitment_indices 2>&1)"
     ]
   }
 }

@@ -35,6 +35,9 @@ import LeavesPage from './pages/leaves/LeavesPage';
 // Formations
 import TrainingsPage from './pages/trainings/TrainingsPage';
 
+// Recrutements
+import RecruitmentsPage from './pages/recruitment/RecruitmentsPage';
+
 // Justifications
 import JustificationsPage from './pages/justifications/JustificationsPage';
 
@@ -107,6 +110,7 @@ export default function App() {
 
               <Route path="leaves" element={<LeavesPage />} />
               <Route path="trainings" element={<TrainingsPage />} />
+              <Route path="recruitment" element={<RecruitmentsPage />} />
               <Route path="justifications" element={<JustificationsPage />} />
 
               {/* Organisation */}
