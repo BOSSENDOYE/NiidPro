@@ -66,6 +66,22 @@ export interface Employee {
   nombre_enfants_charge?:  number;
   a_medaille_travail?:     boolean;
   anciennete_recrutement?: string;
+  family_members?:         EmployeeFamilyMember[];
+}
+
+export interface EmployeeFamilyMember {
+  id?: number;
+  employee_id?: number;
+  relation: 'Conjoint(e)' | 'Fils' | 'Fille' | 'Autre';
+  first_name?: string | null;
+  last_name?: string | null;
+  birth_date?: string | null;
+  birth_place?: string | null;
+  gender?: 'M' | 'F' | null;
+  activity?: string | null;
+  document_type?: string | null;
+  age?: number | null;
+  is_child?: boolean;
 }
 
 export interface Contract {

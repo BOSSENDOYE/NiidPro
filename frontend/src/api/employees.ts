@@ -7,9 +7,9 @@ export const employeesApi = {
 
   get: (id: number) => client.get<Employee>(`/employees/${id}`),
 
-  create: (data: Partial<Employee>) => client.post<Employee>('/employees', data),
+  create: (data: Partial<Employee> | Record<string, unknown>) => client.post<Employee>('/employees', data),
 
-  update: (id: number, data: Partial<Employee>) => client.put<Employee>(`/employees/${id}`, data),
+  update: (id: number, data: Partial<Employee> | Record<string, unknown>) => client.put<Employee>(`/employees/${id}`, data),
 
   uploadPhoto: (id: number, file: File) => {
     const form = new FormData();

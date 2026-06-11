@@ -281,19 +281,50 @@ export default function EmployeeFormPage() {
         employee_number: employee.employee_number ?? '',
       });
       if (employee.photo_url) setPhotoUrl(employee.photo_url);
+
+      // ── Onglet Conjoints/Enfants ──
+      setFamilyRows((employee.family_members ?? []).map((m) => ({
+        id:        String(m.id ?? `${Date.now()}-${Math.random()}`),
+        relation:  m.relation ?? 'Autre',
+        prenom:    m.first_name ?? '',
+        nom:       m.last_name ?? '',
+        naissance: m.birth_date ? String(m.birth_date).substring(0, 10) : '',
+        lieu:      m.birth_place ?? '',
+        sexe:      m.gender ?? '',
+        activite:  m.activity ?? '',
+        typeDoc:   m.document_type ?? '',
+      })));
     }
   }, [employee, reset]);
 
   const createMutation = useMutation({
-    mutationFn: (data: FormData) => employeesApi.create(data),
+    mutationFn: (data: Record<string, unknown>) => employeesApi.create(data),
     onSuccess: (res) => { qc.invalidateQueries({ queryKey: ['employees'] }); navigate(`/employees/${res.data.id}`); },
   });
   const updateMutation = useMutation({
-    mutationFn: (data: FormData) => employeesApi.update(Number(id), data),
+    mutationFn: (data: Record<string, unknown>) => employeesApi.update(Number(id), data),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['employees'] }); navigate(`/employees/${id}`); },
   });
 
-  const onSubmit = (data: FormData) => isEdit ? updateMutation.mutate(data) : createMutation.mutate(data);
+  // Mappe les lignes de l'onglet Conjoints/Enfants vers le format API
+  const buildFamilyPayload = (rows: TableRow[]) =>
+    rows
+      .filter((r) => r.prenom || r.nom || r.naissance)
+      .map((r) => ({
+        relation:      r.relation || 'Autre',
+        first_name:    r.prenom || null,
+        last_name:     r.nom || null,
+        birth_date:    r.naissance || null,
+        birth_place:   r.lieu || null,
+        gender:        r.sexe || null,
+        activity:      r.activite || null,
+        document_type: r.typeDoc || null,
+      }));
+
+  const onSubmit = (data: FormData) => {
+    const payload = { ...data, family_members: buildFamilyPayload(familyRows) };
+    isEdit ? updateMutation.mutate(payload) : createMutation.mutate(payload);
+  };
   const mutError = (createMutation.error ?? updateMutation.error) as { response?: { data?: { message?: string } } } | null;
 
   const handlePhoto = (e: React.ChangeEvent<HTMLInputElement>) => {

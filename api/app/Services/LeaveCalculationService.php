@@ -23,9 +23,12 @@ class LeaveCalculationService
     }
 
     // ────────────────────────────────────────────────────────────────
-    //  CALCUL DES JOURS DE CONGÉ
-    //  Règle : "A défalquer : fêtes légales et dimanches"
-    //  Samedis comptés, dimanches et fériés exclus.
+    //  NOTION DE JOURS OUVRABLES (Art. L.147 du Code du travail)
+    //  Sont exclus du décompte :
+    //   - le dimanche (repos hebdomadaire obligatoire, art. L.147) ;
+    //   - les jours fériés légaux (Loi n° 74-52 du 4 novembre 1974).
+    //  Les samedis sont comptés comme jours ouvrables, SAUF disposition
+    //  contraire du règlement intérieur (config leaves.samedi_ouvrable).
     // ────────────────────────────────────────────────────────────────
     public function calculateLeaveDays(
         string $start,
@@ -43,21 +46,23 @@ class LeaveCalculationService
             return 0;
         }
 
-        $holidays = $this->getHolidaysInRange(
+        $holidays      = $this->getHolidaysInRange(
             $startDate->format('Y-m-d'),
             $endDate->format('Y-m-d')
         );
+        $samediOuvrable = (bool) config('leaves.samedi_ouvrable', true);
 
         $days    = 0;
         $current = $startDate->copy();
 
         while ($current->lte($endDate)) {
-            // Exclure dimanches
-            if ($current->dayOfWeek !== Carbon::SUNDAY) {
-                // Exclure fêtes légales
-                if (! in_array($current->format('Y-m-d'), $holidays)) {
-                    $days++;
-                }
+            $isSunday   = $current->dayOfWeek === Carbon::SUNDAY;
+            $isSaturday = $current->dayOfWeek === Carbon::SATURDAY;
+            $isHoliday  = in_array($current->format('Y-m-d'), $holidays);
+
+            // Jour ouvrable = ni dimanche, ni férié, ni samedi exclu par le règlement
+            if (! $isSunday && ! $isHoliday && ! ($isSaturday && ! $samediOuvrable)) {
+                $days++;
             }
             $current->addDay();
         }
@@ -120,23 +125,37 @@ class LeaveCalculationService
     }
 
     // ────────────────────────────────────────────────────────────────
-    //  SUPPLÉMENT ENFANTS (femmes uniquement)
-    //  +2 jours par enfant à charge :
-    //  - Enfants scolarisés ≤ 21 ans
-    //  - Enfants non scolarisés ≤ 18 ans
-    //  → On utilise le champ nombre_enfants_charge (saisi sur la fiche agent)
-    //    et on calcule +2j/enfant
+    //  MAJORATION POUR MÈRES DE FAMILLE (Art. L.148 du Code du travail)
+    //  Un (1) jour de congé supplémentaire par an pour chaque enfant de
+    //  moins de 14 ans enregistré à l'état civil.
+    //  Réservé aux mères (agents de sexe féminin).
+    //  Source des enfants : onglet "Conjoints/Enfants" de la fiche agent
+    //  (relation = Fils/Fille), l'âge est calculé d'après la date de naissance
+    //  à la date de référence.
     // ────────────────────────────────────────────────────────────────
-    public function getChildrenBonus(Employee $employee): int
+    public function getChildrenBonus(Employee $employee, ?Carbon $asOf = null): int
     {
-        $gender = strtolower($employee->gender ?? '');
+        $gender   = strtolower($employee->gender ?? '');
         $isFemale = in_array($gender, ['f', 'femme', 'female', 'féminin']);
 
         if (! $isFemale) {
             return 0;
         }
 
-        return ($employee->nombre_enfants_charge ?? 0) * 2;
+        $asOf      = $asOf ?? Carbon::now();
+        $ageMax    = (int) config('leaves.mere_famille_age_max', 14);
+        $parEnfant = (int) config('leaves.mere_famille_jours_enfant', 1);
+
+        $eligibles = $employee->children
+            ->filter(function ($child) use ($asOf, $ageMax) {
+                if (! $child->birth_date) {
+                    return false;
+                }
+                return Carbon::parse($child->birth_date)->diffInYears($asOf) < $ageMax;
+            })
+            ->count();
+
+        return $eligibles * $parEnfant;
     }
 
     // ────────────────────────────────────────────────────────────────
@@ -172,7 +191,7 @@ class LeaveCalculationService
 
         $accrued   = $this->getMonthlyAccrual($employee, $lastCalc, $upToDate);
         $seniority = $this->getSeniorityBonus($employee, $upToDate);
-        $children  = $this->getChildrenBonus($employee);
+        $children  = $this->getChildrenBonus($employee, $upToDate);
         $medaille  = $this->getMedailleBonus($employee);
 
         $base = (float) ($employee->nbre_jour_restant ?? 0);
@@ -267,7 +286,7 @@ class LeaveCalculationService
         $nbreJourDispo  = (float) ($employee->nbre_jour_restant ?? 0);
         $nbreJourConges = $this->getMonthlyAccrual($employee, $lastCalc, $dateLimite);
         $suppAnciennete = $this->getSeniorityBonus($employee, $dateLimite);
-        $suppEnfant     = $this->getChildrenBonus($employee);
+        $suppEnfant     = $this->getChildrenBonus($employee, $dateLimite);
         $suppMedaille   = $this->getMedailleBonus($employee);
 
         // Jours approuvés depuis le dernier calcul → à imputer

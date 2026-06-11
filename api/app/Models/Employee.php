@@ -59,6 +59,17 @@ class Employee extends Model
         return $this->belongsTo(Department::class);
     }
 
+    public function familyMembers()
+    {
+        return $this->hasMany(EmployeeFamilyMember::class);
+    }
+
+    public function children()
+    {
+        return $this->hasMany(EmployeeFamilyMember::class)
+            ->whereIn('relation', EmployeeFamilyMember::CHILD_RELATIONS);
+    }
+
     public function position()
     {
         return $this->belongsTo(Position::class);
