@@ -88,7 +88,7 @@ export interface Contract {
   id: number;
   employee_id: number;
   employee?: Employee;
-  type: 'CDI' | 'CDD' | 'Interim' | 'Freelance' | 'Stage' | 'Apprentissage';
+  type: 'CDI' | 'CDD' | 'DECRET' | 'DETACHEMENT' | 'Stage' | 'Alternance' | 'Prestation' | 'Autre';
   start_date: string;
   end_date?: string;
   salary: number;

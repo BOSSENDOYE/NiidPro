@@ -41,10 +41,12 @@ interface TypeConfig { label: string; color: string; bg: string; border: string 
 const TYPE_CONFIG: Record<string, TypeConfig> = {
   CDI:          { label: 'CDI',          color: '#059669', bg: '#ECFDF5', border: '#059669' },
   CDD:          { label: 'CDD',          color: '#D97706', bg: '#FFFBEB', border: '#D97706' },
-  Interim:      { label: 'Intérim',      color: '#0284C7', bg: '#F0F9FF', border: '#0284C7' },
-  Freelance:    { label: 'Freelance',    color: '#7C3AED', bg: '#F5F3FF', border: '#7C3AED' },
+  DECRET:       { label: 'Décret',       color: '#1B4B8A', bg: '#EFF6FF', border: '#1B4B8A' },
+  DETACHEMENT:  { label: 'Détachement',  color: '#7C3AED', bg: '#F5F3FF', border: '#7C3AED' },
   Stage:        { label: 'Stage',        color: '#EC4899', bg: '#FDF2F8', border: '#EC4899' },
-  Apprentissage:{ label: 'Apprentissage',color: '#0D9488', bg: '#F0FDFA', border: '#0D9488' },
+  Alternance:   { label: 'Alternance',   color: '#0D9488', bg: '#F0FDFA', border: '#0D9488' },
+  Prestation:   { label: 'Prestation',   color: '#0284C7', bg: '#F0F9FF', border: '#0284C7' },
+  Autre:        { label: 'Autre',        color: '#64748B', bg: '#F1F5F9', border: '#94A3B8' },
 };
 
 const ALL_TYPES = Object.keys(TYPE_CONFIG);

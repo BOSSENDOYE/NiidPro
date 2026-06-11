@@ -16,7 +16,7 @@ class ContractController extends Controller
             ->when($request->type, fn($q, $t) => $q->where('type', $t))
             ->when($request->is_active !== null, fn($q) => $q->where('is_active', $request->boolean('is_active')));
 
-        return response()->json($query->orderByDesc('start_date')->paginate(15));
+        return response()->json($query->orderByDesc('start_date')->get());
     }
 
     public function expiringSoon(Request $request)
@@ -37,7 +37,7 @@ class ContractController extends Controller
     {
         $data = $request->validate([
             'employee_id'            => ['required', 'exists:employees,id'],
-            'type'                   => ['required', 'in:CDI,CDD,Stage,Alternance,Prestation,Autre'],
+            'type'                   => ['required', 'in:CDI,CDD,DECRET,DETACHEMENT,Stage,Alternance,Prestation,Autre'],
             'start_date'             => ['required', 'date'],
             'end_date'               => ['nullable', 'date', 'after:start_date'],
             'trial_period_end'       => ['nullable', 'date'],
@@ -67,7 +67,7 @@ class ContractController extends Controller
     public function update(Request $request, Contract $contract)
     {
         $data = $request->validate([
-            'type'                   => ['sometimes', 'in:CDI,CDD,Stage,Alternance,Prestation,Autre'],
+            'type'                   => ['sometimes', 'in:CDI,CDD,DECRET,DETACHEMENT,Stage,Alternance,Prestation,Autre'],
             'start_date'             => ['sometimes', 'date'],
             'end_date'               => ['nullable', 'date'],
             'trial_period_end'       => ['nullable', 'date'],

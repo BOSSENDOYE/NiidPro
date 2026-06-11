@@ -10,7 +10,7 @@ return new class extends Migration
     {
         Schema::create('employees', function (Blueprint $table) {
             $table->id();
-            $table->string('employee_number')->unique();
+            $table->string('employee_number')->nullable()->unique();
             $table->foreignId('user_id')->nullable()->constrained()->nullOnDelete();
             $table->foreignId('department_id')->nullable()->constrained()->nullOnDelete();
             $table->foreignId('position_id')->nullable()->constrained()->nullOnDelete();

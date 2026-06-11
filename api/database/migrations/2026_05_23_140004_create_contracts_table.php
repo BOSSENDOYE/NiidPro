@@ -11,7 +11,7 @@ return new class extends Migration
         Schema::create('contracts', function (Blueprint $table) {
             $table->id();
             $table->foreignId('employee_id')->constrained()->cascadeOnDelete();
-            $table->enum('type', ['CDI', 'CDD', 'Stage', 'Alternance', 'Prestation', 'Autre'])->default('CDI');
+            $table->enum('type', ['CDI', 'CDD', 'DECRET', 'DETACHEMENT', 'Stage', 'Alternance', 'Prestation', 'Autre'])->default('CDI');
             $table->date('start_date');
             $table->date('end_date')->nullable();
             $table->date('trial_period_end')->nullable();
