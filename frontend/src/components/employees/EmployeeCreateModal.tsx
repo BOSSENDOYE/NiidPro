@@ -12,7 +12,7 @@ import {
   Autorenew, Groups, Folder, BarChart, Person, Work,
   ContactEmergency, FamilyRestroom, School,
   AttachFile, CheckCircle, Edit, RemoveRedEye,
-  AccountBalance, HealthAndSafety, Home,
+  AccountBalance, HealthAndSafety,
 } from '@mui/icons-material';
 import { useForm, Controller } from 'react-hook-form';
 import { z } from 'zod';
@@ -35,10 +35,10 @@ const schema = z.object({
   birth_date:         z.string().optional(),
   nationality:        z.string().optional(),
   gender:             z.string().optional(),
-  base_salary:        z.number({ coerce: true }).min(0),
-  department_id:      z.number({ coerce: true }).min(1, 'Service requis'),
+  base_salary:        z.number().min(0),
+  department_id:      z.number().min(1, 'Service requis'),
   status:             z.enum(['active', 'inactive', 'suspended']),
-  annual_leave_days:  z.number({ coerce: true }).min(0),
+  annual_leave_days:  z.number().min(0),
   employee_number:    z.string().optional(),
   city:               z.string().optional(),
   country:            z.string().optional(),

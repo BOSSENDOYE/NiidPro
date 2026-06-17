@@ -38,6 +38,9 @@ import TrainingsPage from './pages/trainings/TrainingsPage';
 // Recrutements
 import RecruitmentsPage from './pages/recruitment/RecruitmentsPage';
 
+// Plan de Recrutement
+import PlanRecrutementPage from './pages/planRecrutement/PlanRecrutementPage';
+
 // Justifications
 import JustificationsPage from './pages/justifications/JustificationsPage';
 
@@ -111,6 +114,7 @@ export default function App() {
               <Route path="leaves" element={<LeavesPage />} />
               <Route path="trainings" element={<TrainingsPage />} />
               <Route path="recruitment" element={<RecruitmentsPage />} />
+              <Route path="plan-recrutement" element={<PlanRecrutementPage />} />
               <Route path="justifications" element={<JustificationsPage />} />
 
               {/* Organisation */}

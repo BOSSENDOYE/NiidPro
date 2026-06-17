@@ -45,14 +45,9 @@ export default function AgentPortalPage() {
     ? user.name.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase()
     : '??';
 
-  const approvedLeaves = leaves?.filter((l) => l.status === 'approved').length ?? 0;
   const pendingLeaves = leaves?.filter((l) => l.status === 'pending').length ?? 0;
   const totalLeaveDays = leaves?.filter((l) => l.status === 'approved').reduce((s, l) => s + l.days_count, 0) ?? 0;
   const remainingDays = (user?.employee?.annual_leave_days ?? 30) - totalLeaveDays;
-
-  const upcomingLeaves = leaves
-    ?.filter((l) => l.status === 'approved' && new Date(l.start_date) >= new Date())
-    .slice(0, 3) ?? [];
 
   const recentLeaves = leaves?.slice(0, 5) ?? [];
 

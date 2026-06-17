@@ -10,7 +10,7 @@ import {
 } from '@mui/material';
 import {
   Add, Search, Edit, Delete, Description, Warning,
-  CheckCircle, CalendarToday, AccessTime, ExpandMore, ExpandLess,
+  CheckCircle, CalendarToday, AccessTime, ExpandMore, ExpandLess, PictureAsPdf, Close,
 } from '@mui/icons-material';
 import dayjs from 'dayjs';
 import { contractsApi } from '../../api/contracts';
@@ -185,6 +185,27 @@ export default function ContractsPage() {
     mutationFn: (id: number) => contractsApi.delete(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['contracts'] }),
   });
+
+  const [pdfLoading, setPdfLoading] = useState<number | null>(null);
+  const [pdfUrl,     setPdfUrl]     = useState<string | null>(null);
+  const [pdfLabel,   setPdfLabel]   = useState('');
+
+  const handleViewPdf = async (c: Contract) => {
+    setPdfLoading(c.id);
+    try {
+      const res = await contractsApi.pdf(c.id);
+      const url = URL.createObjectURL(new Blob([res.data as BlobPart], { type: 'application/pdf' }));
+      setPdfLabel(`Contrat ${c.type} — ${c.employee?.first_name ?? ''} ${c.employee?.last_name ?? ''}`);
+      setPdfUrl(url);
+    } finally {
+      setPdfLoading(null);
+    }
+  };
+
+  const closePdf = () => {
+    if (pdfUrl) URL.revokeObjectURL(pdfUrl);
+    setPdfUrl(null);
+  };
 
   // ── filtering ──
   const filtered = useMemo(() => {
@@ -491,6 +512,18 @@ export default function ContractsPage() {
                         {/* Actions */}
                         <TableCell sx={{ py: 1.5 }}>
                           <Box className="ct-actions" sx={{ display: 'flex', gap: 0.25, opacity: 0, transition: 'opacity 0.12s' }}>
+                            <Tooltip title="Voir PDF">
+                              <span>
+                                <IconButton
+                                  size="small"
+                                  onClick={() => handleViewPdf(c)}
+                                  disabled={pdfLoading === c.id}
+                                  sx={{ p: 0.5 }}
+                                >
+                                  <PictureAsPdf sx={{ fontSize: 15, color: pdfLoading === c.id ? '#CBD5E1' : '#DC2626' }} />
+                                </IconButton>
+                              </span>
+                            </Tooltip>
                             <Tooltip title="Modifier">
                               <IconButton size="small" onClick={() => openEdit(c)} sx={{ p: 0.5 }}>
                                 <Edit sx={{ fontSize: 15, color: '#64748B' }} />
@@ -511,6 +544,29 @@ export default function ContractsPage() {
           </Table>
         </TableContainer>
       </Box>
+
+      {/* ── PDF Viewer ── */}
+      <Dialog open={!!pdfUrl} onClose={closePdf} maxWidth="lg" fullWidth
+        PaperProps={{ sx: { borderRadius: '14px', height: '92vh', display: 'flex', flexDirection: 'column' } }}>
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', py: 1.5, px: 2.5, borderBottom: '1px solid #E2E8F0', flexShrink: 0 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <PictureAsPdf sx={{ fontSize: 18, color: '#DC2626' }} />
+            <Typography sx={{ fontSize: 14, fontWeight: 700, color: '#0F172A' }}>{pdfLabel}</Typography>
+          </Box>
+          <IconButton size="small" onClick={closePdf} sx={{ color: '#64748B' }}>
+            <Close fontSize="small" />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent sx={{ p: 0, flexGrow: 1, overflow: 'hidden' }}>
+          {pdfUrl && (
+            <iframe
+              src={pdfUrl}
+              title="Contrat PDF"
+              style={{ width: '100%', height: '100%', border: 'none', display: 'block' }}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* ── Create / Edit dialog ── */}
       <Dialog open={dialogOpen} onClose={closeDialog} maxWidth="sm" fullWidth

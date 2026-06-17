@@ -25,10 +25,6 @@ import type { Leave, LeaveType, Employee } from '../../types';
 
 const ACCENT = '#22C55E';
 
-const MONTH_FR = [
-  'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
-  'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre',
-];
 const DAY_LABELS = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
 
 const STATUS_META: Record<string, { label: string; color: string; bg: string; border: string; icon: React.ReactNode }> = {
@@ -61,8 +57,8 @@ function isLeaveOnDate(leave: Leave, ds: string): boolean {
 /* ─────────────────────────── schéma form ── */
 
 const schema = z.object({
-  employee_id:   z.number({ required_error: 'Agent requis' }).min(1, 'Agent requis'),
-  leave_type_id: z.number({ required_error: 'Type requis' }).min(1, 'Type requis'),
+  employee_id:   z.number().min(1, 'Agent requis'),
+  leave_type_id: z.number().min(1, 'Type requis'),
   start_date:    z.string().min(1, 'Date de début requise'),
   end_date:      z.string().min(1, 'Date de fin requise'),
   reason:        z.string().optional(),

@@ -100,10 +100,12 @@ export default function RecruitmentParamsPage() {
 
   // ── Mutations : Augmentation ──
   const saveAug = useMutation({
-    mutationFn: (d: typeof augForm) =>
-      augDialog.item
-        ? recruitmentApi.updateAugmentation(augDialog.item.id, { ...d, taux: Number(d.taux) })
-        : recruitmentApi.createAugmentation({ ...d, taux: Number(d.taux) }),
+    mutationFn: (d: typeof augForm) => {
+      const payload = { ...d, taux: Number(d.taux), type: d.type as RecruitmentAugmentation['type'], unite: d.unite as RecruitmentAugmentation['unite'] };
+      return augDialog.item
+        ? recruitmentApi.updateAugmentation(augDialog.item.id, payload)
+        : recruitmentApi.createAugmentation(payload);
+    },
     onSuccess: () => {
       invalidate();
       setAugDialog({ open: false, item: null });

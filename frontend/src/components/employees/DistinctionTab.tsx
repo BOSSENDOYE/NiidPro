@@ -9,7 +9,7 @@ import {
 import {
   Add, Edit, Delete, Search, Refresh, Close, Save,
   EmojiEvents, DescriptionOutlined, CalendarMonth,
-  Person, LocationOn, WorkspacePremium, MilitaryTech,
+  LocationOn, WorkspacePremium, MilitaryTech,
   Stars, CardMembership, VerifiedUser,
 } from '@mui/icons-material';
 import { useForm, Controller } from 'react-hook-form';
@@ -42,7 +42,7 @@ const LEVEL_META: Record<NonNullable<Distinction['level']>, { label: string; col
 /* ─────────────────────── schéma ── */
 
 const schema = z.object({
-  employee_id:       z.number({ required_error: 'Agent requis' }).min(1),
+  employee_id:       z.number().min(1),
   type:              z.enum(['medal','commendation','award','diploma','certificate']),
   name:              z.string().min(1, 'Intitulé requis'),
   issuing_authority: z.string().optional(),

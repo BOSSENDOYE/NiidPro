@@ -2,17 +2,16 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Box, Typography, Button, Stack, TextField, Chip,
-  Dialog, DialogContent, Grid, MenuItem, Select,
+  Dialog, DialogTitle, DialogContent, Grid, MenuItem, Select,
   FormControl, IconButton, Tooltip, Table, TableBody,
   TableCell, TableHead, TableRow, Skeleton, Avatar,
-  Switch, FormControlLabel, InputAdornment, alpha,
-  Divider,
+  Switch, InputAdornment, alpha,
 } from '@mui/material';
 import {
   Add, Edit, Delete, Search, Refresh, Close, Save,
   Assignment, CheckCircle, Block, AttachMoney,
   AccessTime, Person, CalendarMonth, DescriptionOutlined,
-  WorkOutline,
+  WorkOutline, PictureAsPdf,
 } from '@mui/icons-material';
 import { useForm, Controller } from 'react-hook-form';
 import { z } from 'zod';
@@ -41,14 +40,14 @@ const ACCENT = '#3B82F6';
 /* ─────────────────────────────────────────────────────── schema ── */
 
 const schema = z.object({
-  employee_id:            z.number({ required_error: 'Agent requis' }).min(1, 'Agent requis'),
-  type:                   z.enum(CONTRACT_TYPES, { required_error: 'Type requis' }),
+  employee_id:            z.number().min(1, 'Agent requis'),
+  type:                   z.enum(CONTRACT_TYPES),
   start_date:             z.string().min(1, 'Date de début requise'),
   end_date:               z.string().optional(),
-  salary:                 z.number({ required_error: 'Salaire requis' }).min(0),
-  working_hours_per_week: z.number().min(1).max(60).default(40),
+  salary:                 z.number().min(0),
+  working_hours_per_week: z.number().min(1).max(60),
   notes:                  z.string().optional(),
-  is_active:              z.boolean().default(true),
+  is_active:              z.boolean(),
 });
 type FormData = z.infer<typeof schema>;
 
@@ -448,6 +447,27 @@ export default function ContractTab() {
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['contracts'] }); setDeleteTarget(null); },
   });
 
+  const [pdfLoading, setPdfLoading] = useState<number | null>(null);
+  const [pdfUrl,     setPdfUrl]     = useState<string | null>(null);
+  const [pdfLabel,   setPdfLabel]   = useState('');
+
+  const handleViewPdf = async (c: Contract) => {
+    setPdfLoading(c.id);
+    try {
+      const res = await contractsApi.pdf(c.id);
+      const url = URL.createObjectURL(new Blob([res.data as BlobPart], { type: 'application/pdf' }));
+      setPdfLabel(`Contrat ${c.type} — ${c.employee?.first_name ?? ''} ${c.employee?.last_name ?? ''}`);
+      setPdfUrl(url);
+    } finally {
+      setPdfLoading(null);
+    }
+  };
+
+  const closePdf = () => {
+    if (pdfUrl) URL.revokeObjectURL(pdfUrl);
+    setPdfUrl(null);
+  };
+
   const openCreate = () => { setEditContract(undefined); setModalOpen(true); };
   const openEdit   = (c: Contract) => { setEditContract(c); setModalOpen(true); };
 
@@ -743,6 +763,15 @@ export default function ContractTab() {
                       {/* Actions */}
                       <TableCell sx={{ px: 2, py: 1.25, borderBottom: '1px solid #F1F5F9' }}>
                         <Stack direction="row" spacing={0.5}>
+                          <Tooltip title="Voir PDF" arrow>
+                            <span>
+                              <IconButton size="small" onClick={() => handleViewPdf(c)} disabled={pdfLoading === c.id}
+                                sx={{ width: 30, height: 30, borderRadius: '8px', bgcolor: '#FFF1F2', color: '#DC2626',
+                                  '&:hover': { bgcolor: '#FEE2E2', transform: 'scale(1.1)' }, transition: 'all .15s' }}>
+                                <PictureAsPdf sx={{ fontSize: 14 }} />
+                              </IconButton>
+                            </span>
+                          </Tooltip>
                           <Tooltip title="Modifier" arrow>
                             <IconButton size="small" onClick={() => openEdit(c)}
                               sx={{ width: 30, height: 30, borderRadius: '8px', bgcolor: '#FFF7ED', color: '#F97316',
@@ -784,6 +813,29 @@ export default function ContractTab() {
           onCancel={() => setDeleteTarget(null)}
         />
       )}
+
+      {/* ── PDF Viewer ── */}
+      <Dialog open={!!pdfUrl} onClose={closePdf} maxWidth="lg" fullWidth
+        PaperProps={{ sx: { borderRadius: '14px', height: '92vh', display: 'flex', flexDirection: 'column' } }}>
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', py: 1.5, px: 2.5, borderBottom: '1px solid #E2E8F0', flexShrink: 0 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <PictureAsPdf sx={{ fontSize: 18, color: '#DC2626' }} />
+            <Typography sx={{ fontSize: 14, fontWeight: 700, color: '#0F172A' }}>{pdfLabel}</Typography>
+          </Box>
+          <IconButton size="small" onClick={closePdf} sx={{ color: '#64748B' }}>
+            <Close fontSize="small" />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent sx={{ p: 0, flexGrow: 1, overflow: 'hidden' }}>
+          {pdfUrl && (
+            <iframe
+              src={pdfUrl}
+              title="Contrat PDF"
+              style={{ width: '100%', height: '100%', border: 'none', display: 'block' }}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

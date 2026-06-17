@@ -17,7 +17,19 @@
       "Bash(cd \"/c/Users/5340/OneDrive/Desktop/PROJET/niidpro/api\" && php artisan migrate 2>&1)",
       "Bash(cd \"/c/Users/5340/OneDrive/Desktop/PROJET/niidpro/frontend\" && npx vite build 2>&1 | tail -8)",
       "Bash(cd \"/c/Users/5340/OneDrive/Desktop/PROJET/niidpro/frontend\" && npx vite build 2>&1 | tail -5)",
-      "Bash(cd \"/c/Users/5340/OneDrive/Desktop/PROJET/niidpro/api\" && php artisan make:migration add_fields_to_recruitment_indices_table --table=recruitment_indices 2>&1)"
+      "Bash(cd \"/c/Users/5340/OneDrive/Desktop/PROJET/niidpro/api\" && php artisan make:migration add_fields_to_recruitment_indices_table --table=recruitment_indices 2>&1)",
+      "Bash(netstat -ano)",
+      "Bash(findstr \":3306\")",
+      "Bash(findstr \":5432\")",
+      "Bash(findstr \":3307\")",
+      "PowerShell(Get-Service | Where-Object { $_.Name -match \"mysql|mariadb|postgres|sql\" } | Select-Object Name, Status)",
+      "PowerShell(Start-Service MySQL80)",
+      "PowerShell(Get-Service MySQL80)",
+      "PowerShell(Start-Process powershell -Verb RunAs -ArgumentList \"-Command Start-Service MySQL80; Start-Sleep 3\" -Wait 2>&1; Get-Service MySQL80 | Select-Object Name, Status)",
+      "Bash(curl -s https://api.ipify.org)",
+      "Bash(git pull *)",
+      "Bash(git stash *)",
+      "Bash(git push *)"
     ]
   }
 }

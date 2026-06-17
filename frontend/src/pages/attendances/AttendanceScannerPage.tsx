@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  Box, Typography, Avatar, Chip, IconButton, Button,
-  TextField, InputAdornment, Tooltip, Divider,
+  Box, Typography, Avatar, IconButton, Button,
+  TextField, Tooltip,
 } from '@mui/material';
 import {
   QrCodeScanner, Login, Logout, CheckCircle, Cancel,
@@ -259,7 +259,7 @@ export default function AttendanceScannerPage() {
       attendancesApi.badge(num, action),
     onSuccess: (res) => {
       const att = res.data as Attendance & { employee?: { first_name: string; last_name: string; employee_number: string; department?: { name: string } } };
-      const empName = att.employee ? `${att.employee.first_name} ${att.employee.last_name}` : att.employee?.employee_number ?? '—';
+      const empName = att.employee ? `${att.employee.first_name} ${att.employee.last_name}` : '—';
       const record: ScanRecord = {
         id:       String(Date.now()),
         empNum:   att.employee?.employee_number ?? '',

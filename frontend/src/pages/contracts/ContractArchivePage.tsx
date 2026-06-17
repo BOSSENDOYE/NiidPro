@@ -1,13 +1,13 @@
-import { useRef, useState, useCallback } from 'react';
+import { useRef, useState, useCallback, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Box, Typography, Button, IconButton, Tooltip, Chip, Avatar,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
-  TextField, MenuItem, Stack, LinearProgress, Dialog,
+  TextField, Stack, LinearProgress, Dialog,
   DialogTitle, DialogContent, DialogActions, Autocomplete,
 } from '@mui/material';
 import {
-  CloudUpload, Download, Delete, FolderOpen, InsertDriveFile,
+  CloudUpload, Visibility, Delete, FolderOpen, InsertDriveFile,
   PictureAsPdf, Image, Description, Search, FilterList, Person,
 } from '@mui/icons-material';
 import { contractArchivesApi, type ContractArchive } from '../../api/contractArchives';
@@ -25,6 +25,11 @@ function fmtSize(bytes: number): string {
 
 function fmtDate(iso: string): string {
   return new Date(iso).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
+function isPdf(archive: ContractArchive): boolean {
+  return archive.mime_type?.toLowerCase().includes('pdf') === true
+    || archive.original_name.toLowerCase().endsWith('.pdf');
 }
 
 function FileIcon({ mime }: { mime: string }) {
@@ -143,6 +148,9 @@ export default function ContractArchivePage() {
   const [uploadLabel, setUploadLabel] = useState('');
   const [uploading, setUploading]   = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [previewArchive, setPreviewArchive] = useState<ContractArchive | null>(null);
+  const [previewUrl, setPreviewUrl] = useState('');
+  const [previewLoading, setPreviewLoading] = useState(false);
 
   const { data: archives = [], isLoading } = useQuery({
     queryKey: ['contract-archives', search, empFilter?.id],
@@ -191,15 +199,31 @@ export default function ContractArchivePage() {
     }
   };
 
-  const handleDownload = async (archive: ContractArchive) => {
-    const res = await contractArchivesApi.download(archive.id);
-    const url = URL.createObjectURL(new Blob([res.data as BlobPart]));
-    const a   = document.createElement('a');
-    a.href     = url;
-    a.download = archive.original_name;
-    a.click();
-    URL.revokeObjectURL(url);
+  const openPreview = async (archive: ContractArchive) => {
+    if (!isPdf(archive)) return;
+
+    setPreviewLoading(true);
+    try {
+      const res = await contractArchivesApi.preview(archive.id);
+      setPreviewUrl(URL.createObjectURL(new Blob([res.data as BlobPart], { type: 'application/pdf' })));
+      setPreviewArchive(archive);
+    } finally {
+      setPreviewLoading(false);
+    }
   };
+
+  const closePreview = () => {
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    setPreviewUrl('');
+    setPreviewArchive(null);
+    setPreviewLoading(false);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+    };
+  }, [previewUrl]);
 
   const totalSize = archives.reduce((s, a) => s + (a.file_size ?? 0), 0);
 
@@ -335,11 +359,13 @@ export default function ContractArchivePage() {
                     </TableCell>
                     <TableCell>
                       <Stack direction="row" spacing={0.25}>
-                        <Tooltip title="Télécharger">
-                          <IconButton size="small" onClick={() => handleDownload(a)}>
-                            <Download sx={{ fontSize: 15, color: '#2563EB' }} />
-                          </IconButton>
-                        </Tooltip>
+                        {isPdf(a) && (
+                          <Tooltip title="Visualiser le PDF">
+                            <IconButton size="small" onClick={() => openPreview(a)}>
+                              <Visibility sx={{ fontSize: 15, color: '#2563EB' }} />
+                            </IconButton>
+                          </Tooltip>
+                        )}
                         <Tooltip title="Supprimer">
                           <IconButton size="small" onClick={() => deleteMut.mutate(a.id)}>
                             <Delete sx={{ fontSize: 15, color: '#EF4444' }} />
@@ -354,6 +380,45 @@ export default function ContractArchivePage() {
           </Table>
         </TableContainer>
       </Box>
+
+      <Dialog
+        open={Boolean(previewArchive)}
+        onClose={closePreview}
+        maxWidth="md"
+        fullWidth
+        PaperProps={{ sx: { borderRadius: '16px', height: 'calc(100vh - 96px)', maxHeight: 'calc(100vh - 96px)' } }}
+      >
+        <DialogTitle sx={{ fontSize: 15, fontWeight: 700, pb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Visibility sx={{ fontSize: 18, color: '#2563EB' }} />
+          <Box sx={{ minWidth: 0, flexGrow: 1 }}>
+            <Typography sx={{ fontSize: 13, color: '#64748B', fontWeight: 500 }}>
+              {previewArchive?.employee?.name ?? 'Archive contrat'}
+            </Typography>
+            <Typography noWrap sx={{ fontSize: 14, color: '#0F172A' }}>
+              {previewArchive?.original_name}
+            </Typography>
+          </Box>
+        </DialogTitle>
+        <DialogContent sx={{ p: 0, height: 'calc(100vh - 190px)', minHeight: 520, bgcolor: '#F8FAFC' }}>
+          {previewLoading && <LinearProgress />}
+          {previewUrl ? (
+            <iframe
+              title={previewArchive?.original_name ?? 'Prévisualisation du contrat'}
+              src={previewUrl}
+              width="100%"
+              height="100%"
+              style={{ border: 0, display: 'block' }}
+            />
+          ) : (
+            <Box sx={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748B' }}>
+              <Typography sx={{ fontSize: 13 }}>Chargement du PDF…</Typography>
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ px: 2, pb: 2 }}>
+          <Button size="small" onClick={closePreview} sx={{ borderRadius: '8px' }}>Fermer</Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Dialog upload */}
       <Dialog open={uploadOpen} onClose={() => !uploading && setUploadOpen(false)} maxWidth="sm" fullWidth

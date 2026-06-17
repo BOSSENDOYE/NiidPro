@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(net start *)",
+      "PowerShell(Start-Service -Name \"MySQL80\" -ErrorAction SilentlyContinue)",
+      "PowerShell(Get-Service \"MySQL80\")",
+      "Bash(where mysql *)",
+      "Read(//c/Program Files/MySQL/MySQL Server 8.0/bin/**)",
+      "Bash(\"C:\\\\Program Files\\\\MySQL\\\\MySQL Server 8.0\\\\bin\\\\mysqladmin.exe\" -u c2793226c_bamba -p\"Senmed@2026\" status)",
+      "Bash(ls \"C:\\\\Program Files\\\\MySQL\\\\MySQL Server 8.0\\\\data\\\\*.pid\" 2>nul || echo \"No PID file - server not running\")",
+      "Read(//c/Program Files/MySQL/MySQL Server 8.0/**)",
+      "PowerShell(Start-Process -FilePath \"C:\\\\Program Files\\\\MySQL\\\\MySQL Server 8.0\\\\bin\\\\mysqld.exe\" -ArgumentList '--defaults-file=\"C:\\\\ProgramData\\\\MySQL\\\\MySQL Server 8.0\\\\my.ini\"' -WindowStyle Hidden -PassThru)",
+      "PowerShell(Test-NetConnection -ComputerName localhost -Port 3306)",
+      "PowerShell(Get-Process mysqld -ErrorAction SilentlyContinue)",
+      "PowerShell(Test-NetConnection localhost -Port 3306 -WarningAction SilentlyContinue)",
+      "Bash(\"C:\\\\Program Files\\\\MySQL\\\\MySQL Server 8.0\\\\bin\\\\mysql.exe\" -u c2793226c_bamba -p\"Senmed@2026\" -h 127.0.0.1 -P 3306 -e \"SELECT 'OK' AS status;\")",
+      "Bash(tasklist /fi \"imagename eq mysqld.exe\")",
+      "Bash(findstr \"3306\")",
+      "PowerShell(New-Item -ItemType File -Path \"C:\\\\Users\\\\5340\\\\OneDrive\\\\Desktop\\\\PROJET\\\\niidpro\\\\api\\\\database\\\\database.sqlite\" -Force)"
+    ]
+  }
+}

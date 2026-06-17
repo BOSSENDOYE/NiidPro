@@ -23,8 +23,8 @@ export const contractArchivesApi = {
       headers: { 'Content-Type': 'multipart/form-data' },
     }),
 
-  download: (id: number) =>
-    client.get(`/contract-archives/${id}/download`, { responseType: 'blob' }),
+  preview: (id: number) =>
+    client.get(`/contract-archives/${id}/preview`, { responseType: 'blob' }),
 
   delete: (id: number) =>
     client.delete(`/contract-archives/${id}`),

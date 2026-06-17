@@ -631,6 +631,191 @@ export interface RecruitmentStatistics {
   by_department: { department_id: number; total: number; department?: Department }[];
 }
 
+// ─── Plan de Recrutement ────────────────────────────────────────────────────
+
+export type ClassificationCCNI = 'A1' | 'A2' | 'B1' | 'B2' | 'C1' | 'C2';
+export type EtapeRecrutement =
+  | 'analyse_besoin' | 'elaboration_fiche' | 'publication' | 'selection_cv'
+  | 'tests_ecrits' | 'entretien_rh' | 'entretien_commission' | 'deliberation'
+  | 'decision_dg' | 'integration' | 'essai' | 'cloture';
+
+export interface PlanPoste {
+  id: number;
+  titre: string;
+  direction_id: number;
+  direction?: Department;
+  classification_ccni: ClassificationCCNI;
+  type_contrat_defaut: 'CDI' | 'CDD' | 'DECRET' | 'Stage';
+  statut: 'actif' | 'inactif';
+  description?: string;
+  created_at: string;
+}
+
+export interface BesoinRecrutement {
+  id: number;
+  poste_id: number;
+  poste?: PlanPoste;
+  direction_id: number;
+  direction?: Department;
+  motif: 'depart' | 'nouveau_besoin' | 'projet';
+  date_constat: string;
+  description?: string;
+  statut: 'collecte' | 'valide' | 'rejete';
+  created_by?: number;
+  createdBy?: User;
+  created_at: string;
+}
+
+export interface PlanRecrutement {
+  id: number;
+  annee: number;
+  titre: string;
+  periode_debut: string;
+  periode_fin: string;
+  enveloppe_budgetaire?: number;
+  statut: 'brouillon' | 'valide_dg';
+  valide_par_user_id?: number;
+  validePar?: User;
+  date_validation?: string;
+  notes?: string;
+  lignes?: LignePlan[];
+  lignes_count?: number;
+  created_at: string;
+}
+
+export interface LignePlan {
+  id: number;
+  plan_recrutement_id: number;
+  planRecrutement?: PlanRecrutement;
+  besoin_id?: number;
+  besoin?: BesoinRecrutement;
+  classification_ccni: ClassificationCCNI;
+  type_contrat: 'CDI' | 'CDD' | 'DECRET' | 'Stage';
+  duree_cdd?: number;
+  salaire_base_estime?: number;
+  cout_estime?: number;
+  urgence_operationnelle: number;
+  impact_reglementaire: number;
+  disponibilite_budgetaire: number;
+  profil_marche_disponible: number;
+  priorite_score?: number;
+  notes?: string;
+  processus?: ProcessusRecrutement[];
+  created_at: string;
+}
+
+export interface FichePoste {
+  id: number;
+  poste_id: number;
+  poste?: PlanPoste;
+  version: number;
+  contenu_json: Record<string, unknown>;
+  classification_ccni: ClassificationCCNI;
+  statut: 'brouillon' | 'valide_sg';
+  valide_par_user_id?: number;
+  validePar?: User;
+  date_validation?: string;
+  created_at: string;
+}
+
+export interface ProcessusRecrutement {
+  id: number;
+  ligne_plan_id: number;
+  lignePlan?: LignePlan;
+  etape_courante: EtapeRecrutement;
+  statut: 'en_cours' | 'cloture' | 'abandonne';
+  date_demarrage: string;
+  notes?: string;
+  etapesHistorique?: EtapeHistorique[];
+  commissionMembres?: CommissionMembre[];
+  candidatures?: CandidaturePlan[];
+  decisions?: DecisionRecrutement[];
+  created_at: string;
+}
+
+export interface EtapeHistorique {
+  id: number;
+  processus_id: number;
+  etape: EtapeRecrutement;
+  date_entree: string;
+  date_sortie?: string;
+  valide_par_user_id?: number;
+  validePar?: User;
+  role_validateur?: string;
+  commentaire?: string;
+  created_at: string;
+}
+
+export interface CommissionMembre {
+  id: number;
+  processus_id: number;
+  user_id: number;
+  user?: User;
+  role: 'president' | 'rrh' | 'expert_technique';
+  created_at: string;
+}
+
+export interface CandidaturePlan {
+  id: number;
+  processus_id: number;
+  nom: string;
+  prenom: string;
+  email?: string;
+  telephone?: string;
+  cv_path?: string;
+  lettre_path?: string;
+  statut: 'recu' | 'shortliste' | 'test' | 'entretien' | 'retenu' | 'rejete';
+  score?: number;
+  notes?: string;
+  created_at: string;
+}
+
+export interface DecisionRecrutement {
+  id: number;
+  processus_id: number;
+  candidature_id?: number;
+  candidature?: CandidaturePlan;
+  type: 'recrute' | 'non_recrute' | 'reporte' | 'annule';
+  commentaire?: string;
+  valide_par_dg_user_id?: number;
+  validePar?: User;
+  date_decision: string;
+  contrat?: ContratRecrutement;
+  created_at: string;
+}
+
+export interface ContratRecrutement {
+  id: number;
+  decision_id: number;
+  type_contrat: 'CDI' | 'CDD' | 'DECRET' | 'Stage';
+  date_debut: string;
+  date_fin?: string;
+  date_fin_essai?: string;
+  salaire_base: number;
+  notes?: string;
+  rapportsEssai?: PeriodeEssaiRapport[];
+  created_at: string;
+}
+
+export interface PeriodeEssaiRapport {
+  id: number;
+  contrat_id: number;
+  date_rapport: string;
+  tuteur_id?: number;
+  tuteur?: User;
+  appreciation: 'insuffisant' | 'satisfaisant' | 'bien' | 'tres_bien';
+  recommandation: 'confirmer' | 'prolonger' | 'rompre';
+  observations?: string;
+  created_at: string;
+}
+
+export interface PlanRecrutementDashboard {
+  total_plans: number;
+  besoins_by_statut: Record<string, number>;
+  processus_by_statut: Record<string, number>;
+  candidatures_by_statut: Record<string, number>;
+}
+
 export interface PaginatedResponse<T> {
   data: T[];
   current_page: number;

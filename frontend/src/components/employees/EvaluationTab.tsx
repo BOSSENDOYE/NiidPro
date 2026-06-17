@@ -12,7 +12,7 @@ import {
   Add, Edit, Delete, Search, Refresh, Close, Save,
   Assessment, CheckCircle, HourglassBottom, DraftsTwoTone,
   VerifiedUser, EmojiEvents, Star, DescriptionOutlined,
-  CalendarMonth, Person, ThumbUp,
+  CalendarMonth, Person,
 } from '@mui/icons-material';
 import { useForm, Controller } from 'react-hook-form';
 import { z } from 'zod';
@@ -106,7 +106,7 @@ function OverallScore({ score, size = 'md' }: { score: number; size?: 'sm' | 'md
 /* ─────────────────────────── schéma form ── */
 
 const schema = z.object({
-  employee_id:        z.number({ required_error: 'Agent requis' }).min(1),
+  employee_id:        z.number().min(1),
   period:             z.string().min(1, 'Période requise'),
   evaluation_date:    z.string().min(1, 'Date requise'),
   evaluator_name:     z.string().optional(),

@@ -11,6 +11,16 @@ use Illuminate\Validation\Rule;
 
 class EmployeeController extends Controller
 {
+    public function counts()
+    {
+        return response()->json([
+            'total'     => Employee::count(),
+            'active'    => Employee::where('status', 'active')->count(),
+            'inactive'  => Employee::where('status', 'inactive')->count(),
+            'suspended' => Employee::where('status', 'suspended')->count(),
+        ]);
+    }
+
     public function index(Request $request)
     {
         $query = Employee::with(['department', 'position', 'manager', 'activeContract'])
@@ -150,6 +160,110 @@ class EmployeeController extends Controller
                 'document_type' => $m['document_type'] ?? null,
             ]);
         }
+    }
+
+    public function export(Request $request)
+    {
+        $employees = Employee::with(['department', 'position'])
+            ->when($request->status, fn($q, $s) => $q->where('status', $s))
+            ->orderBy('last_name')
+            ->get();
+
+        $callback = function () use ($employees) {
+            $file = fopen('php://output', 'w');
+            fprintf($file, chr(0xEF).chr(0xBB).chr(0xBF)); // BOM UTF-8 pour Excel
+
+            fputcsv($file, [
+                'Matricule', 'Prénom', 'Nom', 'Email professionnel', 'Téléphone',
+                'Service', 'Poste', 'Date embauche', 'Salaire de base', 'Statut',
+            ], ';');
+
+            foreach ($employees as $emp) {
+                fputcsv($file, [
+                    $emp->employee_number ?? '',
+                    $emp->first_name,
+                    $emp->last_name,
+                    $emp->professional_email ?? '',
+                    $emp->phone_professional ?? $emp->phone_personal ?? '',
+                    $emp->department?->name ?? '',
+                    $emp->position?->title ?? '',
+                    $emp->hire_date?->format('Y-m-d') ?? '',
+                    $emp->base_salary ?? '',
+                    $emp->status,
+                ], ';');
+            }
+
+            fclose($file);
+        };
+
+        return response()->streamDownload(
+            $callback,
+            'agents_' . now()->format('Y-m-d') . '.csv',
+            ['Content-Type' => 'text/csv; charset=UTF-8']
+        );
+    }
+
+    public function import(Request $request)
+    {
+        $request->validate([
+            'file' => ['required', 'file', 'mimes:csv,txt', 'max:4096'],
+        ]);
+
+        $handle = fopen($request->file('file')->getPathname(), 'r');
+
+        // Sauter le BOM UTF-8 si présent
+        $bom = fread($handle, 3);
+        if ($bom !== "\xEF\xBB\xBF") {
+            fseek($handle, 0);
+        }
+
+        fgetcsv($handle, 1000, ';'); // Ignorer l'en-tête
+
+        $created = 0;
+        $skipped = [];
+        $line    = 2;
+
+        while (($row = fgetcsv($handle, 1000, ';')) !== false) {
+            if (empty(array_filter($row))) { $line++; continue; }
+
+            [$matricule, $prenom, $nom, $email, $tel, $service, , $dateEmbauche, $salaire, $statut]
+                = array_pad($row, 10, '');
+
+            if (!trim($prenom) || !trim($nom)) {
+                $skipped[] = "Ligne $line : prénom et nom obligatoires.";
+                $line++;
+                continue;
+            }
+
+            try {
+                $dept = $service ? \App\Models\Department::where('name', trim($service))->first() : null;
+
+                Employee::create([
+                    'employee_number'    => $matricule ?: $this->generateEmployeeNumber(),
+                    'first_name'         => trim($prenom),
+                    'last_name'          => trim($nom),
+                    'professional_email' => $email    ?: null,
+                    'phone_professional' => $tel      ?: null,
+                    'department_id'      => $dept?->id,
+                    'hire_date'          => $dateEmbauche ?: now()->format('Y-m-d'),
+                    'base_salary'        => is_numeric($salaire) ? (float) $salaire : null,
+                    'status'             => in_array($statut, ['active', 'inactive']) ? $statut : 'active',
+                ]);
+                $created++;
+            } catch (\Exception $e) {
+                $skipped[] = "Ligne $line : " . $e->getMessage();
+            }
+
+            $line++;
+        }
+
+        fclose($handle);
+
+        return response()->json([
+            'created' => $created,
+            'skipped' => $skipped,
+            'message' => "$created agent(s) importé(s) avec succès.",
+        ]);
     }
 
     public function uploadPhoto(Request $request, Employee $employee)

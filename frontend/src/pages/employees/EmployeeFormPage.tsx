@@ -3,16 +3,16 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Box, Card, Typography, Button, TextField, Grid, MenuItem,
-  CircularProgress, Alert, Tabs, Tab, Stack, Avatar, Divider,
+  CircularProgress, Alert, Tabs, Tab, Stack, Divider,
   IconButton, Tooltip, Table, TableHead, TableRow, TableCell,
   TableBody, Checkbox, FormControlLabel, Select, InputLabel,
   FormControl, InputAdornment, Chip, alpha,
 } from '@mui/material';
 import {
   Save, Close, Autorenew, CameraAlt, Add, Delete, Search,
-  Person, Phone, Home, Work, School, FamilyRestroom,
-  Folder, BarChart, ContactEmergency, AccountBalance,
-  HealthAndSafety, Groups, AttachFile, CheckCircle,
+  Person, Phone, Work, School, FamilyRestroom,
+  Folder, BarChart, ContactEmergency,
+  Groups, AttachFile, CheckCircle,
 } from '@mui/icons-material';
 import { useForm, Controller } from 'react-hook-form';
 import { z } from 'zod';
@@ -32,14 +32,14 @@ const schema = z.object({
   birth_place:        z.string().optional(),
   nationality:        z.string().optional(),
   gender:             z.string().optional(),
-  base_salary:        z.number({ coerce: true }).min(0),
-  department_id:      z.number({ coerce: true }).min(1, 'Service requis'),
+  base_salary:        z.number().min(0),
+  department_id:      z.number().min(1, 'Service requis'),
   status:             z.enum(['active', 'inactive', 'suspended']),
   city:               z.string().optional(),
   country:            z.string().optional(),
-  annual_leave_days:  z.number({ coerce: true }).min(0),
+  annual_leave_days:  z.number().min(0),
   employee_number:    z.string().optional(),
-  position_id:        z.number({ coerce: true }).optional(),
+  position_id:        z.number().optional(),
 });
 type FormData = z.infer<typeof schema>;
 
@@ -85,23 +85,7 @@ const GroupBox = ({ title, children }: { title: string; children: React.ReactNod
   </Box>
 );
 
-const TableHeaderCell = ({ children }: { children: React.ReactNode }) => (
-  <TableCell
-    sx={{
-      bgcolor: '#1E293B', color: '#94A3B8', fontSize: 10,
-      fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em',
-      py: 1, px: 1.5, borderColor: '#334155', whiteSpace: 'nowrap',
-    }}
-  >
-    {children}
-  </TableCell>
-);
 
-const TableDataCell = ({ children, sx }: { children?: React.ReactNode; sx?: object }) => (
-  <TableCell sx={{ py: 0.75, px: 1, fontSize: 13, color: '#374151', ...sx }}>
-    {children}
-  </TableCell>
-);
 
 /* ─── Controlled table types & helpers ─── */
 interface TableRow { id: string; [col: string]: string }
@@ -274,7 +258,7 @@ export default function EmployeeFormPage() {
         hire_date: employee.hire_date,
         base_salary: employee.base_salary,
         department_id: employee.department_id,
-        status: employee.status,
+        status: (['active', 'inactive', 'suspended'].includes(employee.status) ? employee.status : 'active') as 'active' | 'inactive' | 'suspended',
         city: employee.city ?? '',
         country: employee.country ?? '',
         annual_leave_days: employee.annual_leave_days,

@@ -20,4 +20,20 @@ export const employeesApi = {
   },
 
   delete: (id: number) => client.delete(`/employees/${id}`),
+
+  counts: () =>
+    client.get<{ total: number; active: number; inactive: number; suspended: number }>('/employees/counts'),
+
+  export: (params?: Record<string, string>) =>
+    client.get('/employees/export', { params, responseType: 'blob' }),
+
+  import: (file: File) => {
+    const form = new FormData();
+    form.append('file', file);
+    return client.post<{ created: number; skipped: string[]; message: string }>(
+      '/employees/import',
+      form,
+      { headers: { 'Content-Type': 'multipart/form-data' } }
+    );
+  },
 };

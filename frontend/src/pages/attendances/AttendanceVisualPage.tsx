@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
-  Box, Card, CardContent, Typography, IconButton, Tooltip,
+  Box, Card, Typography, IconButton, Tooltip,
   Skeleton, Avatar, Stack,
 } from '@mui/material';
 import { ChevronLeft, ChevronRight } from '@mui/icons-material';
@@ -204,7 +204,7 @@ export default function AttendanceVisualPage() {
                               display: 'flex', alignItems: 'center', justifyContent: 'center',
                             }}>
                               <Typography sx={{ fontSize: 10, fontWeight: 700, color: '#CBD5E1' }}>
-                                {c.label}
+                                —
                               </Typography>
                             </Box>
                           </Box>

@@ -17,6 +17,7 @@ use App\Http\Controllers\Api\TaskController;
 use App\Http\Controllers\Api\TrainingController;
 use App\Http\Controllers\Api\RecruitmentController;
 use App\Http\Controllers\Api\RecruitmentParamsController;
+use App\Http\Controllers\Api\PlanRecrutementController;
 use Illuminate\Support\Facades\Route;
 
 // Health check
@@ -48,15 +49,19 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('departments', DepartmentController::class);
 
     // Employees
+    Route::get('/employees/counts',            [EmployeeController::class, 'counts']);
+    Route::get('/employees/export',            [EmployeeController::class, 'export']);
+    Route::post('/employees/import',           [EmployeeController::class, 'import']);
     Route::post('/employees/{employee}/photo', [EmployeeController::class, 'uploadPhoto']);
     Route::apiResource('employees', EmployeeController::class);
 
     // Contracts
-    Route::get('/contracts/expiring', [ContractController::class, 'expiringSoon']);
+    Route::get('/contracts/expiring',       [ContractController::class, 'expiringSoon']);
+    Route::get('/contracts/{contract}/pdf', [ContractController::class, 'pdf']);
     Route::apiResource('contracts', ContractController::class);
 
     // Contract Archives
-    Route::get('/contract-archives/{contractArchive}/download', [ContractArchiveController::class, 'download']);
+    Route::get('/contract-archives/{contractArchive}/preview', [ContractArchiveController::class, 'preview']);
     Route::apiResource('contract-archives', ContractArchiveController::class)->only(['index', 'store', 'destroy']);
 
     // Attendance
@@ -222,5 +227,33 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/generated',               [DocumentController::class, 'generated']);
         Route::get('/generated/{document}',    [DocumentController::class, 'showGenerated']);
         Route::delete('/generated/{document}', [DocumentController::class, 'destroyGenerated']);
+    });
+
+    // ── Plan de Recrutement ──────────────────────────────────────────────────
+    Route::prefix('plan-recrutement')->group(function () {
+        Route::get('/dashboard',             [PlanRecrutementController::class, 'dashboard']);
+        Route::get('/postes',                [PlanRecrutementController::class, 'postes']);
+        Route::post('/postes',               [PlanRecrutementController::class, 'createPoste']);
+        Route::get('/besoins',               [PlanRecrutementController::class, 'besoins']);
+        Route::post('/besoins',              [PlanRecrutementController::class, 'createBesoin']);
+        Route::put('/besoins/{id}/valider',  [PlanRecrutementController::class, 'validerBesoin']);
+        Route::get('/plans',                 [PlanRecrutementController::class, 'plans']);
+        Route::post('/plans',                [PlanRecrutementController::class, 'createPlan']);
+        Route::get('/plans/{id}',            [PlanRecrutementController::class, 'showPlan']);
+        Route::put('/plans/{id}',            [PlanRecrutementController::class, 'updatePlan']);
+        Route::put('/plans/{id}/valider',    [PlanRecrutementController::class, 'validerPlan']);
+        Route::post('/plans/{planId}/lignes',[PlanRecrutementController::class, 'createLigne']);
+        Route::put('/lignes/{id}',           [PlanRecrutementController::class, 'updateLigne']);
+        Route::delete('/lignes/{id}',        [PlanRecrutementController::class, 'deleteLigne']);
+        Route::get('/fiches/{pospeId}',      [PlanRecrutementController::class, 'fichesPoste']);
+        Route::post('/fiches',               [PlanRecrutementController::class, 'createFiche']);
+        Route::get('/processus',             [PlanRecrutementController::class, 'processus']);
+        Route::post('/processus',            [PlanRecrutementController::class, 'createProcessus']);
+        Route::get('/processus/{id}',        [PlanRecrutementController::class, 'showProcessus']);
+        Route::put('/processus/{id}/etape',  [PlanRecrutementController::class, 'avancerEtape']);
+        Route::get('/processus/{id}/candidatures', [PlanRecrutementController::class, 'candidatures']);
+        Route::post('/candidatures',         [PlanRecrutementController::class, 'createCandidature']);
+        Route::put('/candidatures/{id}',     [PlanRecrutementController::class, 'updateCandidature']);
+        Route::post('/decisions',            [PlanRecrutementController::class, 'createDecision']);
     });
 });

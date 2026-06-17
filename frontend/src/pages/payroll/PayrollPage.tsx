@@ -11,7 +11,7 @@ import {
   Add, Edit, Delete, Download, Print, PlayArrow, CheckCircle,
   Visibility, FilterList, BarChart, Search,
   ReceiptLong, Payments, AccountBalance, Description,
-  TableChart, Tune,
+  Tune,
 } from '@mui/icons-material';
 import { recruitmentApi } from '../../api/recruitment';
 import type {
@@ -567,7 +567,7 @@ function ParametresTab() {
 
   const saveAug = useMutation({
     mutationFn: () => {
-      const d = { ...augF, taux: Number(augF.taux) };
+      const d = { ...augF, taux: Number(augF.taux), type: augF.type as RecruitmentAugmentation['type'], unite: augF.unite as RecruitmentAugmentation['unite'] };
       return (dlg.item as RecruitmentAugmentation | null)?.id
         ? recruitmentApi.updateAugmentation((dlg.item as RecruitmentAugmentation).id, d)
         : recruitmentApi.createAugmentation(d);
@@ -599,7 +599,7 @@ function ParametresTab() {
     },
     onSuccess: () => { invalidate(); closeDlg(); },
   });
-  const delBar = useMutation({ mutationFn: (id: number) => recruitmentApi.deleteBareme(id), onSuccess: invalidate });
+  useMutation({ mutationFn: (id: number) => recruitmentApi.deleteBareme(id), onSuccess: invalidate });
 
   const TH_CELL = { color: '#fff', fontWeight: 700, fontSize: 11, py: 1 };
   const subTabs = ['Indice', 'Augmentation', 'Hiérarchies', 'Barème', 'Rapports'];
@@ -1407,7 +1407,7 @@ function ParametresTab() {
                   Sauvegarder
                 </Button>
                 <Button variant="outlined" size="small" disabled={saveBar.isPending || !barF.revenu_brut}
-                  onClick={() => saveBar.mutate().then(() => closeDlg())}
+                  onClick={() => saveBar.mutateAsync().then(() => closeDlg())}
                   sx={{ borderRadius: '20px', textTransform: 'none', fontWeight: 700, fontSize: 11, color: '#fff', borderColor: '#fff', whiteSpace: 'nowrap',
                     '&:hover': { bgcolor: 'rgba(255,255,255,0.12)' }, '&.Mui-disabled': { color: 'rgba(255,255,255,0.4)', borderColor: 'rgba(255,255,255,0.3)' } }}>
                   Sauvegarder&amp;Fermer
@@ -1515,8 +1515,7 @@ export default function PayrollPage() {
             icon={t.icon}
             active={tab === i}
             onClick={() => setTab(i)}
-            badge={t.badge}
-          />
+            />
         ))}
       </Box>
 

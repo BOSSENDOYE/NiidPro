@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Contract;
 use App\Models\Employee;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 
 class ContractController extends Controller
@@ -86,5 +87,23 @@ class ContractController extends Controller
     {
         $contract->delete();
         return response()->json(['message' => 'Contrat supprimé.']);
+    }
+
+    public function pdf(Contract $contract)
+    {
+        $contract->load('employee.department', 'employee.position');
+        $employee    = $contract->employee;
+        $companyName = config('app.company_name', 'NiidPro');
+
+        $pdf = Pdf::loadView('contracts.pdf', compact('contract', 'employee', 'companyName'))
+            ->setPaper('a4', 'portrait');
+
+        $filename = sprintf(
+            'contrat_%s_%s.pdf',
+            str_replace(' ', '_', strtolower($employee?->last_name ?? 'inconnu')),
+            $contract->id
+        );
+
+        return $pdf->stream($filename);
     }
 }

@@ -54,15 +54,17 @@ class ContractArchiveController extends Controller
         return response()->json($saved, 201);
     }
 
-    public function download(ContractArchive $contractArchive)
+    public function preview(ContractArchive $contractArchive)
     {
         if (!Storage::disk('public')->exists($contractArchive->file_path)) {
             return response()->json(['message' => 'Fichier introuvable'], 404);
         }
 
-        return Storage::disk('public')->download(
+        return Storage::disk('public')->response(
             $contractArchive->file_path,
-            $contractArchive->original_name
+            null,
+            [],
+            'inline'
         );
     }
 

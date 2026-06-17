@@ -147,7 +147,7 @@ export default function RecruitmentsPage() {
 
   const createRequest = useMutation({
     mutationFn: (data: typeof reqForm & { submit?: boolean }) =>
-      recruitmentApi.create({ ...data, number_of_positions: Number(data.number_of_positions), budget: data.budget ? Number(data.budget) : undefined }),
+      recruitmentApi.create({ ...data, department_id: Number(data.department_id) as unknown as number, number_of_positions: Number(data.number_of_positions), budget: data.budget ? Number(data.budget) : undefined, contract_type: data.contract_type as RecruitmentRequest['contract_type'] }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['recruitment'] }); setRequestDialog(false); resetReqForm(); },
   });
 
@@ -165,6 +165,7 @@ export default function RecruitmentsPage() {
     mutationFn: (data: typeof postingForm) =>
       recruitmentApi.createJobPosting({
         ...data,
+        publication_type: data.publication_type as 'internal' | 'external' | 'both',
         department_id: Number(data.department_id) as unknown as number,
         required_experience_years: data.required_experience_years ? Number(data.required_experience_years) : undefined,
         recruitment_request_id: data.recruitment_request_id ? Number(data.recruitment_request_id) : undefined,
@@ -198,6 +199,7 @@ export default function RecruitmentsPage() {
     mutationFn: (data: typeof ivForm) =>
       recruitmentApi.createInterview({
         ...data,
+        type: data.type as 'entretien' | 'test_technique' | 'test_psychotechnique',
         job_posting_id: Number(data.job_posting_id) as unknown as number,
         application_id: Number(data.application_id) as unknown as number,
       }),

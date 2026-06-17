@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
   Box, Card, CardContent, Typography, Avatar, Grid, Chip, Button,
-  Tab, Tabs, Skeleton, Divider, Stack,
+  Tab, Tabs, Skeleton, Stack,
 } from '@mui/material';
 import {
   ArrowBack, Edit, Email, Phone, LocationOn, CalendarMonth,

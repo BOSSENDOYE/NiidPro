@@ -8,4 +8,5 @@ export const contractsApi = {
   create: (data: Partial<Contract>) => client.post<Contract>('/contracts', data),
   update: (id: number, data: Partial<Contract>) => client.put<Contract>(`/contracts/${id}`, data),
   delete: (id: number) => client.delete(`/contracts/${id}`),
+  pdf: (id: number) => client.get(`/contracts/${id}/pdf`, { responseType: 'blob' }),
 };

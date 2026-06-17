@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Box, Typography, Button, Stack, TextField, Chip,
   Dialog, DialogContent, Grid, MenuItem, Select,
-  FormControl, InputLabel, IconButton, Tooltip, Skeleton, Avatar,
+  FormControl, IconButton, Tooltip, Skeleton, Avatar,
   InputAdornment, alpha, Autocomplete, Table, TableBody,
   TableCell, TableContainer, TableHead, TableRow, Paper,
 } from '@mui/material';
@@ -14,7 +14,7 @@ import {
   GavelOutlined, HelpOutline, CheckCircleOutline,
   PictureAsPdf, Image as ImageIcon, Download,
 } from '@mui/icons-material';
-import { useForm, Controller } from 'react-hook-form';
+import { useForm, Controller, type Resolver } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { sanctionsApi } from '../../api/sanctions';
@@ -42,7 +42,7 @@ const STATUS_META = {
 
 /* ─── Schéma validation ─── */
 const schema = z.object({
-  employee_id:   z.number({ required_error: 'Agent requis' }).min(1),
+  employee_id:   z.number().min(1),
   type:          z.enum(['avertissement','blame','mise_a_pied','retrogradation','licenciement','autre']),
   reason:        z.string().min(1, 'Motif requis'),
   sanction_date: z.string().min(1, 'Date requise'),
@@ -51,7 +51,7 @@ const schema = z.object({
   duration_days: z.coerce.number().optional(),
   decided_by:    z.string().optional(),
   reference:     z.string().optional(),
-  status:        z.enum(['active','lifted']).default('active'),
+  status:        z.enum(['active','lifted']),
   notes:         z.string().optional(),
 });
 type FormData = z.infer<typeof schema>;
@@ -68,7 +68,7 @@ function SanctionModal({ open, onClose, sanction, employees }: {
   const [file, setFile] = useState<File | null>(null);
 
   const { register, handleSubmit, control, watch, reset, formState: { errors } } = useForm<FormData>({
-    resolver: zodResolver(schema),
+    resolver: zodResolver(schema) as unknown as Resolver<FormData>,
     defaultValues: sanction ? {
       employee_id:   sanction.employee_id,
       type:          sanction.type,

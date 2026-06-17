@@ -9,7 +9,7 @@ import {
 import {
   Add, Edit, Delete, Description, History, NoteAlt, Print,
   Close, Search, Archive, PlayArrow, Article, CheckCircle,
-  AccessTime, Person, ContentCopy, Settings,
+  AccessTime, ContentCopy, Settings,
 } from '@mui/icons-material';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm, Controller } from 'react-hook-form';

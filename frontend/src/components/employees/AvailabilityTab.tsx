@@ -9,7 +9,7 @@ import {
 } from '@mui/material';
 import {
   Add, Edit, Delete, Search, Refresh, Close, Save,
-  AccessTime, CheckCircle, Cancel, HourglassBottom,
+  AccessTime, CheckCircle, HourglassBottom,
   Block, CalendarMonth, DescriptionOutlined, LocationOn,
   ChevronLeft, ChevronRight, CalendarViewMonth, ViewList,
   Wifi, FlightTakeoff, School, SwapHoriz, Person, Gavel,
@@ -66,7 +66,7 @@ function isAvailabilityOnDate(av: Availability, ds: string): boolean {
 /* ─────────────────────── schéma ── */
 
 const schema = z.object({
-  employee_id:  z.number({ required_error: 'Agent requis' }).min(1),
+  employee_id:  z.number().min(1),
   type:         z.enum(['remote','mission','training','secondment','personal','suspension']),
   start_date:   z.string().min(1, 'Date de début requise'),
   end_date:     z.string().min(1, 'Date de fin requise'),
@@ -560,7 +560,7 @@ export default function AvailabilityTab() {
   const [modalOpen, setModalOpen]       = useState(false);
   const [editItem, setEditItem]         = useState<Availability|undefined>(undefined);
   const [deleteTarget, setDeleteTarget] = useState<Availability|null>(null);
-  const [approveTarget, setApproveTarget] = useState<Availability|null>(null);
+  const [, setApproveTarget] = useState<Availability|null>(null);
 
   const { data: availabilities = [], isLoading, refetch } = useQuery({
     queryKey: ['availabilities'],

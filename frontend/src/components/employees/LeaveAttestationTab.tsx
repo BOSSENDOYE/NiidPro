@@ -10,7 +10,7 @@ import { documentsApi } from '../../api/documents';
 import { employeesApi } from '../../api/employees';
 import { leavesApi } from '../../api/leaves';
 import { formatDate } from '../../utils/format';
-import type { Employee, DocumentTemplate, GeneratedDocument } from '../../types';
+import type { Employee, DocumentTemplate, GeneratedDocument, Leave } from '../../types';
 
 const NAV = '#0D2137';
 const ACT = '#E85D04';
@@ -49,7 +49,7 @@ export default function LeaveAttestationTab({ searchText = '' }: Props) {
   const { data: empLeaves = [] } = useQuery({
     queryKey: ['leaves', 'employee', selectedEmp?.id],
     queryFn: () => leavesApi.list().then((r) =>
-      (r.data as { employee_id: number }[]).filter((l) => l.employee_id === selectedEmp!.id)
+      (r.data as Leave[]).filter((l) => l.employee_id === selectedEmp!.id)
     ),
     enabled: !!selectedEmp,
   });

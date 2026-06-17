@@ -39,7 +39,7 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(
       if (editor && !editor.isDestroyed) {
         const current = editor.getHTML();
         if (value !== current) {
-          editor.commands.setContent(value || '', false);
+          editor.commands.setContent(value || '');
         }
       }
     }, [value, editor]);

@@ -3,25 +3,18 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Box, Typography, IconButton, Tooltip, Dialog, DialogTitle,
   DialogContent, DialogActions, TextField, Button, Skeleton,
-  Chip, Collapse, Avatar, InputAdornment,
+  Chip, Collapse, InputAdornment,
 } from '@mui/material';
 import {
   Add, Edit, Delete, People, ExpandMore, ChevronRight,
   Search, AccountTree, ViewList,
 } from '@mui/icons-material';
-import { useForm, Controller } from 'react-hook-form';
+import { useForm } from 'react-hook-form';
 import { departmentsApi } from '../../api/departments';
 import PageHeader from '../../components/common/PageHeader';
 import type { Department } from '../../types';
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
-
-/** Compute visual depth of a dept in the flat list (0 = root) */
-function depth(dept: Department, all: Department[]): number {
-  if (!dept.parent_id) return 0;
-  const parent = all.find((d) => d.id === dept.parent_id);
-  return parent ? depth(parent, all) + 1 : 0;
-}
 
 /** Build a tree from a flat list */
 function buildTree(flat: Department[]): Department[] {
@@ -233,7 +226,7 @@ export default function DepartmentsPage() {
     return buildTree(filtered);
   }, [flatList, search]);
 
-  const { register, handleSubmit, reset, control, setValue } = useForm<FormData>();
+  const { register, handleSubmit, reset } = useForm<FormData>();
 
   const createMutation = useMutation({
     mutationFn: (data: Partial<Department>) => departmentsApi.create(data),

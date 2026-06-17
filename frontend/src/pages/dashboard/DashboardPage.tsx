@@ -4,7 +4,7 @@ import {
   List, ListItem, ListItemText, Skeleton, Stack, Typography,
 } from '@mui/material';
 import {
-  AssignmentLate, BeachAccess, Business, CalendarMonth, CheckCircle,
+  AssignmentLate, BeachAccess, Business, CheckCircle,
   EventAvailable, Groups, PersonAdd, QueryStats, Schedule, TrendingUp,
   WarningAmber, WorkHistory,
 } from '@mui/icons-material';

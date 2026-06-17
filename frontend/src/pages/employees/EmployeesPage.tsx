@@ -1,18 +1,22 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Box, Card, Avatar, Typography, IconButton, Tooltip, TextField,
   Skeleton, Stack, Tabs, Tab, Button,
-  Chip, Select, FormControl, Grid, Divider, Checkbox, Menu, ListItemIcon, ListItemText,
+  Chip, Grid, Divider, Checkbox, Menu, ListItemIcon, ListItemText,
   MenuItem, Dialog, DialogTitle, DialogContent, DialogActions,
+  Alert, LinearProgress, Autocomplete,
 } from '@mui/material';
 import {
   Visibility, Edit, Delete, Email, Badge as BadgeIcon,
   Print, PersonAdd, Groups, CheckCircle, Block,
   Gavel, Assignment, Assessment,
   Phone, Event, Refresh, AccessTime, EmojiEvents, Search, AssignmentTurnedIn,
+  FileDownload, FileUpload, TableChart, CloudUpload,
 } from '@mui/icons-material';
+import * as XLSX from 'xlsx';
 import { employeesApi } from '../../api/employees';
+import { departmentsApi } from '../../api/departments';
 import { tasksApi } from '../../api/tasks';
 import { formatDate } from '../../utils/format';
 import EmployeeCreateModal from '../../components/employees/EmployeeCreateModal';
@@ -42,11 +46,8 @@ export default function EmployeesPage() {
   const [matricule, setMatricule]       = useState('');
   const [prenom, setPrenom]             = useState('');
   const [nom, setNom]                   = useState('');
-  const [sexe, setSexe]                 = useState('');
   const [service, setService]           = useState('');
   const [telephone, setTelephone]       = useState('');
-  const [dateFrom, setDateFrom]         = useState('');
-  const [dateTo, setDateTo]             = useState('');
   const [search, setSearch]             = useState('');
   const [selected, setSelected]         = useState<number[]>([]);
   const [anchorEl, setAnchorEl]         = useState<null | HTMLElement>(null);
@@ -57,8 +58,81 @@ export default function EmployeesPage() {
   const [badgeEmployee, setBadgeEmployee] = useState<Employee | null>(null);
   const [taskEmp, setTaskEmp]   = useState<Employee | null>(null);
   const [taskForm, setTaskForm] = useState({ title: '', description: '', priority: 'medium', due_date: '' });
+  const [importOpen, setImportOpen]   = useState(false);
+  const [importFile, setImportFile]   = useState<File | null>(null);
+  const [importResult, setImportResult] = useState<{ created: number; skipped: string[] } | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const qcPage = useQueryClient();
+
+  const { data: counts } = useQuery({
+    queryKey: ['employees', 'counts'],
+    queryFn: () => employeesApi.counts().then(r => r.data),
+  });
+
+  const { data: depts } = useQuery({
+    queryKey: ['departments'],
+    queryFn: () => departmentsApi.list().then(r => r.data),
+  });
+  const deptNames = (depts as { id: number; name: string }[] | undefined)?.map(d => d.name) ?? [];
+
+  const importMut = useMutation({
+    mutationFn: (file: File) => employeesApi.import(file),
+    onSuccess: (res) => {
+      setImportResult({ created: res.data.created, skipped: res.data.skipped });
+      qcPage.invalidateQueries({ queryKey: ['employees'] });
+      qcPage.invalidateQueries({ queryKey: ['employees', 'counts'] });
+      setImportFile(null);
+    },
+  });
+
+  const handleExport = async () => {
+    const params: Record<string, string> = {};
+    if (statusFilter !== 'all') params.status = statusFilter;
+    const res = await employeesApi.export(params);
+    const url = window.URL.createObjectURL(new Blob([res.data as BlobPart]));
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `agents_${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    window.URL.revokeObjectURL(url);
+  };
+
+  const handleImportClose = () => {
+    setImportOpen(false);
+    setImportFile(null);
+    setImportResult(null);
+    importMut.reset();
+  };
+
+  const isExcel = (file: File) =>
+    file.name.endsWith('.xlsx') || file.name.endsWith('.xls');
+
+  const excelToCsvFile = (file: File): Promise<File> =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const wb = XLSX.read(e.target!.result, { type: 'binary' });
+          const ws = wb.Sheets[wb.SheetNames[0]];
+          const rows = XLSX.utils.sheet_to_json<string[]>(ws, { header: 1 });
+          const bom = '﻿';
+          const csv = bom + rows.map(r => (r as string[]).join(';')).join('\n');
+          resolve(new File([csv], file.name.replace(/\.xlsx?$/i, '.csv'), { type: 'text/csv' }));
+        } catch (err) { reject(err); }
+      };
+      reader.onerror = reject;
+      reader.readAsBinaryString(file);
+    });
+
+  const handleImport = async () => {
+    if (!importFile) return;
+    const fileToSend = isExcel(importFile)
+      ? await excelToCsvFile(importFile)
+      : importFile;
+    importMut.mutate(fileToSend);
+  };
+
   const taskMut = useMutation({
     mutationFn: (data: Record<string, unknown>) => tasksApi.create(data),
     onSuccess: () => { qcPage.invalidateQueries({ queryKey: ['tasks'] }); setTaskEmp(null); setTaskForm({ title: '', description: '', priority: 'medium', due_date: '' }); },
@@ -72,17 +146,6 @@ export default function EmployeesPage() {
   };
   const closeModal = () => { setModalOpen(false); setModalEmployee(undefined); };
 
-  const { data, isLoading, refetch } = useQuery({
-    queryKey: ['employees', page, search, statusFilter],
-    queryFn: () =>
-      employeesApi.list({
-        page: page + 1,
-        per_page: rowsPerPage,
-        search: search || undefined,
-        status: statusFilter !== 'all' ? statusFilter : undefined,
-      }).then((r) => r.data),
-  });
-
   const handleSelect = (id: number) =>
     setSelected(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
 
@@ -91,10 +154,27 @@ export default function EmployeesPage() {
     setPage(0);
   };
 
+  const departmentId = service
+    ? (depts as { id: number; name: string }[] | undefined)?.find(d => d.name === service)?.id
+    : undefined;
+
+  const { data, isLoading, refetch } = useQuery({
+    queryKey: ['employees', page, search, statusFilter, departmentId],
+    queryFn: () =>
+      employeesApi.list({
+        page: page + 1,
+        per_page: rowsPerPage,
+        search: search || undefined,
+        status: statusFilter !== 'all' ? statusFilter : undefined,
+        department_id: departmentId,
+      }).then((r) => r.data),
+  });
+
   const handleClear = () => {
-    setMatricule(''); setPrenom(''); setNom(''); setSexe('');
-    setService(''); setTelephone(''); setDateFrom(''); setDateTo('');
+    setMatricule(''); setPrenom(''); setNom('');
+    setService(''); setTelephone('');
     setSearch(''); setStatusFilter('all'); setPage(0);
+    // departmentId se recalcule automatiquement quand service = ''
   };
 
   return (
@@ -139,13 +219,13 @@ export default function EmployeesPage() {
           </Stack>
           <Stack direction="row" spacing={1}>
             <Chip icon={<Groups sx={{ fontSize: '13px !important', color: '#94A3B8 !important' }} />}
-              label={`${data?.total ?? 0} Total`} size="small"
+              label={`${counts?.total ?? data?.total ?? 0} Total`} size="small"
               sx={{ bgcolor: 'rgba(255,255,255,0.08)', color: '#CBD5E1', border: '1px solid rgba(255,255,255,0.12)', fontSize: 11, fontWeight: 600 }} />
             <Chip icon={<CheckCircle sx={{ fontSize: '13px !important', color: '#34D399 !important' }} />}
-              label="Actifs" size="small"
+              label={`${counts?.active ?? 0} Actifs`} size="small"
               sx={{ bgcolor: 'rgba(5,150,105,0.15)', color: '#34D399', border: '1px solid rgba(52,211,153,0.25)', fontSize: 11, fontWeight: 600 }} />
             <Chip icon={<Block sx={{ fontSize: '13px !important', color: '#FCA5A5 !important' }} />}
-              label="Inactifs" size="small"
+              label={`${counts?.inactive ?? 0} Inactifs`} size="small"
               sx={{ bgcolor: 'rgba(220,38,38,0.15)', color: '#FCA5A5', border: '1px solid rgba(252,165,165,0.25)', fontSize: 11, fontWeight: 600 }} />
           </Stack>
         </Stack>
@@ -193,15 +273,25 @@ export default function EmployeesPage() {
                   sx={{ bgcolor: '#fff', width: 105 }} InputProps={{ sx: { fontSize: 12 } }} />
                 <TextField placeholder="Nom" size="small" value={nom} onChange={e => setNom(e.target.value)}
                   sx={{ bgcolor: '#fff', width: 105 }} InputProps={{ sx: { fontSize: 12 } }} />
-                <TextField placeholder="Service" size="small" value={service} onChange={e => setService(e.target.value)}
-                  sx={{ bgcolor: '#fff', width: 105 }} InputProps={{ sx: { fontSize: 12 } }} />
+                <Autocomplete
+                  options={deptNames}
+                  value={service || null}
+                  onChange={(_, val) => setService(val ?? '')}
+                  size="small"
+                  sx={{ width: 140, bgcolor: '#fff' }}
+                  renderInput={(params) => (
+                    <TextField {...params} placeholder="Service"
+                      InputProps={{ ...params.InputProps, sx: { fontSize: 12 } }} />
+                  )}
+                  noOptionsText="Aucun service"
+                />
                 <TextField placeholder="Téléphone" size="small" value={telephone} onChange={e => setTelephone(e.target.value)}
                   sx={{ bgcolor: '#fff', width: 115 }} InputProps={{ sx: { fontSize: 12 } }} />
 
                 {/* Toggle Statut */}
                 <Stack direction="row" spacing={0.25} sx={{ bgcolor: '#fff', border: '1px solid #E2E8F0', borderRadius: '8px', px: 0.75, py: 0.4 }}>
                   {([['all','Tous','#475569'],['active','Actif','#059669'],['inactive','Inactif','#DC2626']] as const).map(([val, lbl, clr]) => (
-                    <Box key={val} onClick={() => setStatusFilter(val)}
+                    <Box key={val} onClick={() => { setStatusFilter(val); setPage(0); }}
                       sx={{
                         px: 1.1, py: 0.3, borderRadius: '6px', cursor: 'pointer', fontSize: 11, fontWeight: 700,
                         bgcolor: statusFilter === val ? clr : 'transparent',
@@ -234,6 +324,20 @@ export default function EmployeesPage() {
                       sx={{ color: '#64748B', borderRadius: '8px', border: '1px solid #E2E8F0', bgcolor: '#fff', '&:hover': { color: '#2563EB', bgcolor: '#EFF6FF', borderColor: '#BFDBFE' } }}>
                       <Refresh fontSize="small" />
                     </IconButton>
+                  </Tooltip>
+                  <Tooltip title="Exporter en CSV" arrow>
+                    <Button size="small" variant="outlined" startIcon={<FileDownload sx={{ fontSize: '14px !important' }} />}
+                      onClick={handleExport}
+                      sx={{ color: '#059669', borderColor: '#A7F3D0', bgcolor: '#F0FDF4', fontSize: 12, borderRadius: '8px', px: 1.75, fontWeight: 600, whiteSpace: 'nowrap', '&:hover': { borderColor: '#059669', bgcolor: '#DCFCE7' }, transition: 'all 0.2s' }}>
+                      Exporter
+                    </Button>
+                  </Tooltip>
+                  <Tooltip title="Importer depuis un fichier CSV" arrow>
+                    <Button size="small" variant="outlined" startIcon={<FileUpload sx={{ fontSize: '14px !important' }} />}
+                      onClick={() => setImportOpen(true)}
+                      sx={{ color: '#7C3AED', borderColor: '#DDD6FE', bgcolor: '#FAF5FF', fontSize: 12, borderRadius: '8px', px: 1.75, fontWeight: 600, whiteSpace: 'nowrap', '&:hover': { borderColor: '#7C3AED', bgcolor: '#EDE9FE' }, transition: 'all 0.2s' }}>
+                      Importer
+                    </Button>
                   </Tooltip>
                   <Button size="small" variant="outlined" startIcon={<Print sx={{ fontSize: '14px !important' }} />}
                     sx={{ color: '#475569', borderColor: '#E2E8F0', bgcolor: '#fff', fontSize: 12, borderRadius: '8px', px: 1.75, fontWeight: 600, whiteSpace: 'nowrap', '&:hover': { borderColor: '#94A3B8', bgcolor: '#F8FAFC' }, transition: 'all 0.2s' }}>
@@ -525,6 +629,139 @@ export default function EmployeesPage() {
                 </Box>
               )}
             </Box>
+
+            {/* ── DIALOG IMPORT CSV ── */}
+            <Dialog open={importOpen} onClose={handleImportClose} maxWidth="sm" fullWidth
+              PaperProps={{ sx: { borderRadius: '18px', overflow: 'hidden' } }}>
+              <Box sx={{
+                background: 'linear-gradient(135deg, #0F172A 0%, #4C1D95 60%, #1E293B 100%)',
+                px: 3, py: 2.5, position: 'relative', overflow: 'hidden',
+                '&::before': { content: '""', position: 'absolute', inset: 0, background: 'radial-gradient(ellipse at 80% 40%, rgba(124,58,237,0.25) 0%, transparent 55%)', pointerEvents: 'none' },
+              }}>
+                <Stack direction="row" alignItems="center" justifyContent="space-between">
+                  <Stack direction="row" alignItems="center" spacing={1.75}>
+                    <Box sx={{ width: 40, height: 40, borderRadius: '11px', background: 'linear-gradient(135deg,#7C3AED,#5B21B6)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 6px 16px rgba(124,58,237,0.45)' }}>
+                      <FileUpload sx={{ color: '#fff', fontSize: 20 }} />
+                    </Box>
+                    <Box>
+                      <Typography sx={{ color: '#F8FAFC', fontWeight: 800, fontSize: 15.5, letterSpacing: '-0.3px' }}>
+                        Importer des agents
+                      </Typography>
+                      <Typography sx={{ color: '#94A3B8', fontSize: 11.5 }}>
+                        Fichier CSV (séparateur ;) ou Excel (.xlsx / .xls)
+                      </Typography>
+                    </Box>
+                  </Stack>
+                  <IconButton onClick={handleImportClose} size="small"
+                    sx={{ color: '#64748B', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)', '&:hover': { color: '#fff', bgcolor: 'rgba(255,255,255,0.08)' } }}>
+                    <Delete sx={{ fontSize: 16 }} />
+                  </IconButton>
+                </Stack>
+              </Box>
+
+              <DialogContent sx={{ p: 3 }}>
+                {importResult ? (
+                  <Stack spacing={2}>
+                    <Alert severity="success" sx={{ borderRadius: '10px' }}>
+                      <Typography fontWeight={700}>{importResult.created} agent(s) importé(s) avec succès</Typography>
+                    </Alert>
+                    {importResult.skipped.length > 0 && (
+                      <Alert severity="warning" sx={{ borderRadius: '10px' }}>
+                        <Typography fontWeight={700} mb={0.5}>{importResult.skipped.length} ligne(s) ignorée(s) :</Typography>
+                        {importResult.skipped.map((msg, i) => (
+                          <Typography key={i} fontSize={12}>{msg}</Typography>
+                        ))}
+                      </Alert>
+                    )}
+                  </Stack>
+                ) : (
+                  <Stack spacing={2.5}>
+                    {/* Format attendu */}
+                    <Box sx={{ p: 2, bgcolor: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: '10px' }}>
+                      <Stack direction="row" alignItems="center" spacing={1} mb={1}>
+                        <TableChart sx={{ fontSize: 16, color: '#059669' }} />
+                        <Typography fontSize={12.5} fontWeight={700} color="#059669">Colonnes attendues (dans l'ordre)</Typography>
+                      </Stack>
+                      <Typography fontSize={11.5} sx={{ fontFamily: 'monospace', color: '#374151', lineHeight: 1.8 }}>
+                        Matricule · Prénom · Nom · Email professionnel · Téléphone ·<br />
+                        Service · Poste · Date embauche (AAAA-MM-JJ) · Salaire · Statut
+                      </Typography>
+                      <Typography fontSize={11} sx={{ color: '#6B7280', mt: 0.75 }}>
+                        CSV : séparateur point-virgule (;) · Excel : première feuille utilisée
+                      </Typography>
+                    </Box>
+
+                    {/* Télécharger template */}
+                    <Button variant="outlined" size="small" startIcon={<FileDownload fontSize="small" />}
+                      onClick={() => {
+                        const bom = '﻿';
+                        const header = 'Matricule;Prénom;Nom;Email professionnel;Téléphone;Service;Poste;Date embauche;Salaire de base;Statut\n';
+                        const example = ';Jean;DUPONT;jean.dupont@exemple.com;771234567;Direction RH;Responsable RH;2024-01-15;450000;active\n';
+                        const blob = new Blob([bom + header + example], { type: 'text/csv;charset=utf-8' });
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url; a.download = 'modele_import_agents.csv'; a.click();
+                        URL.revokeObjectURL(url);
+                      }}
+                      sx={{ borderRadius: '8px', fontSize: 12, fontWeight: 600, color: '#059669', borderColor: '#A7F3D0', alignSelf: 'flex-start' }}>
+                      Télécharger le modèle CSV
+                    </Button>
+
+                    {/* Zone de dépôt */}
+                    <Box
+                      onClick={() => fileInputRef.current?.click()}
+                      sx={{
+                        border: `2px dashed ${importFile ? '#7C3AED' : '#CBD5E1'}`,
+                        borderRadius: '12px', p: 3, textAlign: 'center', cursor: 'pointer',
+                        bgcolor: importFile ? '#FAF5FF' : '#F8FAFC',
+                        transition: 'all .2s',
+                        '&:hover': { borderColor: '#7C3AED', bgcolor: '#FAF5FF' },
+                      }}>
+                      <input
+                        ref={fileInputRef} type="file" accept=".csv,.txt,.xlsx,.xls" style={{ display: 'none' }}
+                        onChange={(e) => { if (e.target.files?.[0]) setImportFile(e.target.files[0]); e.target.value = ''; }}
+                      />
+                      <CloudUpload sx={{ fontSize: 36, color: importFile ? '#7C3AED' : '#CBD5E1', mb: 1 }} />
+                      {importFile ? (
+                        <Stack spacing={0.5}>
+                          <Typography fontSize={13} fontWeight={700} color="#7C3AED">{importFile.name}</Typography>
+                          <Typography fontSize={11.5} color="#64748B">
+                            {(importFile.size / 1024).toFixed(1)} Ko
+                            {isExcel(importFile) && <Box component="span" sx={{ ml: 1, color: '#059669', fontWeight: 700 }}>· Excel détecté ✓</Box>}
+                          </Typography>
+                        </Stack>
+                      ) : (
+                        <Stack spacing={0.5}>
+                          <Typography fontSize={13} fontWeight={600} color="#475569">Cliquez pour sélectionner un fichier</Typography>
+                          <Typography fontSize={11.5} color="#94A3B8">CSV ou Excel (.xlsx / .xls) · max 4 Mo</Typography>
+                        </Stack>
+                      )}
+                    </Box>
+
+                    {importMut.isError && (
+                      <Alert severity="error" sx={{ borderRadius: '10px', fontSize: 12 }}>
+                        Une erreur est survenue lors de l'import.
+                      </Alert>
+                    )}
+                    {importMut.isPending && <LinearProgress sx={{ borderRadius: '4px' }} />}
+                  </Stack>
+                )}
+              </DialogContent>
+
+              <DialogActions sx={{ px: 3, pb: 2.5, gap: 1 }}>
+                <Button onClick={handleImportClose} sx={{ color: '#64748B', textTransform: 'none', borderRadius: '8px' }}>
+                  {importResult ? 'Fermer' : 'Annuler'}
+                </Button>
+                {!importResult && (
+                  <Button
+                    variant="contained" disabled={!importFile || importMut.isPending}
+                    onClick={handleImport}
+                    sx={{ bgcolor: '#7C3AED', textTransform: 'none', fontWeight: 700, borderRadius: '8px', '&:hover': { bgcolor: '#6D28D9' } }}>
+                    {importMut.isPending ? 'Import en cours…' : `Importer${importFile && isExcel(importFile) ? ' (Excel)' : ''}`}
+                  </Button>
+                )}
+              </DialogActions>
+            </Dialog>
 
             {/* Modal création / vue / édition */}
             <EmployeeCreateModal key={modalKey} open={modalOpen} onClose={closeModal} mode={modalMode} employee={modalEmployee} />

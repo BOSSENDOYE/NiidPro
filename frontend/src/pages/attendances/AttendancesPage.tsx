@@ -1,14 +1,14 @@
 import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
-  Box, Typography, Avatar, Chip, IconButton, Tooltip, Button,
+  Box, Typography, Avatar, Chip, Tooltip, Button,
   TextField, InputAdornment, MenuItem, Select, FormControl,
   Dialog, DialogTitle, DialogContent, DialogActions,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
   Skeleton, Tab, Tabs, LinearProgress,
 } from '@mui/material';
 import {
-  Search, Edit, Login, Logout, AccessTime, People, CheckCircle,
+  Search, Edit, AccessTime, People, CheckCircle,
   Warning, BeachAccess, QrCodeScanner, CalendarToday, Add,
 } from '@mui/icons-material';
 import dayjs from 'dayjs';
@@ -186,7 +186,6 @@ function ManualDialog({ open, onClose, employees, onSuccess }: {
 function TodayTab() {
   const qc = useQueryClient();
   const navigate = useNavigate();
-  const [deptFilter, setDeptFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
   const [search, setSearch] = useState('');
   const [manualOpen, setManualOpen] = useState(false);
