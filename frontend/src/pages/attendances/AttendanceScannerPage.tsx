@@ -12,6 +12,7 @@ import {
 import dayjs from 'dayjs';
 import { useNavigate } from 'react-router-dom';
 import { attendancesApi } from '../../api/attendances';
+import { useCompany } from '../../hooks/useCompany';
 import type { Attendance } from '../../types';
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
@@ -230,6 +231,7 @@ function FeedbackOverlay({ record, onDone }: { record: ScanRecord | null; onDone
 export default function AttendanceScannerPage() {
   const navigate = useNavigate();
   const qc       = useQueryClient();
+  const { name: companyName } = useCompany();
 
   const [mode,        setMode]       = useState<'in' | 'out'>('in');
   const [inputMode,   setInputMode]  = useState<'camera' | 'keyboard' | 'manual'>('keyboard');
@@ -334,7 +336,7 @@ export default function AttendanceScannerPage() {
               Terminal de Badgeage QR
             </Typography>
             <Typography sx={{ fontSize: 10.5, color: '#3D5068' }}>
-              ANASER · {dayjs().format('dddd D MMMM YYYY')}
+              {companyName} · {dayjs().format('dddd D MMMM YYYY')}
             </Typography>
           </Box>
         </Box>

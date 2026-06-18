@@ -14,13 +14,32 @@ export interface ContractArchive {
   created_at: string;
 }
 
+export interface MatchResult {
+  filename: string;
+  type: string | null;
+  status: 'matched' | 'ambiguous' | 'none';
+  employee_id: number | null;
+  employee_name: string | null;
+  employee_number: string | null;
+  candidates: { id: number; name: string }[];
+}
+
 export const contractArchivesApi = {
   list: (params?: Record<string, unknown>) =>
     client.get<ContractArchive[]>('/contract-archives', { params }),
 
-  upload: (formData: FormData) =>
+  match: (filenames: string[]) =>
+    client.post<MatchResult[]>('/contract-archives/match', { filenames }),
+
+  upload: (formData: FormData, onUploadProgress?: (pct: number) => void) =>
     client.post<ContractArchive[]>('/contract-archives', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 120000, // 2 min : évite une requête suspendue indéfiniment
+      onUploadProgress: (e) => {
+        if (onUploadProgress && e.total) {
+          onUploadProgress(Math.round((e.loaded / e.total) * 100));
+        }
+      },
     }),
 
   preview: (id: number) =>

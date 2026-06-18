@@ -14,6 +14,7 @@ import {
   Tune,
 } from '@mui/icons-material';
 import { recruitmentApi } from '../../api/recruitment';
+import { useCompany } from '../../hooks/useCompany';
 import type {
   RecruitmentIndice, RecruitmentHierarchy,
   RecruitmentAugmentation, RecruitmentBareme,
@@ -1456,6 +1457,7 @@ function ParametresTab() {
 // ═══════════════════════════════════════════════════════════════════
 export default function PayrollPage() {
   const [tab, setTab] = useState(1);
+  const { name: companyName } = useCompany();
 
   const MONTHS = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
   const now = new Date();
@@ -1482,7 +1484,7 @@ export default function PayrollPage() {
             Gestion de la Paie
           </Typography>
           <Typography sx={{ color: 'rgba(255,255,255,0.45)', fontSize: 11.5, mt: 0.1 }}>
-            {MONTHS[now.getMonth()]} {now.getFullYear()} · ANASER
+            {MONTHS[now.getMonth()]} {now.getFullYear()} · {companyName}
           </Typography>
         </Box>
         <Stack direction="row" spacing={2}>

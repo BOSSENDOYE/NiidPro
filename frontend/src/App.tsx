@@ -1,8 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { ThemeProvider } from '@mui/material/styles';
-import CssBaseline from '@mui/material/CssBaseline';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { theme } from './theme';
+import { ThemeModeProvider } from './theme/ThemeModeContext';
 import { useAuthStore } from './store/auth.store';
 import AppLayout from './components/layout/AppLayout';
 
@@ -74,28 +72,64 @@ import DocumentsPage from './pages/documents/DocumentsPage';
 // Profil
 import ProfilePage from './pages/profile/ProfilePage';
 
+// Configuration
+import ConfigurationPage from './pages/configuration/ConfigurationPage';
+
+// Portail Agent
+import PortalLayout from './pages/portal/PortalLayout';
+import PortalHome from './pages/portal/PortalHome';
+import PortalAttendance from './pages/portal/PortalAttendance';
+import PortalLeaves from './pages/portal/PortalLeaves';
+import PortalTasks from './pages/portal/PortalTasks';
+import PortalProfile from './pages/portal/PortalProfile';
+import PortalDocuments from './pages/portal/PortalDocuments';
+
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 30_000 } },
 });
+
+const ADMIN_ROLES = ['super_admin', 'admin_rh', 'manager'];
+
+function isEmployeeOnly(roles: string[]): boolean {
+  return roles.includes('employe') && !roles.some((r) => ADMIN_ROLES.includes(r));
+}
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuthStore();
   return isAuthenticated ? <>{children}</> : <Navigate to="/login" replace />;
 }
 
+/** Espace admin : un employé (rôle employe seul) est renvoyé vers son portail. */
+function AdminGate() {
+  const { user } = useAuthStore();
+  if (isEmployeeOnly(user?.roles ?? [])) return <Navigate to="/portail" replace />;
+  return <AppLayout />;
+}
+
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <ThemeProvider theme={theme}>
-        <CssBaseline />
+      <ThemeModeProvider>
         <BrowserRouter>
           <Routes>
             <Route path="/login" element={<LoginPage />} />
+
+            {/* ══ Portail Agent ══ */}
+            <Route path="/portail" element={<PrivateRoute><PortalLayout /></PrivateRoute>}>
+              <Route index element={<PortalHome />} />
+              <Route path="pointage" element={<PortalAttendance />} />
+              <Route path="conges" element={<PortalLeaves />} />
+              <Route path="taches" element={<PortalTasks />} />
+              <Route path="profil" element={<PortalProfile />} />
+              <Route path="documents" element={<PortalDocuments />} />
+            </Route>
+
+            {/* ══ Espace administration ══ */}
             <Route
               path="/"
               element={
                 <PrivateRoute>
-                  <AppLayout />
+                  <AdminGate />
                 </PrivateRoute>
               }
             >
@@ -136,6 +170,7 @@ export default function App() {
               <Route path="documents" element={<DocumentsPage />} />
 
               {/* Configuration */}
+              <Route path="configuration" element={<ConfigurationPage />} />
               <Route path="schema" element={<SchemaPage />} />
 
               {/* Espace agent */}
@@ -143,13 +178,13 @@ export default function App() {
 
               {/* Profil */}
               <Route path="profile" element={<ProfilePage />} />
-            </Route>
 
-            {/* Catch-all */}
-            <Route path="*" element={<Navigate to="/dashboard" replace />} />
+              {/* Catch-all admin */}
+              <Route path="*" element={<Navigate to="/dashboard" replace />} />
+            </Route>
           </Routes>
         </BrowserRouter>
-      </ThemeProvider>
+      </ThemeModeProvider>
     </QueryClientProvider>
   );
 }

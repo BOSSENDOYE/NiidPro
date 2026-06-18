@@ -12,6 +12,7 @@ import {
 } from '@mui/icons-material';
 import { attendancesApi } from '../../api/attendances';
 import { formatDate } from '../../utils/format';
+import { useCompany } from '../../hooks/useCompany';
 import type { Employee } from '../../types';
 
 /* ── Dimensions carte credit-card paysage ── */
@@ -25,6 +26,7 @@ function qrPayload(emp: Employee): string {
 /* ════════════════════════════ RECTO ════════════════════════════ */
 function Recto({ emp, cardRef }: { emp: Employee; cardRef?: React.RefObject<HTMLDivElement | null> }) {
   const initials = `${emp.first_name?.[0] ?? ''}${emp.last_name?.[0] ?? ''}`.toUpperCase();
+  const { name: companyName, legalName } = useCompany();
 
   return (
     <Box ref={cardRef} id="badge-recto" sx={{
@@ -56,7 +58,7 @@ function Recto({ emp, cardRef }: { emp: Employee; cardRef?: React.RefObject<HTML
             Ministère des Transports et des Travaux Publics
           </Typography>
           <Typography sx={{ fontSize: 6.5, color: '#555', lineHeight: 1.4 }}>
-            Agence Nationale de Sécurité Routière (ANASER)
+            {legalName ? `${legalName} (${companyName})` : companyName}
           </Typography>
         </Box>
 
@@ -84,7 +86,7 @@ function Recto({ emp, cardRef }: { emp: Employee; cardRef?: React.RefObject<HTML
               letterSpacing: '-0.5px', fontStyle: 'italic',
               textAlign: 'center', lineHeight: 1,
             }}>
-              ANASER
+              {companyName}
             </Typography>
           </Box>
         </Box>
@@ -195,7 +197,7 @@ function Recto({ emp, cardRef }: { emp: Employee; cardRef?: React.RefObject<HTML
         <Box sx={{ position: 'relative', width: 38, height: 32 }}>
           <Box sx={{ position: 'absolute', width: 2.5, height: 30, bgcolor: '#F97316', top: 1, left: 18, transform: 'rotate(-20deg)', borderRadius: 1 }} />
           <Typography sx={{ position: 'absolute', bottom: 0, left: 0, right: 0, fontSize: 12, fontWeight: 900, color: '#1D4ED8', fontStyle: 'italic', textAlign: 'center', lineHeight: 1 }}>
-            ANASER
+            {companyName}
           </Typography>
         </Box>
         <Typography sx={{ fontSize: 5.5, color: '#666', lineHeight: 1.3 }}>
@@ -208,6 +210,7 @@ function Recto({ emp, cardRef }: { emp: Employee; cardRef?: React.RefObject<HTML
 
 /* ════════════════════════════ VERSO ════════════════════════════ */
 function Verso({ emp, cardRef }: { emp: Employee; cardRef?: React.RefObject<HTMLDivElement | null> }) {
+  const { name: companyName, legalName } = useCompany();
   return (
     <Box ref={cardRef} id="badge-verso" sx={{
       width: CARD_W, height: CARD_H,
@@ -225,7 +228,7 @@ function Verso({ emp, cardRef }: { emp: Employee; cardRef?: React.RefObject<HTML
         <Box sx={{ position: 'relative', width: 52, height: 42 }}>
           <Box sx={{ position: 'absolute', width: 3, height: 40, bgcolor: '#F97316', top: 1, left: 26, transform: 'rotate(-20deg)', borderRadius: 1 }} />
           <Typography sx={{ position: 'absolute', bottom: 0, left: 0, right: 0, fontSize: 18, fontWeight: 900, color: '#1D4ED8', fontStyle: 'italic', textAlign: 'center', lineHeight: 1 }}>
-            ANASER
+            {companyName}
           </Typography>
         </Box>
         <Box sx={{ borderLeft: '1px solid #ddd', pl: 1 }}>
@@ -243,8 +246,7 @@ function Verso({ emp, cardRef }: { emp: Employee; cardRef?: React.RefObject<HTML
           fontSize: 10.5, color: '#222', lineHeight: 1.85,
           textAlign: 'justify',
         }}>
-          Cette carte est strictement personnelle, propriété de l'Agence Nationale de Sécurité
-          Routière (ANASER). En cas de cessation de service ou d'affection, l'agent doit déposer
+          Cette carte est strictement personnelle, propriété de {legalName || 'l\'Agence Nationale de Sécurité Routière'} ({companyName}). En cas de cessation de service ou d'affection, l'agent doit déposer
           sa carte à la Direction Générale de l'agence. Toute personne trouvant cette carte est
           priée de bien vouloir la déposer au siège de l'agence :
         </Typography>
@@ -290,6 +292,7 @@ function Verso({ emp, cardRef }: { emp: Employee; cardRef?: React.RefObject<HTML
 interface Props { open: boolean; onClose: () => void; employee: Employee }
 
 export default function EmployeeBadgeCard({ open, onClose, employee }: Props) {
+  const { name: companyName } = useCompany();
   const rectoRef = useRef<HTMLDivElement>(null);
   const versoRef = useRef<HTMLDivElement>(null);
   const [side, setSide]   = useState<0 | 1>(0);
@@ -379,7 +382,7 @@ export default function EmployeeBadgeCard({ open, onClose, employee }: Props) {
             </Box>
             <Box>
               <Typography sx={{ color: '#F8FAFC', fontWeight: 800, fontSize: 15 }}>
-                Carte professionnelle ANASER
+                Carte professionnelle {companyName}
               </Typography>
               <Typography sx={{ color: '#64748B', fontSize: 11.5 }}>
                 {employee.first_name} {employee.last_name} · {employee.employee_number}

@@ -8,11 +8,16 @@ use App\Http\Controllers\Api\ContractArchiveController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\DepartmentController;
 use App\Http\Controllers\Api\DocumentController;
+use App\Http\Controllers\Api\EmailController;
 use App\Http\Controllers\Api\EmployeeController;
 use App\Http\Controllers\Api\JustificationController;
 use App\Http\Controllers\Api\LeaveController;
+use App\Http\Controllers\Api\MeController;
 use App\Http\Controllers\Api\SanctionController;
 use App\Http\Controllers\Api\SettingsController;
+use App\Http\Controllers\Api\UserManagementController;
+use App\Http\Controllers\Api\RoleController;
+use App\Http\Controllers\Api\MailSettingController;
 use App\Http\Controllers\Api\TaskController;
 use App\Http\Controllers\Api\TrainingController;
 use App\Http\Controllers\Api\RecruitmentController;
@@ -44,6 +49,36 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('/password', [AuthController::class, 'changePassword']);
     });
 
+    // Paramètres de l'entreprise (configuration)
+    Route::post('/settings', [SettingsController::class, 'update']);
+    Route::delete('/settings/logo', [SettingsController::class, 'deleteLogo']);
+
+    // ── Portail Agent (données de l'employé connecté uniquement) ──
+    Route::prefix('me')->group(function () {
+        Route::get('/profile',           [MeController::class, 'profile']);
+        Route::put('/profile',           [MeController::class, 'updateProfile']);
+        Route::get('/leaves',            [MeController::class, 'leaves']);
+        Route::post('/leaves',           [MeController::class, 'storeLeave']);
+        Route::get('/leave-balance',     [MeController::class, 'leaveBalance']);
+        Route::get('/attendances',       [MeController::class, 'attendances']);
+        Route::post('/attendances/check-in',  [MeController::class, 'checkIn']);
+        Route::post('/attendances/check-out', [MeController::class, 'checkOut']);
+        Route::get('/tasks',             [MeController::class, 'tasks']);
+        Route::patch('/tasks/{task}/status', [MeController::class, 'updateTaskStatus']);
+        Route::get('/documents',         [MeController::class, 'documents']);
+    });
+
+    // Gestion des utilisateurs
+    Route::apiResource('users', UserManagementController::class)->except(['show']);
+
+    // Rôles & droits
+    Route::apiResource('roles', RoleController::class)->except(['show']);
+
+    // Paramètres de messagerie (mailing)
+    Route::get('/mail-settings',       [MailSettingController::class, 'index']);
+    Route::post('/mail-settings',      [MailSettingController::class, 'update']);
+    Route::post('/mail-settings/test', [MailSettingController::class, 'test']);
+
     // Dashboard
     Route::get('/dashboard', [DashboardController::class, 'index']);
 
@@ -57,6 +92,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/employees/{employee}/photo', [EmployeeController::class, 'uploadPhoto']);
     Route::apiResource('employees', EmployeeController::class);
 
+    // Emails (envoi intégré à la plateforme)
+    Route::get('/emails',      [EmailController::class, 'index']);
+    Route::post('/emails/send', [EmailController::class, 'send']);
+
     // Contracts
     Route::get('/contracts/expiring',       [ContractController::class, 'expiringSoon']);
     Route::get('/contracts/{contract}/pdf', [ContractController::class, 'pdf']);
@@ -64,6 +103,8 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Contract Archives
     Route::get('/contract-archives/{contractArchive}/preview', [ContractArchiveController::class, 'preview']);
+    Route::get('/contract-archives/{contractArchive}/download', [ContractArchiveController::class, 'download']);
+    Route::post('/contract-archives/match', [ContractArchiveController::class, 'match']);
     Route::apiResource('contract-archives', ContractArchiveController::class)->only(['index', 'store', 'destroy']);
 
     // Attendance

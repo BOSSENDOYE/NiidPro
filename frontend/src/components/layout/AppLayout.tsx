@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { leavesApi } from '../../api/leaves';
+import { settingsApi } from '../../api/settings';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import {
   Box, Drawer, AppBar, Toolbar, Typography, IconButton, List, ListItemButton,
@@ -84,6 +85,12 @@ const NAV: NavSection[] = [
       { path: '/agent-portal', label: 'Portail Agent', icon: <PhoneAndroid />, color: '#FB7185' },
     ],
   },
+  {
+    label: 'CONFIGURATION',
+    items: [
+      { path: '/configuration', label: 'Configuration', icon: <Settings />, color: '#94A3B8' },
+    ],
+  },
 ];
 
 // Page labels for top bar
@@ -102,7 +109,7 @@ const PAGE_LABELS: Record<string, string> = {
   '/plan-formation':       'Plan de Formation',
   '/evaluations':          'Évaluation Période d\'Essai',
   '/justifications':    'Justifications',
-  '/organigramme':      'Organigramme ANASER',
+  '/organigramme':      'Organigramme',
   '/departments':       'Directions',
   '/tasks':             'Gestion des Tâches',
   '/payroll':           'Paie & Bulletins',
@@ -110,6 +117,7 @@ const PAGE_LABELS: Record<string, string> = {
   '/documents':         'Documents de Service',
   '/schema':            'Schéma SQL',
   '/agent-portal':      'Portail Agent',
+  '/configuration':     'Configuration de l\'entreprise',
   '/profile':           'Mon Profil',
 };
 
@@ -138,6 +146,13 @@ export default function AppLayout() {
     queryFn: () => leavesApi.pending().then((r) => r.data),
     refetchInterval: 60_000,
   });
+
+  const { data: company } = useQuery({
+    queryKey: ['settings'],
+    queryFn: () => settingsApi.get().then((r) => r.data),
+    staleTime: 5 * 60_000,
+  });
+  const companyName = company?.name || 'RH+PAIE';
 
   const dynamicBadges: Record<string, number> = {
     '/leaves': pendingLeaves.length,
@@ -207,23 +222,29 @@ export default function AppLayout() {
           >
             <Box
               sx={{
-                width: 36, height: 36, borderRadius: '10px', flexShrink: 0,
-                background: 'linear-gradient(135deg, #2563EB 0%, #7C3AED 100%)',
+                width: 38, height: 38, borderRadius: '10px', flexShrink: 0, overflow: 'hidden',
+                background: company?.logo_url ? '#fff' : 'linear-gradient(135deg, #002f59 0%, #014a8f 100%)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                boxShadow: '0 4px 14px rgba(37,99,235,0.5)',
+                boxShadow: '0 4px 14px rgba(0,47,89,0.5)',
+                p: company?.logo_url ? '4px' : 0,
               }}
             >
-              <Typography sx={{ color: '#fff', fontWeight: 900, fontSize: 16, letterSpacing: '-1px' }}>N</Typography>
+              {company?.logo_url
+                ? <img src={company.logo_url} alt={companyName}
+                    style={{ maxWidth: '100%', maxHeight: '100%', width: 'auto', height: 'auto', objectFit: 'contain', display: 'block' }} />
+                : <Typography sx={{ color: '#fff', fontWeight: 900, fontSize: 16, letterSpacing: '-1px' }}>
+                    {companyName[0]?.toUpperCase() ?? 'N'}
+                  </Typography>}
             </Box>
 
             {open && (
               <>
                 <Box sx={{ flexGrow: 1, overflow: 'hidden' }}>
-                  <Typography sx={{ color: '#F1F5F9', fontWeight: 800, fontSize: 15, letterSpacing: '-0.4px', lineHeight: 1.2 }}>
-                    RH+PAIE
+                  <Typography sx={{ color: '#F1F5F9', fontWeight: 800, fontSize: 15, letterSpacing: '-0.4px', lineHeight: 1.2 }} noWrap>
+                    {companyName}
                   </Typography>
-                  <Typography sx={{ color: SB.sectionLabel, fontSize: 9, letterSpacing: '0.1em', textTransform: 'uppercase' }}>
-                    Ressources Humaines
+                  <Typography sx={{ color: SB.sectionLabel, fontSize: 9, letterSpacing: '0.1em', textTransform: 'uppercase' }} noWrap>
+                    {company?.legal_name || 'Ressources Humaines'}
                   </Typography>
                 </Box>
                 <IconButton size="small" onClick={() => setOpen(false)}
@@ -364,7 +385,7 @@ export default function AppLayout() {
                   transition: 'background 150ms',
                 }}
               >
-                <Avatar sx={{
+                <Avatar src={user?.employee?.photo_url ?? undefined} sx={{
                   width: 32, height: 32,
                   background: 'linear-gradient(135deg, #2563EB, #7C3AED)',
                   fontSize: 12, fontWeight: 800, flexShrink: 0,
@@ -385,7 +406,7 @@ export default function AppLayout() {
             ) : (
               <Tooltip title={user?.name ?? 'Profil'} placement="right">
                 <IconButton onClick={(e) => setAnchorEl(e.currentTarget)} sx={{ p: 0.5, mx: 'auto', display: 'flex' }}>
-                  <Avatar sx={{
+                  <Avatar src={user?.employee?.photo_url ?? undefined} sx={{
                     width: 32, height: 32,
                     background: 'linear-gradient(135deg, #2563EB, #7C3AED)',
                     fontSize: 12, fontWeight: 800,
@@ -435,8 +456,8 @@ export default function AppLayout() {
                 }}>
                   <Box sx={{ width: 7, height: 2, bgcolor: '#fff', borderRadius: 1 }} />
                 </Box>
-                <Typography sx={{ fontSize: 12, fontWeight: 900, color: '#fff', letterSpacing: '0.06em', fontStyle: 'italic', lineHeight: 1 }}>
-                  ANASER
+                <Typography sx={{ fontSize: 12, fontWeight: 900, color: '#fff', letterSpacing: '0.06em', fontStyle: 'italic', lineHeight: 1, whiteSpace: 'nowrap' }}>
+                  {companyName}
                 </Typography>
               </Box>
 
@@ -625,7 +646,7 @@ export default function AppLayout() {
           sx={{
             flexGrow: 1, overflow: 'auto',
             p: { xs: 2, md: 3 },
-            background: 'linear-gradient(180deg, #EEF2F7 0%, #F1F5F9 100%)',
+            bgcolor: 'background.default',
           }}
         >
           <Outlet />
@@ -658,7 +679,7 @@ export default function AppLayout() {
             display: 'flex', alignItems: 'center', gap: 1.5,
           }}
         >
-          <Avatar sx={{
+          <Avatar src={user?.employee?.photo_url ?? undefined} sx={{
             width: 36, height: 36,
             background: 'linear-gradient(135deg, #2563EB, #7C3AED)',
             fontSize: 13, fontWeight: 800,
@@ -678,10 +699,10 @@ export default function AppLayout() {
             <Person fontSize="small" sx={{ color: '#64748B' }} />
             Mon profil
           </MenuItem>
-          <MenuItem onClick={() => setAnchorEl(null)}
+          <MenuItem onClick={() => { navigate('/configuration'); setAnchorEl(null); }}
             sx={{ fontSize: 13, py: 1, borderRadius: '8px', gap: 1 }}>
             <Settings fontSize="small" sx={{ color: '#64748B' }} />
-            Paramètres
+            Configuration
           </MenuItem>
           <Divider sx={{ my: 0.5, borderColor: '#F1F5F9' }} />
           <MenuItem onClick={handleLogout}

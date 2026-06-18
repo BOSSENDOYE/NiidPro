@@ -5,6 +5,8 @@ import {
 } from '@mui/material';
 import { GlobalStyles } from '@mui/material';
 import { Edit, Restore, ExpandMore, ExpandLess, Print } from '@mui/icons-material';
+import PageHeader from '../../components/common/PageHeader';
+import { useCompany } from '../../hooks/useCompany';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface OrgNode {
@@ -388,6 +390,7 @@ const LEGEND = [
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 export default function OrganigrammePage() {
+  const { name: companyName } = useCompany();
   const [org, setOrg] = useState<OrgNode>(loadOrg);
   const [editTarget, setEditTarget] = useState<EditTarget | null>(null);
   const [editLabel, setEditLabel] = useState('');
@@ -436,7 +439,7 @@ export default function OrganigrammePage() {
       <Box sx={{ display: 'flex', alignItems: 'flex-start', mb: 3.5, gap: 2 }}>
         <Box sx={{ flexGrow: 1 }}>
           <Typography sx={{ fontSize: 22, fontWeight: 800, color: '#0F172A', letterSpacing: '-0.4px' }}>
-            Organigramme ANASER
+            Organigramme {companyName}
           </Typography>
           <Typography sx={{ fontSize: 13, color: '#64748B', mt: 0.5 }}>
             Survolez un nœud et cliquez sur <Edit sx={{ fontSize: 11, verticalAlign: 'middle' }} /> pour modifier son intitulé
@@ -579,7 +582,7 @@ export default function OrganigrammePage() {
         <DialogTitle sx={{ fontSize: 15, fontWeight: 700 }}>Réinitialiser l'organigramme ?</DialogTitle>
         <DialogContent>
           <Typography sx={{ fontSize: 13, color: '#64748B' }}>
-            Toutes vos modifications seront perdues. L'organigramme sera remis aux intitulés ANASER d'origine.
+            Toutes vos modifications seront perdues. L'organigramme sera remis aux intitulés d'origine.
           </Typography>
         </DialogContent>
         <DialogActions sx={{ px: 2.5, pb: 2, gap: 1 }}>

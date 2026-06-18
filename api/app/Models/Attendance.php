@@ -9,6 +9,7 @@ class Attendance extends Model
     protected $fillable = [
         'employee_id', 'date', 'check_in', 'check_out', 'worked_minutes',
         'overtime_minutes', 'status', 'source', 'notes', 'recorded_by',
+        'latitude', 'longitude', 'distance_metres',
     ];
 
     protected function casts(): array

@@ -21,6 +21,7 @@ import TrainingDocumentsTab from '../../components/trainings/TrainingDocumentsTa
 import TrainingStatsTab from '../../components/trainings/TrainingStatsTab';
 import TrainingSettingsTab from '../../components/trainings/TrainingSettingsTab';
 import { formatDate } from '../../utils/format';
+import { useCompany } from '../../hooks/useCompany';
 import type { Training } from '../../types';
 
 /* ─── Palette ─── */
@@ -100,6 +101,7 @@ const PRIORITY_CONFIG: Record<string, { label: string; color: string }> = {
 /* ─── Main ─── */
 export default function TrainingsPage() {
   const qc = useQueryClient();
+  const { name: companyName } = useCompany();
   const [tab, setTab] = useState(0);
   const [selectedId, setSelectedId] = useState<number | null>(null);
 
@@ -572,7 +574,7 @@ export default function TrainingsPage() {
       <Box sx={{ bgcolor: NAV, px: 3, py: 1.5, borderRadius: '12px 12px 0 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <Box>
           <Typography sx={{ color: '#fff', fontWeight: 800, fontSize: 18, letterSpacing: '-0.3px' }}>Gestion des Formations</Typography>
-          <Typography sx={{ color: 'rgba(255,255,255,0.45)', fontSize: 11.5, mt: 0.1 }}>Demandes, validations et suivi · ANASER</Typography>
+          <Typography sx={{ color: 'rgba(255,255,255,0.45)', fontSize: 11.5, mt: 0.1 }}>Demandes, validations et suivi · {companyName}</Typography>
         </Box>
         <Stack direction="row" spacing={2}>
           {[

@@ -1,15 +1,21 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import {
   Box, TextField, Button, Typography,
   Alert, InputAdornment, IconButton, CircularProgress, Stack,
 } from '@mui/material';
-import { Visibility, VisibilityOff } from '@mui/icons-material';
+import { Visibility, VisibilityOff, MailOutline, LockOutlined, ArrowForward } from '@mui/icons-material';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { authApi } from '../../api/auth';
+import { settingsApi } from '../../api/settings';
 import { useAuthStore } from '../../store/auth.store';
+
+// ── Charte ──
+const NAVY = '#002f59';
+const ORANGE = '#ff7631';
 
 const schema = z.object({
   email: z.string().email('Email invalide'),
@@ -18,12 +24,40 @@ const schema = z.object({
 
 type FormData = z.infer<typeof schema>;
 
+// ── Logo de l'entreprise (image si configurée, sinon initiale) ──
+function CompanyLogo({ logoUrl, name, size = 88 }: { logoUrl?: string | null; name: string; size?: number }) {
+  return (
+    <Box sx={{
+      width: size, height: size, borderRadius: '24px', flexShrink: 0,
+      bgcolor: '#fff', p: logoUrl ? '8px' : 0, overflow: 'hidden',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      boxShadow: `0 12px 30px rgba(0,47,89,0.28)`,
+      border: '4px solid #fff',
+      ...(!logoUrl && { background: `linear-gradient(140deg, ${NAVY} 0%, #013b73 100%)` }),
+    }}>
+      {logoUrl
+        ? <img src={logoUrl} alt={name} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+        : <Typography sx={{ color: '#fff', fontWeight: 900, fontSize: size * 0.42, letterSpacing: '-1px' }}>
+            {name?.[0]?.toUpperCase() ?? 'N'}
+          </Typography>}
+    </Box>
+  );
+}
 
 export default function LoginPage() {
   const [showPwd, setShowPwd] = useState(false);
   const [error, setError] = useState('');
   const { setAuth } = useAuthStore();
   const navigate = useNavigate();
+
+  const { data: company } = useQuery({
+    queryKey: ['settings'],
+    queryFn: () => settingsApi.get().then((r) => r.data),
+    staleTime: 5 * 60_000,
+  });
+
+  const companyName = company?.name || 'RH+PAIE';
+  const tagline = company?.description || 'Plateforme de gestion des ressources humaines';
 
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<FormData>({
     resolver: zodResolver(schema),
@@ -35,185 +69,172 @@ export default function LoginPage() {
     try {
       const res = await authApi.login(data.email, data.password);
       setAuth(res.data.user, res.data.token);
-      navigate('/dashboard');
+      const roles = res.data.user.roles ?? [];
+      const isEmployee = roles.includes('employe') && !roles.some((r) => ['super_admin', 'admin_rh', 'manager'].includes(r));
+      navigate(isEmployee ? '/portail' : '/dashboard', { replace: true });
     } catch (err: unknown) {
       const e = err as { response?: { data?: { message?: string } } };
       setError(e.response?.data?.message ?? 'Identifiants incorrects');
     }
   };
 
+  const fieldSx = {
+    '& .MuiOutlinedInput-root': {
+      bgcolor: '#F7F9FC', borderRadius: '13px',
+      transition: 'all .2s',
+      '& fieldset': { borderColor: '#E6EBF2' },
+      '&:hover fieldset': { borderColor: '#FFD2BC' },
+      '&:hover': { bgcolor: '#fff' },
+      '&.Mui-focused': { bgcolor: '#fff', boxShadow: `0 0 0 4px ${ORANGE}22` },
+      '&.Mui-focused fieldset': { borderColor: ORANGE, borderWidth: 2 },
+    },
+    '& label.Mui-focused': { color: ORANGE },
+  };
+
   return (
-    <Box sx={{ minHeight: '100vh', display: 'flex' }}>
-      {/* Left — Brand panel */}
+    <Box sx={{
+      minHeight: '100vh',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      p: 2, position: 'relative', overflow: 'hidden', bgcolor: '#F4F7FB',
+    }}>
+      {/* ══ Décor de fond ══ */}
+      <Box sx={{ position: 'absolute', width: 560, height: 560, borderRadius: '50%', top: -220, right: -150, background: `radial-gradient(circle, ${ORANGE}1F 0%, transparent 70%)` }} />
+      <Box sx={{ position: 'absolute', width: 640, height: 640, borderRadius: '50%', bottom: -260, left: -180, background: `radial-gradient(circle, rgba(0,47,89,0.16) 0%, transparent 70%)` }} />
+      <Box sx={{ position: 'absolute', width: 300, height: 300, borderRadius: '50%', top: '10%', left: '6%', background: `radial-gradient(circle, ${ORANGE}14 0%, transparent 70%)` }} />
       <Box sx={{
-        display: { xs: 'none', md: 'flex' },
-        flexDirection: 'column',
-        justifyContent: 'space-between',
-        width: '45%',
-        background: 'linear-gradient(160deg, #0F172A 0%, #1E3A8A 60%, #1D4ED8 100%)',
-        p: 5,
-        position: 'relative',
-        overflow: 'hidden',
-      }}>
-        {/* Decorative circles */}
-        <Box sx={{
-          position: 'absolute', width: 400, height: 400,
-          borderRadius: '50%', border: '1px solid rgba(255,255,255,0.06)',
-          top: -100, right: -100,
-        }} />
-        <Box sx={{
-          position: 'absolute', width: 600, height: 600,
-          borderRadius: '50%', border: '1px solid rgba(255,255,255,0.04)',
-          bottom: -200, left: -200,
-        }} />
-        <Box sx={{
-          position: 'absolute', width: 200, height: 200,
-          borderRadius: '50%',
-          background: 'radial-gradient(circle, rgba(37,99,235,0.3) 0%, transparent 70%)',
-          top: '40%', left: '60%',
-        }} />
+        position: 'absolute', inset: 0,
+        backgroundImage: 'linear-gradient(rgba(0,47,89,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(0,47,89,0.03) 1px, transparent 1px)',
+        backgroundSize: '48px 48px',
+        maskImage: 'radial-gradient(ellipse 70% 60% at center, #000 0%, transparent 80%)',
+        WebkitMaskImage: 'radial-gradient(ellipse 70% 60% at center, #000 0%, transparent 80%)',
+      }} />
 
-        {/* Logo */}
-        <Box sx={{ position: 'relative', zIndex: 1 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-            <Box sx={{
-              width: 40, height: 40, borderRadius: '11px',
-              background: 'linear-gradient(135deg, #3B82F6 0%, #7C3AED 100%)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              boxShadow: '0 8px 24px rgba(37,99,235,0.5)',
-            }}>
-              <Typography sx={{ color: '#fff', fontWeight: 800, fontSize: 18 }}>N</Typography>
-            </Box>
-            <Typography sx={{ color: '#fff', fontWeight: 800, fontSize: 20, letterSpacing: '-0.5px' }}>
-              RH+PAIE
-            </Typography>
-          </Box>
-        </Box>
-
-        {/* Center content */}
-        <Box sx={{ position: 'relative', zIndex: 1 }}>
-          <Typography sx={{
-            fontSize: 36, fontWeight: 800, color: '#F8FAFC',
-            letterSpacing: '-1px', lineHeight: 1.2, mb: 2,
+      {/* ══ Carte centrée ══ */}
+      <Box sx={{ position: 'relative', zIndex: 1, width: '100%', maxWidth: 440 }}>
+        <Box sx={{
+          bgcolor: '#fff', borderRadius: '28px', overflow: 'hidden',
+          boxShadow: '0 30px 80px rgba(0,47,89,0.22), 0 8px 20px rgba(0,47,89,0.08)',
+          border: '1px solid #EDF1F7',
+        }}>
+          {/* ── En-tête navy ── */}
+          <Box sx={{
+            position: 'relative',
+            background: `linear-gradient(150deg, ${NAVY} 0%, #013b73 60%, #014a8f 100%)`,
+            px: 4, pt: 4.5, pb: 8, textAlign: 'center', overflow: 'hidden',
           }}>
-            Gérez vos<br />
-            ressources<br />
-            <Box component="span" sx={{
-              background: 'linear-gradient(90deg, #60A5FA, #A78BFA)',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-            }}>
-              humaines
+            {/* Décor en-tête */}
+            <Box sx={{ position: 'absolute', width: 220, height: 220, borderRadius: '50%', top: -90, right: -60, border: '1px solid rgba(255,255,255,0.07)' }} />
+            <Box sx={{ position: 'absolute', width: 160, height: 160, borderRadius: '50%', bottom: -40, left: -30, background: `radial-gradient(circle, ${ORANGE}40 0%, transparent 70%)` }} />
+            {/* Barre d'accent orange */}
+            <Box sx={{ position: 'absolute', top: 0, left: 0, right: 0, height: 5, background: `linear-gradient(90deg, ${ORANGE} 0%, #ffb088 100%)` }} />
+
+            <Box sx={{ position: 'relative', zIndex: 1 }}>
+              <Typography sx={{
+                display: 'inline-block', px: 1.5, py: 0.4, mb: 2, borderRadius: '20px',
+                bgcolor: 'rgba(255,118,49,0.18)', border: `1px solid ${ORANGE}66`,
+                color: '#FFD9C6', fontSize: 10.5, fontWeight: 800, letterSpacing: '0.12em', textTransform: 'uppercase',
+              }}>
+                Espace sécurisé
+              </Typography>
+              <Typography sx={{ color: '#fff', fontWeight: 800, fontSize: 26, letterSpacing: '-0.6px', lineHeight: 1.2 }}>
+                {companyName}
+              </Typography>
+              <Typography sx={{ color: 'rgba(255,255,255,0.6)', fontSize: 13, mt: 0.5, maxWidth: 300, mx: 'auto' }}>
+                {company?.legal_name || tagline}
+              </Typography>
             </Box>
-          </Typography>
-          <Typography sx={{ color: 'rgba(255,255,255,0.55)', fontSize: 15, lineHeight: 1.7, maxWidth: 340 }}>
-            Plateforme RH complète : pointage, congés, contrats, paie et organigramme en un seul endroit.
-          </Typography>
-        </Box>
-
-        {/* Footer stats */}
-        <Box sx={{ position: 'relative', zIndex: 1 }}>
-          <Box sx={{ display: 'flex', gap: 4 }}>
-            {[
-              { value: '500+', label: 'Entreprises' },
-              { value: '50k+', label: 'Employés gérés' },
-              { value: '99.9%', label: 'Disponibilité' },
-            ].map((s) => (
-              <Box key={s.label}>
-                <Typography sx={{ color: '#F8FAFC', fontWeight: 800, fontSize: 22 }}>{s.value}</Typography>
-                <Typography sx={{ color: 'rgba(255,255,255,0.45)', fontSize: 12 }}>{s.label}</Typography>
-              </Box>
-            ))}
           </Box>
-        </Box>
-      </Box>
 
-      {/* Right — Login form */}
-      <Box sx={{
-        flexGrow: 1,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        bgcolor: '#F8FAFC',
-        p: 3,
-      }}>
-        <Box sx={{ width: '100%', maxWidth: 400 }}>
-          {/* Mobile logo */}
-          <Box sx={{ display: { xs: 'flex', md: 'none' }, alignItems: 'center', gap: 1.5, mb: 4 }}>
-            <Box sx={{
-              width: 36, height: 36, borderRadius: '10px',
-              background: 'linear-gradient(135deg, #2563EB, #7C3AED)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}>
-              <Typography sx={{ color: '#fff', fontWeight: 800, fontSize: 16 }}>N</Typography>
+          {/* ── Logo chevauchant ── */}
+          <Box sx={{ display: 'flex', justifyContent: 'center', mt: '-44px', position: 'relative', zIndex: 2 }}>
+            <CompanyLogo logoUrl={company?.logo_url} name={companyName} size={88} />
+          </Box>
+
+          {/* ── Corps : formulaire ── */}
+          <Box sx={{ px: { xs: 3, sm: 4.5 }, pt: 2.5, pb: 4.5 }}>
+            <Typography sx={{ fontWeight: 800, fontSize: 22, color: NAVY, letterSpacing: '-0.5px', textAlign: 'center', mb: 0.5 }}>
+              Bon retour 👋
+            </Typography>
+            <Typography sx={{ color: '#64748B', fontSize: 13.5, textAlign: 'center', mb: 3.5 }}>
+              Connectez-vous à votre espace de gestion
+            </Typography>
+
+            {error && (
+              <Alert severity="error" sx={{ mb: 2.5, borderRadius: '12px', fontSize: 13 }}>
+                {error}
+              </Alert>
+            )}
+
+            <Box component="form" onSubmit={handleSubmit(onSubmit)} noValidate>
+              <Stack spacing={2.25}>
+                <TextField
+                  {...register('email')}
+                  label="Adresse email"
+                  type="email"
+                  fullWidth
+                  autoComplete="email"
+                  error={!!errors.email}
+                  helperText={errors.email?.message}
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <MailOutline sx={{ fontSize: 19, color: '#94A3B8' }} />
+                      </InputAdornment>
+                    ),
+                  }}
+                  sx={fieldSx}
+                />
+                <TextField
+                  {...register('password')}
+                  label="Mot de passe"
+                  type={showPwd ? 'text' : 'password'}
+                  fullWidth
+                  autoComplete="current-password"
+                  error={!!errors.password}
+                  helperText={errors.password?.message}
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <LockOutlined sx={{ fontSize: 19, color: '#94A3B8' }} />
+                      </InputAdornment>
+                    ),
+                    endAdornment: (
+                      <InputAdornment position="end">
+                        <IconButton onClick={() => setShowPwd(!showPwd)} edge="end" size="small">
+                          {showPwd ? <VisibilityOff fontSize="small" /> : <Visibility fontSize="small" />}
+                        </IconButton>
+                      </InputAdornment>
+                    ),
+                  }}
+                  sx={fieldSx}
+                />
+                <Button
+                  type="submit"
+                  variant="contained"
+                  fullWidth
+                  size="large"
+                  disabled={isSubmitting}
+                  endIcon={!isSubmitting && <ArrowForward />}
+                  sx={{
+                    py: 1.6, mt: 0.5, borderRadius: '13px', fontSize: 15, fontWeight: 700, textTransform: 'none',
+                    background: `linear-gradient(135deg, ${ORANGE} 0%, #ff5e3a 100%)`,
+                    boxShadow: `0 12px 28px ${ORANGE}66`,
+                    transition: 'all .2s',
+                    '&:hover': { background: 'linear-gradient(135deg, #ff6a1f 0%, #f24e2a 100%)', boxShadow: `0 16px 36px ${ORANGE}80`, transform: 'translateY(-1px)' },
+                    '&:disabled': { background: '#FFC4A8', color: '#fff' },
+                  }}
+                >
+                  {isSubmitting ? <CircularProgress size={20} color="inherit" /> : 'Se connecter'}
+                </Button>
+              </Stack>
             </Box>
-            <Typography sx={{ fontWeight: 800, fontSize: 18, color: '#0F172A' }}>RH+PAIE</Typography>
           </Box>
-
-          <Typography sx={{ fontWeight: 800, fontSize: 26, color: '#0F172A', letterSpacing: '-0.5px', mb: 0.5 }}>
-            Connexion
-          </Typography>
-          <Typography sx={{ color: '#64748B', fontSize: 14, mb: 3.5 }}>
-            Accédez à votre espace de gestion RH
-          </Typography>
-
-          {error && (
-            <Alert severity="error" sx={{ mb: 2.5, borderRadius: '10px', fontSize: 13 }}>
-              {error}
-            </Alert>
-          )}
-
-          <Box component="form" onSubmit={handleSubmit(onSubmit)} noValidate>
-            <Stack spacing={2.5}>
-              <TextField
-                {...register('email')}
-                label="Adresse email"
-                type="email"
-                fullWidth
-                autoComplete="email"
-                error={!!errors.email}
-                helperText={errors.email?.message}
-                sx={{
-                  '& .MuiOutlinedInput-root': { bgcolor: '#fff', borderRadius: '10px' },
-                }}
-              />
-              <TextField
-                {...register('password')}
-                label="Mot de passe"
-                type={showPwd ? 'text' : 'password'}
-                fullWidth
-                autoComplete="current-password"
-                error={!!errors.password}
-                helperText={errors.password?.message}
-                InputProps={{
-                  endAdornment: (
-                    <InputAdornment position="end">
-                      <IconButton onClick={() => setShowPwd(!showPwd)} edge="end" size="small">
-                        {showPwd ? <VisibilityOff fontSize="small" /> : <Visibility fontSize="small" />}
-                      </IconButton>
-                    </InputAdornment>
-                  ),
-                }}
-                sx={{
-                  '& .MuiOutlinedInput-root': { bgcolor: '#fff', borderRadius: '10px' },
-                }}
-              />
-              <Button
-                type="submit"
-                variant="contained"
-                fullWidth
-                size="large"
-                disabled={isSubmitting}
-                sx={{ py: 1.5, borderRadius: '10px', fontSize: 15 }}
-              >
-                {isSubmitting
-                  ? <CircularProgress size={20} color="inherit" />
-                  : 'Se connecter'}
-              </Button>
-            </Stack>
-          </Box>
-
         </Box>
+
+        {/* Pied */}
+        <Typography sx={{ textAlign: 'center', color: '#8499AE', fontSize: 12, mt: 3 }}>
+          © {new Date().getFullYear()} {companyName} — Tous droits réservés
+        </Typography>
       </Box>
     </Box>
   );

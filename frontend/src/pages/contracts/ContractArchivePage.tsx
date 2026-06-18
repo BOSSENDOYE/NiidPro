@@ -1,16 +1,17 @@
-import { useRef, useState, useCallback, useEffect } from 'react';
+import { useRef, useState, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Box, Typography, Button, IconButton, Tooltip, Chip, Avatar,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
-  TextField, Stack, LinearProgress, Dialog,
-  DialogTitle, DialogContent, DialogActions, Autocomplete,
+  TextField, Stack, LinearProgress, Dialog, TablePagination,
+  DialogTitle, DialogContent, DialogActions, Autocomplete, CircularProgress, Alert,
 } from '@mui/material';
 import {
-  CloudUpload, Visibility, Delete, FolderOpen, InsertDriveFile,
+  CloudUpload, Download, Delete, FolderOpen, InsertDriveFile,
   PictureAsPdf, Image, Description, Search, FilterList, Person,
+  CheckCircle, ReportProblem, HelpOutline, AutoFixHigh,
 } from '@mui/icons-material';
-import { contractArchivesApi, type ContractArchive } from '../../api/contractArchives';
+import { contractArchivesApi, type ContractArchive, type MatchResult } from '../../api/contractArchives';
 import { employeesApi } from '../../api/employees';
 import PageHeader from '../../components/common/PageHeader';
 import type { Employee } from '../../types';
@@ -25,11 +26,6 @@ function fmtSize(bytes: number): string {
 
 function fmtDate(iso: string): string {
   return new Date(iso).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' });
-}
-
-function isPdf(archive: ContractArchive): boolean {
-  return archive.mime_type?.toLowerCase().includes('pdf') === true
-    || archive.original_name.toLowerCase().endsWith('.pdf');
 }
 
 function FileIcon({ mime }: { mime: string }) {
@@ -136,21 +132,37 @@ function DropZone({ onFiles }: { onFiles: (files: File[]) => void }) {
   );
 }
 
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+interface MatchRow {
+  file: File;
+  type: string;
+  employeeId: number | null;
+  status: 'matched' | 'ambiguous' | 'none';
+}
+
+const STATUS_META: Record<MatchRow['status'], { label: string; color: string; bg: string; icon: React.ReactNode }> = {
+  matched:   { label: 'Rattaché',   color: '#059669', bg: '#ECFDF5', icon: <CheckCircle sx={{ fontSize: 14 }} /> },
+  ambiguous: { label: 'À vérifier', color: '#D97706', bg: '#FFFBEB', icon: <ReportProblem sx={{ fontSize: 14 }} /> },
+  none:      { label: 'Non trouvé', color: '#DC2626', bg: '#FEF2F2', icon: <HelpOutline sx={{ fontSize: 14 }} /> },
+};
+
 // ─── Page principale ─────────────────────────────────────────────────────────
 
 export default function ContractArchivePage() {
   const qc = useQueryClient();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [search, setSearch]       = useState('');
   const [empFilter, setEmpFilter] = useState<Employee | null>(null);
   const [uploadOpen, setUploadOpen] = useState(false);
-  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
-  const [uploadEmp, setUploadEmp]   = useState<Employee | null>(null);
-  const [uploadLabel, setUploadLabel] = useState('');
+  const [matchRows, setMatchRows]   = useState<MatchRow[]>([]);
+  const [matching, setMatching]     = useState(false);
   const [uploading, setUploading]   = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
-  const [previewArchive, setPreviewArchive] = useState<ContractArchive | null>(null);
-  const [previewUrl, setPreviewUrl] = useState('');
-  const [previewLoading, setPreviewLoading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [rowFilter, setRowFilter]   = useState<'all' | 'matched' | 'unmatched'>('all');
+  const [page, setPage]             = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
 
   const { data: archives = [], isLoading } = useQuery({
     queryKey: ['contract-archives', search, empFilter?.id],
@@ -171,74 +183,111 @@ export default function ContractArchivePage() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['contract-archives'] }),
   });
 
-  const handleFiles = (files: File[]) => {
-    setPendingFiles(files);
+  // Sélection de fichiers → rattachement automatique par nom de fichier
+  const handleFiles = async (files: File[]) => {
+    if (!files.length) return;
     setUploadOpen(true);
+    setMatching(true);
+    // Lignes provisoires (avant réponse du serveur)
+    setMatchRows(files.map((file) => ({ file, type: '', employeeId: null, status: 'none' })));
+    try {
+      const { data } = await contractArchivesApi.match(files.map((f) => f.name));
+      setMatchRows(files.map((file, i) => {
+        const m: MatchResult | undefined = data[i];
+        return {
+          file,
+          type: m?.type ?? '',
+          employeeId: m?.employee_id ?? null,
+          status: m?.status ?? 'none',
+        };
+      }));
+    } catch {
+      // en cas d'échec on garde les lignes vides (rattachement manuel)
+    } finally {
+      setMatching(false);
+    }
   };
 
+  const updateRow = (idx: number, patch: Partial<MatchRow>) =>
+    setMatchRows((rows) => rows.map((r, i) => (i === idx ? { ...r, ...patch } : r)));
+
+  const removeRow = (idx: number) =>
+    setMatchRows((rows) => rows.filter((_, i) => i !== idx));
+
   const handleUpload = async () => {
-    if (!pendingFiles.length) return;
+    if (!matchRows.length) return;
     setUploading(true);
     setUploadProgress(0);
+    setUploadError(null);
 
     const fd = new FormData();
-    pendingFiles.forEach((f) => fd.append('files[]', f));
-    if (uploadEmp) fd.append('employee_id', String(uploadEmp.id));
-    if (uploadLabel) fd.append('label', uploadLabel);
+    matchRows.forEach((r, i) => {
+      fd.append('files[]', r.file);
+      fd.append(`employee_ids[${i}]`, r.employeeId ? String(r.employeeId) : '');
+      fd.append(`labels[${i}]`, r.type || '');
+    });
 
     try {
-      await contractArchivesApi.upload(fd);
+      await contractArchivesApi.upload(fd, setUploadProgress);
       qc.invalidateQueries({ queryKey: ['contract-archives'] });
       setUploadOpen(false);
-      setPendingFiles([]);
-      setUploadEmp(null);
-      setUploadLabel('');
+      setMatchRows([]);
+      setRowFilter('all');
+    } catch (err) {
+      const e = err as { code?: string; response?: { status?: number; data?: { message?: string } } };
+      if (e.code === 'ECONNABORTED') {
+        setUploadError("Délai dépassé : le serveur met trop de temps à répondre. Réessayez (ou utilisez Apache plutôt que « php artisan serve »).");
+      } else if (e.response?.status === 413) {
+        setUploadError('Fichiers trop volumineux pour le serveur (limite PHP post_max_size / upload_max_filesize).');
+      } else {
+        setUploadError(e.response?.data?.message ?? "Échec de l'import. Vérifiez la connexion au serveur (port 8000).");
+      }
     } finally {
       setUploading(false);
       setUploadProgress(0);
     }
   };
 
-  const openPreview = async (archive: ContractArchive) => {
-    if (!isPdf(archive)) return;
+  const matchedCount = matchRows.filter((r) => r.employeeId).length;
+  const visibleRows = matchRows
+    .map((row, idx) => ({ row, idx }))
+    .filter(({ row }) =>
+      rowFilter === 'all' ? true
+      : rowFilter === 'matched' ? !!row.employeeId
+      : !row.employeeId);
 
-    setPreviewLoading(true);
-    try {
-      const res = await contractArchivesApi.preview(archive.id);
-      setPreviewUrl(URL.createObjectURL(new Blob([res.data as BlobPart], { type: 'application/pdf' })));
-      setPreviewArchive(archive);
-    } finally {
-      setPreviewLoading(false);
-    }
+  const handleDownload = async (archive: ContractArchive) => {
+    const res = await contractArchivesApi.download(archive.id);
+    const url = URL.createObjectURL(new Blob([res.data as BlobPart]));
+    const a   = document.createElement('a');
+    a.href     = url;
+    a.download = archive.original_name;
+    a.click();
+    URL.revokeObjectURL(url);
   };
-
-  const closePreview = () => {
-    if (previewUrl) URL.revokeObjectURL(previewUrl);
-    setPreviewUrl('');
-    setPreviewArchive(null);
-    setPreviewLoading(false);
-  };
-
-  useEffect(() => {
-    return () => {
-      if (previewUrl) URL.revokeObjectURL(previewUrl);
-    };
-  }, [previewUrl]);
 
   const totalSize = archives.reduce((s, a) => s + (a.file_size ?? 0), 0);
+  const pagedArchives = archives.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
 
   return (
     <Box>
       <PageHeader
         title="Archives Contrats"
         subtitle={`${archives.length} fichier(s) · ${fmtSize(totalSize)}`}
-        action={{ label: 'Ajouter des fichiers', icon: <CloudUpload />, onClick: () => setUploadOpen(true) }}
+        action={{ label: 'Ajouter des fichiers', icon: <CloudUpload />, onClick: () => fileInputRef.current?.click() }}
       />
 
-      {/* Zone de dépôt */}
-      <Box sx={{ mb: 3 }}>
-        <DropZone onFiles={handleFiles} />
-      </Box>
+      {/* Sélecteur de fichiers (déclenché par le bouton « Ajouter des fichiers ») */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        multiple
+        hidden
+        onChange={(e) => {
+          if (e.target.files?.length) handleFiles(Array.from(e.target.files));
+          e.target.value = '';
+        }}
+      />
 
       {/* Filtres */}
       <Box sx={{ display: 'flex', gap: 1.5, mb: 2, flexWrap: 'wrap', alignItems: 'center' }}>
@@ -246,7 +295,7 @@ export default function ContractArchivePage() {
           size="small"
           placeholder="Rechercher un fichier…"
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={(e) => { setSearch(e.target.value); setPage(0); }}
           InputProps={{ startAdornment: <Search sx={{ fontSize: 17, color: '#94A3B8', mr: 0.5 }} /> }}
           sx={{ width: 240, bgcolor: '#fff' }}
         />
@@ -255,7 +304,7 @@ export default function ContractArchivePage() {
           options={employees}
           getOptionLabel={(e) => `${e.employee_number} — ${e.first_name} ${e.last_name}`}
           value={empFilter}
-          onChange={(_, v) => setEmpFilter(v)}
+          onChange={(_, v) => { setEmpFilter(v); setPage(0); }}
           sx={{ width: 260 }}
           renderOption={(props, e) => {
             const { key, ...optProps } = props as typeof props & { key: React.Key };
@@ -275,7 +324,7 @@ export default function ContractArchivePage() {
           )}
         />
         {(search || empFilter) && (
-          <Button size="small" onClick={() => { setSearch(''); setEmpFilter(null); }}
+          <Button size="small" onClick={() => { setSearch(''); setEmpFilter(null); setPage(0); }}
             sx={{ textTransform: 'none', color: '#64748B', fontSize: 12 }}>
             Réinitialiser
           </Button>
@@ -320,7 +369,7 @@ export default function ContractArchivePage() {
                     </TableCell>
                   </TableRow>
                 )
-                : archives.map((a, i) => (
+                : pagedArchives.map((a, i) => (
                   <TableRow key={a.id} hover sx={{ bgcolor: i % 2 === 0 ? '#fff' : '#F8FAFC' }}>
                     <TableCell sx={{ py: 0.75 }}>
                       <FileIcon mime={a.mime_type} />
@@ -359,13 +408,11 @@ export default function ContractArchivePage() {
                     </TableCell>
                     <TableCell>
                       <Stack direction="row" spacing={0.25}>
-                        {isPdf(a) && (
-                          <Tooltip title="Visualiser le PDF">
-                            <IconButton size="small" onClick={() => openPreview(a)}>
-                              <Visibility sx={{ fontSize: 15, color: '#2563EB' }} />
-                            </IconButton>
-                          </Tooltip>
-                        )}
+                        <Tooltip title="Télécharger">
+                          <IconButton size="small" onClick={() => handleDownload(a)}>
+                            <Download sx={{ fontSize: 15, color: '#2563EB' }} />
+                          </IconButton>
+                        </Tooltip>
                         <Tooltip title="Supprimer">
                           <IconButton size="small" onClick={() => deleteMut.mutate(a.id)}>
                             <Delete sx={{ fontSize: 15, color: '#EF4444' }} />
@@ -379,140 +426,181 @@ export default function ContractArchivePage() {
             </TableBody>
           </Table>
         </TableContainer>
+
+        {/* Pagination */}
+        {!isLoading && archives.length > 0 && (
+          <Box sx={{ borderTop: '1px solid #E2E8F0', bgcolor: '#F8FAFC' }}>
+            <TablePagination
+              component="div"
+              count={archives.length}
+              page={page}
+              rowsPerPage={rowsPerPage}
+              onPageChange={(_, p) => setPage(p)}
+              onRowsPerPageChange={(e) => { setRowsPerPage(parseInt(e.target.value, 10)); setPage(0); }}
+              rowsPerPageOptions={[5, 10, 15, 25, 50]}
+              labelRowsPerPage="Lignes par page :"
+              labelDisplayedRows={({ from, to, count }) => `${from}–${to} sur ${count}`}
+              sx={{
+                fontSize: 12,
+                '& .MuiTablePagination-selectLabel, & .MuiTablePagination-displayedRows': { fontSize: 12 },
+                '& .MuiTablePagination-select': { fontSize: 12 },
+              }}
+            />
+          </Box>
+        )}
       </Box>
 
-      <Dialog
-        open={Boolean(previewArchive)}
-        onClose={closePreview}
-        maxWidth="md"
-        fullWidth
-        PaperProps={{ sx: { borderRadius: '16px', height: 'calc(100vh - 96px)', maxHeight: 'calc(100vh - 96px)' } }}
-      >
-        <DialogTitle sx={{ fontSize: 15, fontWeight: 700, pb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
-          <Visibility sx={{ fontSize: 18, color: '#2563EB' }} />
-          <Box sx={{ minWidth: 0, flexGrow: 1 }}>
-            <Typography sx={{ fontSize: 13, color: '#64748B', fontWeight: 500 }}>
-              {previewArchive?.employee?.name ?? 'Archive contrat'}
-            </Typography>
-            <Typography noWrap sx={{ fontSize: 14, color: '#0F172A' }}>
-              {previewArchive?.original_name}
-            </Typography>
-          </Box>
-        </DialogTitle>
-        <DialogContent sx={{ p: 0, height: 'calc(100vh - 190px)', minHeight: 520, bgcolor: '#F8FAFC' }}>
-          {previewLoading && <LinearProgress />}
-          {previewUrl ? (
-            <iframe
-              title={previewArchive?.original_name ?? 'Prévisualisation du contrat'}
-              src={previewUrl}
-              width="100%"
-              height="100%"
-              style={{ border: 0, display: 'block' }}
-            />
-          ) : (
-            <Box sx={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748B' }}>
-              <Typography sx={{ fontSize: 13 }}>Chargement du PDF…</Typography>
-            </Box>
-          )}
-        </DialogContent>
-        <DialogActions sx={{ px: 2, pb: 2 }}>
-          <Button size="small" onClick={closePreview} sx={{ borderRadius: '8px' }}>Fermer</Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Dialog upload */}
-      <Dialog open={uploadOpen} onClose={() => !uploading && setUploadOpen(false)} maxWidth="sm" fullWidth
+      {/* Dialog upload + rattachement automatique */}
+      <Dialog open={uploadOpen} onClose={() => !uploading && setUploadOpen(false)} maxWidth="md" fullWidth
         PaperProps={{ sx: { borderRadius: '16px' } }}>
         <DialogTitle sx={{ fontWeight: 700, fontSize: 16, pb: 1 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <CloudUpload sx={{ color: '#2563EB' }} />
-            Uploader des fichiers
+            <AutoFixHigh sx={{ color: '#2563EB' }} />
+            Importer & rattacher les contrats
           </Box>
+          <Typography sx={{ fontSize: 12, color: '#64748B', fontWeight: 400, mt: 0.5 }}>
+            L'agent est détecté automatiquement d'après le nom du fichier (ex. «&nbsp;CDI NDIOBA FALL&nbsp;»). Vérifiez et corrigez si besoin.
+          </Typography>
         </DialogTitle>
         <DialogContent>
           <Stack spacing={2} sx={{ pt: 1 }}>
 
-            {/* Liste des fichiers en attente */}
-            {pendingFiles.length > 0 && (
-              <Box sx={{ bgcolor: '#F8FAFC', borderRadius: '10px', border: '1px solid #E2E8F0', p: 1.5 }}>
-                <Typography sx={{ fontSize: 12, fontWeight: 700, color: '#0F172A', mb: 1 }}>
-                  {pendingFiles.length} fichier(s) sélectionné(s)
-                </Typography>
-                <Box sx={{ maxHeight: 160, overflowY: 'auto' }}>
-                  {pendingFiles.map((f, i) => (
-                    <Box key={i} sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', py: 0.4 }}>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, minWidth: 0 }}>
-                        <InsertDriveFile sx={{ fontSize: 14, color: '#64748B', flexShrink: 0 }} />
-                        <Typography sx={{ fontSize: 11.5, color: '#475569' }} noWrap>{f.name}</Typography>
-                      </Box>
-                      <Typography sx={{ fontSize: 11, color: '#94A3B8', flexShrink: 0, ml: 1 }}>{fmtSize(f.size)}</Typography>
-                    </Box>
-                  ))}
-                </Box>
-              </Box>
+            {/* Zone de dépôt si aucun fichier */}
+            {matchRows.length === 0 ? (
+              <DropZone onFiles={handleFiles} />
+            ) : (
+              <>
+                {/* Résumé + filtres cliquables */}
+                <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
+                  {matching && <Chip icon={<CircularProgress size={12} />} label="Analyse…" size="small" sx={{ fontSize: 11 }} />}
+                  <Chip
+                    label={`Tous (${matchRows.length})`} size="small" clickable
+                    variant={rowFilter === 'all' ? 'filled' : 'outlined'}
+                    onClick={() => setRowFilter('all')}
+                    sx={{ fontWeight: 700, fontSize: 11, ...(rowFilter === 'all' && { bgcolor: '#1E3A5F', color: '#fff' }) }} />
+                  <Chip icon={<CheckCircle sx={{ fontSize: '14px !important' }} />}
+                    label={`Rattachés (${matchedCount})`} size="small" clickable
+                    onClick={() => setRowFilter('matched')}
+                    sx={{ fontWeight: 700, fontSize: 11,
+                      bgcolor: rowFilter === 'matched' ? '#059669' : '#ECFDF5',
+                      color: rowFilter === 'matched' ? '#fff' : '#059669',
+                      '& .MuiChip-icon': { color: `${rowFilter === 'matched' ? '#fff' : '#059669'} !important` } }} />
+                  <Chip icon={<HelpOutline sx={{ fontSize: '14px !important' }} />}
+                    label={`À compléter (${matchRows.length - matchedCount})`} size="small" clickable
+                    onClick={() => setRowFilter('unmatched')}
+                    sx={{ fontWeight: 700, fontSize: 11,
+                      bgcolor: rowFilter === 'unmatched' ? '#DC2626' : '#FEF2F2',
+                      color: rowFilter === 'unmatched' ? '#fff' : '#DC2626',
+                      '& .MuiChip-icon': { color: `${rowFilter === 'unmatched' ? '#fff' : '#DC2626'} !important` } }} />
+                  <Box sx={{ flex: 1 }} />
+                  <Button size="small" startIcon={<InsertDriveFile sx={{ fontSize: '14px !important' }} />}
+                    component="label" sx={{ textTransform: 'none', fontSize: 12 }}>
+                    Ajouter
+                    <input type="file" multiple hidden
+                      onChange={(e) => { if (e.target.files?.length) handleFiles([...matchRows.map(r => r.file), ...Array.from(e.target.files)]); }} />
+                  </Button>
+                </Stack>
+
+                {/* Tableau de correspondance éditable */}
+                <TableContainer sx={{ border: '1px solid #E2E8F0', borderRadius: '10px', maxHeight: 380 }}>
+                  <Table size="small" stickyHeader>
+                    <TableHead>
+                      <TableRow>
+                        {['Fichier', 'Type', 'Agent rattaché', 'Statut', ''].map((h) => (
+                          <TableCell key={h} sx={{ bgcolor: '#F1F5F9', fontWeight: 700, fontSize: 11, py: 1 }}>{h}</TableCell>
+                        ))}
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {visibleRows.length === 0 && (
+                        <TableRow>
+                          <TableCell colSpan={5} sx={{ textAlign: 'center', py: 3, color: '#94A3B8', fontSize: 12 }}>
+                            Aucun fichier dans ce filtre.
+                          </TableCell>
+                        </TableRow>
+                      )}
+                      {visibleRows.map(({ row, idx }) => {
+                        const meta = STATUS_META[row.employeeId ? 'matched' : row.status];
+                        const selectedEmp = employees.find((e) => e.id === row.employeeId) ?? null;
+                        return (
+                          <TableRow key={idx} hover>
+                            <TableCell sx={{ maxWidth: 200 }}>
+                              <Stack direction="row" spacing={0.75} alignItems="center">
+                                <FileIcon mime={row.file.type} />
+                                <Typography sx={{ fontSize: 11.5, color: '#0F172A' }} noWrap>{row.file.name}</Typography>
+                              </Stack>
+                            </TableCell>
+                            <TableCell sx={{ width: 110 }}>
+                              <TextField size="small" variant="standard" value={row.type}
+                                onChange={(e) => updateRow(idx, { type: e.target.value })}
+                                placeholder="Type" InputProps={{ sx: { fontSize: 12 } }} sx={{ width: 90 }} />
+                            </TableCell>
+                            <TableCell sx={{ width: 260 }}>
+                              <Autocomplete
+                                size="small"
+                                options={employees}
+                                getOptionLabel={(e) => `${e.first_name} ${e.last_name}`}
+                                value={selectedEmp}
+                                onChange={(_, v) => updateRow(idx, { employeeId: v?.id ?? null, status: v ? 'matched' : 'none' })}
+                                isOptionEqualToValue={(o, v) => o.id === v.id}
+                                renderInput={(params) => (
+                                  <TextField {...params} variant="standard" placeholder="Choisir un agent"
+                                    InputProps={{ ...params.InputProps, sx: { fontSize: 12 } }} />
+                                )}
+                                sx={{ minWidth: 230 }}
+                              />
+                            </TableCell>
+                            <TableCell sx={{ width: 110 }}>
+                              <Chip icon={meta.icon as React.ReactElement} label={meta.label} size="small"
+                                sx={{ height: 22, fontSize: 10, fontWeight: 700, color: meta.color, bgcolor: meta.bg,
+                                  '& .MuiChip-icon': { color: `${meta.color} !important` } }} />
+                            </TableCell>
+                            <TableCell sx={{ width: 40 }}>
+                              <IconButton size="small" onClick={() => removeRow(idx)}>
+                                <Delete sx={{ fontSize: 15, color: '#94A3B8' }} />
+                              </IconButton>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              </>
             )}
 
-            {/* Zone de dépôt si pas encore de fichiers */}
-            {pendingFiles.length === 0 && (
-              <DropZone onFiles={setPendingFiles} />
+            {/* Message d'erreur */}
+            {uploadError && (
+              <Alert severity="error" onClose={() => setUploadError(null)} sx={{ fontSize: 12.5 }}>
+                {uploadError}
+              </Alert>
             )}
-
-            {/* Agent lié */}
-            <Autocomplete
-              size="small"
-              options={employees}
-              getOptionLabel={(e) => `${e.employee_number} — ${e.first_name} ${e.last_name}`}
-              value={uploadEmp}
-              onChange={(_, v) => setUploadEmp(v)}
-              renderOption={(props, e) => {
-                const { key, ...optProps } = props as typeof props & { key: React.Key };
-                return (
-                  <Box key={key} component="li" {...optProps} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <Avatar sx={{ width: 24, height: 24, fontSize: 10, bgcolor: '#2563EB' }}>
-                      {e.first_name?.[0]}{e.last_name?.[0]}
-                    </Avatar>
-                    <Typography sx={{ fontSize: 13 }}>{e.first_name} {e.last_name}</Typography>
-                  </Box>
-                );
-              }}
-              renderInput={(params) => (
-                <TextField {...params} label="Associer à un agent (optionnel)" size="small" />
-              )}
-            />
-
-            {/* Libellé */}
-            <TextField
-              label="Libellé / Description (optionnel)"
-              size="small"
-              fullWidth
-              value={uploadLabel}
-              onChange={(e) => setUploadLabel(e.target.value)}
-              placeholder="Ex: Contrat initial, Avenant 2024…"
-            />
 
             {/* Barre de progression */}
             {uploading && (
               <Box>
-                <Typography sx={{ fontSize: 12, color: '#64748B', mb: 0.5 }}>Upload en cours…</Typography>
-                <LinearProgress variant={uploadProgress > 0 ? 'determinate' : 'indeterminate'} value={uploadProgress}
+                <Typography sx={{ fontSize: 12, color: '#64748B', mb: 0.5 }}>
+                  {uploadProgress >= 100 ? 'Finalisation côté serveur…' : `Upload en cours… ${uploadProgress}%`}
+                </Typography>
+                <LinearProgress variant={uploadProgress > 0 && uploadProgress < 100 ? 'determinate' : 'indeterminate'} value={uploadProgress}
                   sx={{ borderRadius: 4, height: 6 }} />
               </Box>
             )}
           </Stack>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2.5, gap: 1 }}>
-          <Button onClick={() => { setUploadOpen(false); setPendingFiles([]); }} disabled={uploading}
+          <Button onClick={() => { setUploadOpen(false); setMatchRows([]); }} disabled={uploading}
             sx={{ textTransform: 'none', color: '#64748B' }}>
             Annuler
           </Button>
           <Button
             variant="contained"
             onClick={handleUpload}
-            disabled={uploading || pendingFiles.length === 0}
+            disabled={uploading || matching || matchRows.length === 0}
             startIcon={<CloudUpload />}
             sx={{ textTransform: 'none', fontWeight: 700, borderRadius: '8px', bgcolor: '#2563EB' }}
           >
-            {uploading ? 'Envoi en cours…' : `Uploader ${pendingFiles.length > 0 ? `(${pendingFiles.length})` : ''}`}
+            {uploading ? 'Envoi en cours…' : `Importer ${matchRows.length > 0 ? `(${matchRows.length})` : ''}`}
           </Button>
         </DialogActions>
       </Dialog>

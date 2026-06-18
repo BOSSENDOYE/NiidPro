@@ -38,6 +38,28 @@ class Employee extends Model
         ];
     }
 
+    protected static function booted(): void
+    {
+        // Garantit un matricule non nul (colonne NOT NULL) si aucun n'est fourni
+        static::creating(function (Employee $employee) {
+            if (empty($employee->employee_number)) {
+                $employee->employee_number = static::generateUniqueEmployeeNumber();
+            }
+        });
+    }
+
+    /** Génère un matricule unique au format EMP#### */
+    public static function generateUniqueEmployeeNumber(): string
+    {
+        $n = (int) (static::withTrashed()->max('id') ?? 0);
+        do {
+            $n++;
+            $candidate = 'EMP' . str_pad((string) $n, 4, '0', STR_PAD_LEFT);
+        } while (static::withTrashed()->where('employee_number', $candidate)->exists());
+
+        return $candidate;
+    }
+
     public function getFullNameAttribute(): string
     {
         return "{$this->first_name} {$this->last_name}";

@@ -29,7 +29,9 @@
       "Bash(curl -s https://api.ipify.org)",
       "Bash(git pull *)",
       "Bash(git stash *)",
-      "Bash(git push *)"
+      "Bash(git push *)",
+      "Bash(git add *)",
+      "Bash(git rebase *)"
     ]
   }
 }

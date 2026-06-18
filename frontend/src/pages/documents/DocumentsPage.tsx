@@ -15,6 +15,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm, Controller } from 'react-hook-form';
 import { documentsApi } from '../../api/documents';
 import { employeesApi } from '../../api/employees';
+import { useCompany } from '../../hooks/useCompany';
 import type { DocumentTemplate, DocumentTemplateSettings, Employee, GeneratedDocument } from '../../types';
 import RichTextEditor, { type RichTextEditorHandle } from '../../components/common/RichTextEditor';
 
@@ -35,8 +36,10 @@ function detectCustomVars(content: string): string[] {
   return [...new Set(matches.filter((m) => !PREDEFINED_KEYS.has(m)))];
 }
 
-/** Génère le HTML complet au format officiel ANASER pour l'impression */
-function buildAnaserPrintHtml(docs: GeneratedDocument[], template: DocumentTemplate): string {
+type PrintCompany = { name?: string | null; logo_url?: string | null; email?: string | null; phone?: string | null; address?: string | null };
+
+/** Génère le HTML complet au format officiel de l'entreprise pour l'impression */
+function buildAnaserPrintHtml(docs: GeneratedDocument[], template: DocumentTemplate, company?: PrintCompany): string {
   const s: DocumentTemplateSettings = template.settings ?? {};
   const ministry    = s.ministry         ?? 'Ministère des Infrastructures, des Transports terrestres et Aériens';
   const sigName     = s.signataire_name  ?? '';
@@ -45,7 +48,9 @@ function buildAnaserPrintHtml(docs: GeneratedDocument[], template: DocumentTempl
   const typeLabel   = s.document_title ?? (template.type === 'attestation' ? 'ATTESTATION' : 'NOTE DE SERVICE');
   const objet       = s.objet ?? null;
   const letterFormat = !!objet;
-  const logoUrl = `${window.location.origin}/image.png`;
+  const companyName = company?.name || 'ANASER';
+  const logoUrl = company?.logo_url || `${window.location.origin}/image.png`;
+  const footer = [company?.address, company?.email, company?.phone].filter(Boolean).join(' – ') || ORG_FOOTER;
 
   const pages = docs.map((doc) => {
     const dateDoc = new Date(doc.created_at).toLocaleDateString('fr-FR', {
@@ -85,11 +90,11 @@ function buildAnaserPrintHtml(docs: GeneratedDocument[], template: DocumentTempl
           <p class="sep">------</p>
           <p class="ministry">${ministry}</p>
           <div class="logo-block">
-            <img src="${logoUrl}" width="70" height="70" style="display:block; object-fit:contain;" alt="ANASER" />
+            <img src="${logoUrl}" width="70" height="70" style="display:block; object-fit:contain;" alt="${companyName}" />
           </div>
         </div>
         <div class="header-right">
-          <p class="ref">N° <strong>${doc.reference}</strong>/ANASER/DG/SG/DAF/RH</p>
+          <p class="ref">N° <strong>${doc.reference}</strong>/${companyName}/DG/SG/DAF/RH</p>
           <br>
           <p class="date">Dakar, le ${dateDoc}</p>
         </div>
@@ -112,7 +117,7 @@ function buildAnaserPrintHtml(docs: GeneratedDocument[], template: DocumentTempl
         <ul>${ampliations.map((a) => `<li>${a} ;</li>`).join('')}</ul>
       </div>` : ''}
 
-      <div class="footer">${ORG_FOOTER}</div>
+      <div class="footer">${footer}</div>
     </div>`;
   }).join('');
 
@@ -120,7 +125,7 @@ function buildAnaserPrintHtml(docs: GeneratedDocument[], template: DocumentTempl
 <html lang="fr">
 <head>
   <meta charset="UTF-8"/>
-  <title>Documents ANASER</title>
+  <title>Documents ${companyName}</title>
   <style>
     @page { margin: 1.2cm 1.8cm; size: A4 portrait; }
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -539,7 +544,7 @@ function TemplateModal({ open, onClose, template, type }: TemplateModalProps) {
                       InputProps={{ sx: { borderRadius: '9px', fontSize: 13 } }} />
                   )} />
                 <Alert severity="info" sx={{ borderRadius: '9px', fontSize: 12, py: 0.5 }}>
-                  Ces informations apparaissent sur le document imprimé (entête officielle ANASER, bloc signature, ampliations).
+                  Ces informations apparaissent sur le document imprimé (entête officielle de l'entreprise, bloc signature, ampliations).
                 </Alert>
               </Box>
             )}
@@ -585,6 +590,7 @@ function GenerateModal({ open, onClose, template }: GenerateModalProps) {
   const [customVarValues, setCustomVarValues]     = useState<Record<string, string>>({});
 
   const qc  = useQueryClient();
+  const { company } = useCompany();
   const cfg = template ? TYPE_CFG[template.type] : TYPE_CFG.attestation;
 
   // Detect custom variables (non-system) in template content
@@ -625,7 +631,7 @@ function GenerateModal({ open, onClose, template }: GenerateModalProps) {
 
   const handlePrint = () => {
     if (!template || generatedDocs.length === 0) return;
-    const html = buildAnaserPrintHtml(generatedDocs, template);
+    const html = buildAnaserPrintHtml(generatedDocs, template, company);
     const win  = window.open('', '_blank');
     if (!win) return;
     win.document.write(html);
@@ -663,7 +669,7 @@ function GenerateModal({ open, onClose, template }: GenerateModalProps) {
           <Button startIcon={<Print />} variant="contained" size="small" onClick={handlePrint}
             sx={{ borderRadius: '8px', textTransform: 'none', fontWeight: 700, bgcolor: cfg.color,
               '&:hover': { bgcolor: cfg.color, opacity: 0.9 }, px: 2 }}>
-            Imprimer (format ANASER)
+            Imprimer (format officiel)
           </Button>
         )}
         <IconButton size="small" onClick={handleClose} sx={{ ml: 1 }}><Close fontSize="small" /></IconButton>
@@ -835,6 +841,7 @@ interface HistoryModalProps {
 function HistoryModal({ open, onClose, type }: HistoryModalProps) {
   const [search, setSearch] = useState('');
   const qc   = useQueryClient();
+  const { company } = useCompany();
   const cfg  = TYPE_CFG[type];
 
   const { data, isLoading } = useQuery({
@@ -852,7 +859,7 @@ function HistoryModal({ open, onClose, type }: HistoryModalProps) {
 
   const handlePrint = (doc: GeneratedDocument) => {
     if (!doc.template) return;
-    const html = buildAnaserPrintHtml([doc], doc.template);
+    const html = buildAnaserPrintHtml([doc], doc.template, company);
     const win  = window.open('', '_blank');
     if (!win) return;
     win.document.write(html);

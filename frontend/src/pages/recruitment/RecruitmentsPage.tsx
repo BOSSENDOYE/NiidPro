@@ -5,7 +5,7 @@ import {
   DialogContent, DialogActions, TextField, MenuItem, Grid, Card,
   CardContent, IconButton, Tooltip, Table, TableBody, TableCell,
   TableContainer, TableHead, TableRow, Select, FormControl,
-  InputLabel, CircularProgress, Divider, Stack,
+  InputLabel, CircularProgress, Divider, Stack, Alert,
 } from '@mui/material';
 import {
   Add, Check, Close, Work, People, CalendarMonth,
@@ -86,6 +86,7 @@ export default function RecruitmentsPage() {
   const [statusDialog, setStatusDialog]         = useState<{ open: boolean; application: JobApplication | null }>({ open: false, application: null });
   const [selectedPosting, setSelectedPosting]   = useState<JobPosting | null>(null);
   const [rejectReason, setRejectReason]         = useState('');
+  const [reqError, setReqError]                 = useState<string | null>(null);
 
   // �"? Form states �"?
   const [reqForm, setReqForm] = useState({
@@ -147,8 +148,17 @@ export default function RecruitmentsPage() {
 
   const createRequest = useMutation({
     mutationFn: (data: typeof reqForm & { submit?: boolean }) =>
-      recruitmentApi.create({ ...data, department_id: Number(data.department_id) as unknown as number, number_of_positions: Number(data.number_of_positions), budget: data.budget ? Number(data.budget) : undefined, contract_type: data.contract_type as RecruitmentRequest['contract_type'] }),
+      recruitmentApi.create({ ...data, number_of_positions: Number(data.number_of_positions), budget: data.budget ? Number(data.budget) : undefined }),
+    onMutate: () => setReqError(null),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['recruitment'] }); setRequestDialog(false); resetReqForm(); },
+    onError: (e: { response?: { status?: number; data?: { message?: string; errors?: Record<string, string[]> } } }) => {
+      const errs = e.response?.data?.errors;
+      setReqError(
+        errs ? Object.values(errs).flat()[0]
+        : e.response?.status === 401 ? 'Session expirée — reconnectez-vous.'
+        : (e.response?.data?.message ?? "Échec de la création. Vérifiez les champs obligatoires (*).")
+      );
+    },
   });
 
   const approveRequest = useMutation({
@@ -165,7 +175,6 @@ export default function RecruitmentsPage() {
     mutationFn: (data: typeof postingForm) =>
       recruitmentApi.createJobPosting({
         ...data,
-        publication_type: data.publication_type as 'internal' | 'external' | 'both',
         department_id: Number(data.department_id) as unknown as number,
         required_experience_years: data.required_experience_years ? Number(data.required_experience_years) : undefined,
         recruitment_request_id: data.recruitment_request_id ? Number(data.recruitment_request_id) : undefined,
@@ -199,7 +208,6 @@ export default function RecruitmentsPage() {
     mutationFn: (data: typeof ivForm) =>
       recruitmentApi.createInterview({
         ...data,
-        type: data.type as 'entretien' | 'test_technique' | 'test_psychotechnique',
         job_posting_id: Number(data.job_posting_id) as unknown as number,
         application_id: Number(data.application_id) as unknown as number,
       }),
@@ -240,7 +248,7 @@ export default function RecruitmentsPage() {
         <Stack direction="row" spacing={1.5}>
           {tab === 1 && (
             <Button variant="contained" startIcon={<Add />}
-              onClick={() => setRequestDialog(true)}
+              onClick={() => { setReqError(null); setRequestDialog(true); }}
               sx={{ borderRadius: '10px', textTransform: 'none', fontWeight: 700 }}>
               Nouvelle demande
             </Button>
@@ -627,6 +635,11 @@ export default function RecruitmentsPage() {
         <DialogTitle sx={{ fontWeight: 800, pb: 1 }}>Nouvelle demande de recrutement</DialogTitle>
         <Divider />
         <DialogContent sx={{ pt: 2 }}>
+          {reqError && (
+            <Alert severity="error" onClose={() => setReqError(null)} sx={{ mb: 2, borderRadius: '10px' }}>
+              {reqError}
+            </Alert>
+          )}
           <Grid container spacing={2}>
             <Grid item xs={12}>
               <FormControl fullWidth size="small">
@@ -692,7 +705,7 @@ export default function RecruitmentsPage() {
           </Button>
           <Button variant="outlined" color="secondary"
             onClick={() => createRequest.mutate({ ...reqForm })}
-            disabled={createRequest.isPending}
+            disabled={createRequest.isPending || !reqForm.department_id || !reqForm.position_title || !reqForm.justification}
             sx={{ borderRadius: '9px', textTransform: 'none' }}>
             Enregistrer brouillon
           </Button>

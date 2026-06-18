@@ -1,0 +1,16 @@
+# ════════════════════════════════════════════════════════════
+#  À placer dans /public_html/apirh  (renommer en « .htaccess »)
+#  UNIQUEMENT si le Document Root du sous-domaine reste
+#  /public_html/apirh au lieu de /public_html/apirh/public.
+#  Redirige tout le trafic vers le dossier public/ de Laravel.
+# ════════════════════════════════════════════════════════════
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+
+  # Forcer HTTPS
+  RewriteCond %{HTTPS} off
+  RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
+  # Servir le contenu depuis public/
+  RewriteRule ^(.*)$ public/$1 [L]
+</IfModule>
