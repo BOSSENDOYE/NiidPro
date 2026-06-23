@@ -1632,7 +1632,7 @@ export default function EvaluationsPage() {
   return (
     <Box>
       <Typography variant="h5" fontWeight={700} mb={0.5}>
-        Évaluation en Période d'Essai
+        Évaluation
       </Typography>
       <Typography variant="body2" color="text.secondary" mb={3}>
         Grille ANASER-RH-GE-2025-002 · Suivi des dossiers d'évaluation et gestion du workflow de confirmation
