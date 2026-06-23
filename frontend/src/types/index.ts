@@ -816,6 +816,247 @@ export interface PlanRecrutementDashboard {
   candidatures_by_statut: Record<string, number>;
 }
 
+// ─── Plan de Formation ────────────────────────────────────────────────────────
+
+export type TypePrestataire = 'externe' | 'public' | 'interne' | 'bailleurs';
+export type CategorieFormation = 'reglementaire' | 'manageriale' | 'metier' | 'rh' | 'developpement_personnel' | 'integration';
+export type ModeFormation = 'presentiel' | 'distanciel' | 'mixte' | 'tutorat';
+export type CaractereFormation = 'obligatoire' | 'prioritaire' | 'complementaire';
+export type SourceFinancement = 'budget_propre' | '3fpt' | 'cooperation' | 'bailleurs';
+export type SourceBesoinFormation = 'entretien_annuel' | 'direction' | 'rh' | 'reglementaire';
+export type StatutSession = 'planifiee' | 'en_cours' | 'realisee' | 'annulee';
+export type StatutInscription = 'inscrit' | 'present' | 'absent' | 'certifie';
+export type TypeEvaluation = 'a_chaud' | 'acquis_j30' | 'transfert_n90';
+
+export interface FormationPrestataire {
+  id: number;
+  nom: string;
+  type: TypePrestataire;
+  contact_nom?: string;
+  email?: string;
+  telephone?: string;
+  adresse?: string;
+  statut: 'actif' | 'inactif';
+  created_at: string;
+}
+
+export interface FormationAction {
+  id: number;
+  intitule: string;
+  objectifs_pedagogiques?: string;
+  categorie: CategorieFormation;
+  duree_jours: number;
+  mode: ModeFormation;
+  caractere: CaractereFormation;
+  cout_unitaire_estime?: number;
+  prestataire_id?: number;
+  prestataire?: FormationPrestataire;
+  statut: 'actif' | 'inactif';
+  created_at: string;
+}
+
+export interface FormationBesoin {
+  id: number;
+  action_id?: number;
+  action?: FormationAction;
+  intitule_libre?: string;
+  direction_id: number;
+  direction?: { id: number; name: string };
+  employee_id?: number;
+  employee?: Employee;
+  annee: number;
+  source: SourceBesoinFormation;
+  commentaire?: string;
+  statut: 'collecte' | 'retenu' | 'rejete';
+  created_by?: number;
+  created_at: string;
+}
+
+export interface PlanFormation {
+  id: number;
+  annee: number;
+  titre: string;
+  periode_debut: string;
+  periode_fin: string;
+  enveloppe_budgetaire?: number;
+  statut: 'brouillon' | 'soumis' | 'valide_dg';
+  valide_par_user_id?: number;
+  validePar?: User;
+  date_validation?: string;
+  notes?: string;
+  lignes?: LignePlanFormation[];
+  lignes_count?: number;
+  created_at: string;
+}
+
+export interface LignePlanFormation {
+  id: number;
+  plan_formation_id: number;
+  plan?: PlanFormation;
+  action_id: number;
+  action?: FormationAction;
+  besoin_id?: number;
+  besoin?: FormationBesoin;
+  direction_id: number;
+  direction?: { id: number; name: string };
+  nb_participants_prevu: number;
+  dates_previsionnelles?: string;
+  cout_unitaire?: number;
+  cout_total?: number;
+  source_financement: SourceFinancement;
+  caractere: CaractereFormation;
+  notes?: string;
+  sessions?: FormationSession[];
+  created_at: string;
+}
+
+export interface FormationSession {
+  id: number;
+  ligne_plan_id: number;
+  lignePlan?: LignePlanFormation;
+  date_debut: string;
+  date_fin: string;
+  lieu?: string;
+  prestataire_id?: number;
+  prestataire?: FormationPrestataire;
+  nb_participants_reel?: number;
+  cout_reel?: number;
+  statut: StatutSession;
+  notes?: string;
+  inscriptions?: FormationInscription[];
+  created_at: string;
+}
+
+export interface FormationInscription {
+  id: number;
+  session_id: number;
+  session?: FormationSession;
+  employee_id: number;
+  employee?: Employee;
+  statut: StatutInscription;
+  attestation_path?: string;
+  date_attestation?: string;
+  notes?: string;
+  evaluations?: FormationEvaluation[];
+  created_at: string;
+}
+
+export interface FormationEvaluation {
+  id: number;
+  inscription_id: number;
+  inscription?: FormationInscription;
+  type: TypeEvaluation;
+  score?: number;
+  commentaire?: string;
+  evalue_par_user_id?: number;
+  evaluePar?: User;
+  date_evaluation: string;
+  created_at: string;
+}
+
+export interface PlanFormationDashboard {
+  kpis: {
+    taux_acces: number;
+    jours_moyen: number;
+    taux_budget: number;
+    taux_satisfaction: number | null;
+    taux_transfert: number | null;
+    taux_realisation: number;
+    agents_formes: number;
+    budget_alloue: number;
+    budget_consomme: number;
+  };
+  prochaines_sessions: FormationSession[];
+  plans_recents: PlanFormation[];
+}
+
+// ── Évaluation Période d'Essai ────────────────────────────────────────────────
+
+export type TypeEvaluationEssai = '3_mois' | '6_mois';
+export type CategorieEssai = 'A1' | 'A2' | 'B1' | 'B2' | 'C' | 'D' | 'E';
+export type StatutEvaluation = 'brouillon' | 'auto_evaluation' | 'entretien' | 'signe' | 'valide_rrh' | 'decision_dg' | 'archive';
+export type StatutDossierEvaluation = 'en_cours' | 'confirme' | 'renouvele' | 'non_confirme' | 'en_attente';
+export type AppreciationEvaluation = 'insuffisant' | 'passable' | 'satisfaisant' | 'excellent';
+export type DecisionEvaluation = 'confirmation' | 'renouvellement' | 'non_confirmation';
+export type GroupeCritere = 'competences_techniques' | 'comportement_relations' | 'aptitudes_personnelles';
+
+export interface EvaluationCritere {
+  id: number;
+  code: string;
+  libelle: string;
+  groupe: GroupeCritere;
+  poids: number;
+  ordre: number;
+  actif: boolean;
+}
+
+export interface EvaluationNote {
+  id: number;
+  evaluation_id: number;
+  critere_id: number;
+  note: number | null;
+  note_ponderee: number | null;
+  commentaire_agent: string | null;
+  commentaire_hierarchique: string | null;
+  critere?: EvaluationCritere;
+}
+
+export interface EvaluationHistoriqueItem {
+  id: number;
+  evaluation_id: number;
+  user_id: number | null;
+  etape: string;
+  commentaire: string | null;
+  created_at: string;
+  user?: { id: number; name: string };
+}
+
+export interface EvaluationPeriodeEssai {
+  id: number;
+  employee_id: number;
+  responsable_id: number | null;
+  type: TypeEvaluationEssai;
+  categorie: CategorieEssai;
+  date_prise_poste: string;
+  date_fin_periode: string;
+  date_envoi_fiche: string | null;
+  date_entretien: string | null;
+  note_globale: number | null;
+  appreciation: AppreciationEvaluation | null;
+  decision_recommandee: DecisionEvaluation | null;
+  commentaire_general: string | null;
+  plan_amelioration: string | null;
+  statut: StatutEvaluation;
+  statut_dossier: StatutDossierEvaluation;
+  signe_agent_at: string | null;
+  signe_hierarchique_at: string | null;
+  valide_rrh_at: string | null;
+  valide_rrh_user_id: number | null;
+  decision_dg_at: string | null;
+  decision_dg_user_id: number | null;
+  decision_finale: DecisionEvaluation | null;
+  remarques_dg: string | null;
+  employee?: Employee;
+  responsable?: { id: number; name: string };
+  valide_rrh_user?: { id: number; name: string };
+  decision_dg_user?: { id: number; name: string };
+  notations?: EvaluationNote[];
+  historique?: EvaluationHistoriqueItem[];
+}
+
+export interface EvaluationDashboard {
+  total: number;
+  en_cours: number;
+  confirmes: number;
+  renouveles: number;
+  non_confirmes: number;
+  en_attente: number;
+  prochains_entretiens: EvaluationPeriodeEssai[];
+  recents: EvaluationPeriodeEssai[];
+  repartition: { appreciation: string; count: number }[];
+  a_echoir: EvaluationPeriodeEssai[];
+}
+
 export interface PaginatedResponse<T> {
   data: T[];
   current_page: number;

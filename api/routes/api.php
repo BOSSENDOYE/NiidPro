@@ -18,6 +18,8 @@ use App\Http\Controllers\Api\TrainingController;
 use App\Http\Controllers\Api\RecruitmentController;
 use App\Http\Controllers\Api\RecruitmentParamsController;
 use App\Http\Controllers\Api\PlanRecrutementController;
+use App\Http\Controllers\Api\PlanFormationController;
+use App\Http\Controllers\Api\EvaluationController;
 use Illuminate\Support\Facades\Route;
 
 // Health check
@@ -255,5 +257,62 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/candidatures',         [PlanRecrutementController::class, 'createCandidature']);
         Route::put('/candidatures/{id}',     [PlanRecrutementController::class, 'updateCandidature']);
         Route::post('/decisions',            [PlanRecrutementController::class, 'createDecision']);
+    });
+
+    // ── Plan de Formation ────────────────────────────────────────────────────
+    Route::prefix('plan-formation')->group(function () {
+        Route::get('/dashboard',                        [PlanFormationController::class, 'dashboard']);
+
+        // Prestataires
+        Route::get('/prestataires',                     [PlanFormationController::class, 'prestataires']);
+        Route::post('/prestataires',                    [PlanFormationController::class, 'createPrestataire']);
+
+        // Catalogue actions
+        Route::get('/actions',                          [PlanFormationController::class, 'actions']);
+        Route::post('/actions',                         [PlanFormationController::class, 'createAction']);
+
+        // Besoins
+        Route::get('/besoins',                          [PlanFormationController::class, 'besoins']);
+        Route::post('/besoins',                         [PlanFormationController::class, 'createBesoin']);
+        Route::put('/besoins/{besoin}/valider',         [PlanFormationController::class, 'validerBesoin']);
+
+        // Plans annuels
+        Route::get('/plans',                            [PlanFormationController::class, 'plans']);
+        Route::post('/plans',                           [PlanFormationController::class, 'createPlan']);
+        Route::get('/plans/{plan}',                     [PlanFormationController::class, 'showPlan']);
+        Route::put('/plans/{plan}/valider',             [PlanFormationController::class, 'validerPlan']);
+
+        // Lignes du plan
+        Route::post('/plans/{plan}/lignes',             [PlanFormationController::class, 'createLigne']);
+        Route::put('/lignes/{ligne}',                   [PlanFormationController::class, 'updateLigne']);
+        Route::delete('/lignes/{ligne}',                [PlanFormationController::class, 'deleteLigne']);
+
+        // Sessions
+        Route::get('/sessions',                         [PlanFormationController::class, 'sessions']);
+        Route::post('/sessions',                        [PlanFormationController::class, 'createSession']);
+        Route::get('/sessions/{session}',               [PlanFormationController::class, 'showSession']);
+        Route::put('/sessions/{session}',               [PlanFormationController::class, 'updateSession']);
+
+        // Inscriptions
+        Route::post('/sessions/{session}/inscrire',     [PlanFormationController::class, 'inscrire']);
+        Route::put('/inscriptions/{inscription}',       [PlanFormationController::class, 'updateInscription']);
+
+        // Évaluations
+        Route::get('/evaluations',                      [PlanFormationController::class, 'evaluations']);
+        Route::post('/evaluations',                     [PlanFormationController::class, 'createEvaluation']);
+    });
+
+    // ── Évaluations période d'essai ──────────────────────────────────────────
+    Route::prefix('evaluations')->group(function () {
+        Route::get('/dashboard',                [EvaluationController::class, 'dashboard']);
+        Route::get('/criteres',                 [EvaluationController::class, 'criteres']);
+        Route::get('/',                         [EvaluationController::class, 'index']);
+        Route::post('/',                        [EvaluationController::class, 'store']);
+        Route::get('/{id}',                     [EvaluationController::class, 'show']);
+        Route::put('/{id}/notes',               [EvaluationController::class, 'saveNotes']);
+        Route::put('/{id}/auto-evaluation',     [EvaluationController::class, 'autoEvaluation']);
+        Route::put('/{id}/avancer',             [EvaluationController::class, 'avancer']);
+        Route::put('/{id}/valider-rrh',         [EvaluationController::class, 'validerRrh']);
+        Route::put('/{id}/decision-dg',         [EvaluationController::class, 'decisionDg']);
     });
 });

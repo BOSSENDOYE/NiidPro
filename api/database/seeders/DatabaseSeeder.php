@@ -269,6 +269,9 @@ class DatabaseSeeder extends Seeder
         // ── Training Module ──────────────────────────────────────────────────
         $this->call(TrainingSeeder::class);
 
+        // ── Module Évaluation Période d'Essai ────────────────────────────────
+        $this->call(EvaluationSeeder::class);
+
         $this->command->info('RH+PAIE database seeded successfully!');
         $this->command->table(
             ['Rôle', 'Email', 'Mot de passe'],
