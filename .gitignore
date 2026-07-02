@@ -4,8 +4,7 @@
 *.tar
 *.gz
 
-# Dossiers de build frontend
-frontend/dist/
+# Dossiers de build frontend (dist/ est commité volontairement pour le déploiement)
 frontend/node_modules/
 
 # Dossiers Laravel

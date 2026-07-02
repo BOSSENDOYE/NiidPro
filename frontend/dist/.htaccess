@@ -1,0 +1,31 @@
+# ── Frontend React (SPA) — rh.lamadoneadn.com (/public_html/rh) ──
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /
+
+  # Forcer HTTPS
+  RewriteCond %{HTTPS} off
+  RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
+  # Ne pas réécrire les fichiers/dossiers existants (assets, sw.js, manifest…)
+  RewriteCond %{REQUEST_FILENAME} -f [OR]
+  RewriteCond %{REQUEST_FILENAME} -d
+  RewriteRule ^ - [L]
+
+  # Toutes les autres routes → index.html (history mode)
+  RewriteRule ^ index.html [L]
+</IfModule>
+
+<IfModule mod_headers.c>
+  # Assets hashés : cache long
+  <FilesMatch "\.(js|css|woff2|png|jpg|jpeg|gif|svg|webp)$">
+    Header set Cache-Control "public, max-age=31536000, immutable"
+  </FilesMatch>
+  # Le service worker / manifest ne doivent JAMAIS être mis en cache (override)
+  <FilesMatch "(sw\.js|registerSW\.js|manifest\.webmanifest)$">
+    Header set Cache-Control "no-cache, no-store, must-revalidate"
+  </FilesMatch>
+</IfModule>
+
+# Type MIME correct pour le manifest PWA
+AddType application/manifest+json .webmanifest
