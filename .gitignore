@@ -1,0 +1,20 @@
+# Archives lourdes — ne jamais committer
+*.zip
+*.tar.gz
+*.tar
+*.gz
+
+# Dossiers de build frontend
+frontend/dist/
+frontend/node_modules/
+
+# Dossiers Laravel
+api/vendor/
+api/.env
+api/storage/app/public/*
+api/storage/logs/*
+api/bootstrap/cache/*
+
+# Divers
+.DS_Store
+Thumbs.db
