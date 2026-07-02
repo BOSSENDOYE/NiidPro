@@ -45,6 +45,9 @@ export const contractArchivesApi = {
   preview: (id: number) =>
     client.get(`/contract-archives/${id}/preview`, { responseType: 'blob' }),
 
+  download: (id: number) =>
+    client.get(`/contract-archives/${id}/download`, { responseType: 'blob' }),
+
   delete: (id: number) =>
     client.delete(`/contract-archives/${id}`),
 };

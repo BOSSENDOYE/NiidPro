@@ -14,6 +14,7 @@ const TYPE_LABELS: Record<TemplateLineType, string> = {
   css:          'Cotisations CSS',
   ir:           'Impôt sur le Revenu (IR)',
   trimf:        'TRIMF',
+  retenue:      'Retenues diverses',
 };
 
 interface Props {

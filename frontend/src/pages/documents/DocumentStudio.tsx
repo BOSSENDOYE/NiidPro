@@ -259,24 +259,26 @@ export default function DocumentStudio() {
   }, []);
 
   // ── Load template for editing ─────────────────────────────────────────────────
-  const { isLoading: tplLoading } = useQuery({
+  const { isLoading: tplLoading, data: tplData } = useQuery({
     queryKey: ['doc-template-studio', id],
     queryFn: () => documentsApi.getTemplate(Number(id)).then(r => r.data),
     enabled: !!id && !initialLoad,
-    onSuccess: (tpl: DocumentTemplate) => {
-      const s = tpl.settings ?? {};
-      setDocType((tpl.type as DocTypeKey) ?? 'attestation');
-      setName(tpl.name);
-      setDescription(tpl.description ?? '');
-      setContent(tpl.content);
-      setMinistry(s.ministry ?? DEFAULT_MINISTRY);
-      setSigName(s.signataire_name ?? DEFAULT_SIG_NAME);
-      setSigTitle(s.signataire_title ?? DEFAULT_SIG_TITLE);
-      setObjet(s.objet ?? '');
-      setAmpliationsText((s.ampliations ?? []).join('\n'));
-      setInitialLoad(true);
-    },
   });
+
+  useEffect(() => {
+    if (!tplData || initialLoad) return;
+    const s = tplData.settings ?? {};
+    setDocType((tplData.type as DocTypeKey) ?? 'attestation');
+    setName(tplData.name);
+    setDescription(tplData.description ?? '');
+    setContent(tplData.content);
+    setMinistry(s.ministry ?? DEFAULT_MINISTRY);
+    setSigName(s.signataire_name ?? DEFAULT_SIG_NAME);
+    setSigTitle(s.signataire_title ?? DEFAULT_SIG_TITLE);
+    setObjet(s.objet ?? '');
+    setAmpliationsText((s.ampliations ?? []).join('\n'));
+    setInitialLoad(true);
+  }, [tplData, initialLoad]);
 
   // ── Debounced live preview ────────────────────────────────────────────────────
   useEffect(() => {

@@ -154,7 +154,7 @@ export default function RecruitmentsPage() {
 
   const createRequest = useMutation({
     mutationFn: (data: typeof reqForm & { submit?: boolean }) =>
-      recruitmentApi.create({ ...data, number_of_positions: Number(data.number_of_positions), budget: data.budget ? Number(data.budget) : undefined }),
+      recruitmentApi.create({ ...data, department_id: Number(data.department_id), number_of_positions: Number(data.number_of_positions), budget: data.budget ? Number(data.budget) : undefined }),
     onMutate: () => setReqError(null),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['recruitment'] }); setRequestDialog(false); resetReqForm(); },
     onError: (e: { response?: { status?: number; data?: { message?: string; errors?: Record<string, string[]> } } }) => {
@@ -181,7 +181,8 @@ export default function RecruitmentsPage() {
     mutationFn: (data: typeof postingForm) =>
       recruitmentApi.createJobPosting({
         ...data,
-        department_id: Number(data.department_id) as unknown as number,
+        department_id: Number(data.department_id),
+        publication_type: data.publication_type as 'internal' | 'external' | 'both',
         required_experience_years: data.required_experience_years ? Number(data.required_experience_years) : undefined,
         recruitment_request_id: data.recruitment_request_id ? Number(data.recruitment_request_id) : undefined,
       }),
@@ -214,8 +215,9 @@ export default function RecruitmentsPage() {
     mutationFn: (data: typeof ivForm) =>
       recruitmentApi.createInterview({
         ...data,
-        job_posting_id: Number(data.job_posting_id) as unknown as number,
-        application_id: Number(data.application_id) as unknown as number,
+        type: data.type as 'entretien' | 'test_technique' | 'test_psychotechnique',
+        job_posting_id: Number(data.job_posting_id),
+        application_id: Number(data.application_id),
       }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['recruitment'] }); setInterviewDialog(false); resetIvForm(); },
   });

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ReactElement } from 'react';
 import { Box, Tabs, Tab, Typography } from '@mui/material';
 import { Assessment, TrendingUp, WorkspacePremium, LibraryBooks, SwapHoriz } from '@mui/icons-material';
 import EvaluationsAnnuellesTab from './tabs/EvaluationsAnnuellesTab';
@@ -9,7 +9,7 @@ import MobiliteTab from './tabs/MobiliteTab';
 
 interface TabConfig {
   label: string;
-  icon: React.ReactNode;
+  icon: ReactElement;
   component: React.ReactNode;
 }
 

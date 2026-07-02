@@ -70,6 +70,8 @@ export interface Employee {
   payroll_template_id?:    number | null;
   indice_id?:              number | null;
   indice?:                 RecruitmentIndice;
+  part_ir?:                number | null;
+  part_trimf?:             number | null;
   // Carrière
   categorie_emploi?: string;
   echelon?: string;

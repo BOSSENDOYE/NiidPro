@@ -157,7 +157,7 @@ export default function RecruitmentParamsPage() {
   const openAug = (item?: RecruitmentAugmentation) => {
     setAugDialog({ open: true, item: item ?? null });
     setAugForm(item
-      ? { libelle: item.libelle, type: item.type, taux: String(item.taux), unite: item.unite, date_effet: item.date_effet ?? '', description: item.description ?? '', is_active: item.is_active }
+      ? { libelle: item.libelle, type: item.type, taux: String(item.taux), unite: item.unite ?? 'pourcentage', date_effet: item.date_effet ?? '', description: item.description ?? '', is_active: item.is_active }
       : { libelle: '', type: 'indiciaire', taux: '', unite: 'pourcentage', date_effet: '', description: '', is_active: true });
   };
   const openBareme = (item?: RecruitmentBareme) => {
