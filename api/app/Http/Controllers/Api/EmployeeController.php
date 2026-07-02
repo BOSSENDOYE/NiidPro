@@ -276,6 +276,71 @@ class EmployeeController extends Controller
         ]);
     }
 
+    // ── Import JSON (depuis interface de prévisualisation frontend) ──────────
+    public function importJson(Request $request)
+    {
+        $request->validate([
+            'rows'   => ['required', 'array', 'min:1', 'max:500'],
+            'rows.*' => ['array'],
+        ]);
+
+        $created = 0;
+        $skipped = [];
+
+        foreach ($request->rows as $i => $row) {
+            $line = $i + 2;
+            $prenom = trim($row['first_name'] ?? '');
+            $nom    = trim($row['last_name']  ?? '');
+
+            if (!$prenom || !$nom) {
+                $skipped[] = "Ligne $line : prénom et nom obligatoires.";
+                continue;
+            }
+
+            // Éviter les doublons sur le matricule
+            $matricule = trim($row['employee_number'] ?? '');
+            if ($matricule && Employee::where('employee_number', $matricule)->exists()) {
+                $skipped[] = "Ligne $line : matricule $matricule déjà existant.";
+                continue;
+            }
+
+            try {
+                $dept = !empty($row['department']) ? \App\Models\Department::where('name', trim($row['department']))->first() : null;
+
+                Employee::create([
+                    'employee_number'       => $matricule ?: $this->generateEmployeeNumber(),
+                    'first_name'            => $prenom,
+                    'last_name'             => $nom,
+                    'birth_date'            => $row['birth_date']  ?? null,
+                    'birth_place'           => $row['birth_place'] ?? null,
+                    'hire_date'             => $row['hire_date']   ?? now()->format('Y-m-d'),
+                    'categorie_emploi'      => $row['categorie_emploi'] ?? null,
+                    'fonction'              => $row['fonction']    ?? null,
+                    'qualification'         => $row['qualification'] ?? null,
+                    'niveau_rh'             => $row['niveau_rh']  ?? null,
+                    'part_ir'               => is_numeric($row['part_ir'] ?? null) ? (float)$row['part_ir'] : null,
+                    'part_trimf'            => is_numeric($row['part_trimf'] ?? null) ? (float)$row['part_trimf'] : null,
+                    'nombre_enfants_charge' => is_numeric($row['nombre_enfants_charge'] ?? null) ? (int)$row['nombre_enfants_charge'] : 0,
+                    'nombre_femmes'         => is_numeric($row['nombre_femmes'] ?? null) ? (int)$row['nombre_femmes'] : 0,
+                    'department_id'         => $dept?->id,
+                    'status'                => 'active',
+                    'annual_leave_days'     => 30,
+                    'professional_email'    => $row['professional_email'] ?? null,
+                    'gender'                => $row['gender'] ?? null,
+                ]);
+                $created++;
+            } catch (\Exception $e) {
+                $skipped[] = "Ligne $line : " . $e->getMessage();
+            }
+        }
+
+        return response()->json([
+            'created' => $created,
+            'skipped' => $skipped,
+            'message' => "$created agent(s) importé(s) avec succès.",
+        ]);
+    }
+
     // ── Paie : données de paie de l'agent ────────────────────────────────────
     public function payeData(Employee $employee)
     {

@@ -88,6 +88,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('departments', DepartmentController::class);
 
     // Employees
+    Route::post('/employees/import-json',              [EmployeeController::class, 'importJson']);
     Route::get('/employees/counts',                    [EmployeeController::class, 'counts']);
     Route::get('/employees/export',                    [EmployeeController::class, 'export']);
     Route::post('/employees/import',                   [EmployeeController::class, 'import']);

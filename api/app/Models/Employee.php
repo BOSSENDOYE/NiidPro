@@ -25,8 +25,11 @@ class Employee extends Model
         'anciennete_recrutement', 'nombre_enfants_charge', 'a_medaille_travail',
         // Carrière
         'categorie_emploi', 'echelon', 'date_entree_echelon',
+        'fonction', 'qualification', 'niveau_rh',
         // Paie
         'payroll_template_id', 'indice_id', 'part_trimf', 'part_ir',
+        // Famille
+        'nombre_femmes',
     ];
 
     protected function casts(): array

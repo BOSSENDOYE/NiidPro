@@ -12,7 +12,9 @@ import {
   Print, PersonAdd, Groups, CheckCircle, Block,
   Gavel, Assignment, Assessment, ViewModule, ViewList,
   Phone, Event, Refresh, AccessTime, EmojiEvents, Search, AssignmentTurnedIn,
+  FileUpload,
 } from '@mui/icons-material';
+import { useNavigate } from 'react-router-dom';
 import { employeesApi } from '../../api/employees';
 import { tasksApi } from '../../api/tasks';
 import { formatDate } from '../../utils/format';
@@ -36,7 +38,7 @@ const TAB_CONFIG = [
 ];
 
 export default function EmployeesPage() {
-
+  const navigate = useNavigate();
   const [activeTab, setActiveTab]       = useState(0);
   const [viewMode, setViewMode]         = useState<'grid' | 'table'>('grid');
   const [page, setPage]                 = useState(0);
@@ -242,6 +244,15 @@ export default function EmployeesPage() {
                   <Button size="small" variant="outlined" startIcon={<Print sx={{ fontSize: '14px !important' }} />}
                     sx={{ color: '#475569', borderColor: '#E2E8F0', bgcolor: '#fff', fontSize: 12, borderRadius: '8px', px: 1.75, fontWeight: 600, whiteSpace: 'nowrap', '&:hover': { borderColor: '#94A3B8', bgcolor: '#F8FAFC' }, transition: 'all 0.2s' }}>
                     Imprimer
+                  </Button>
+                  <Button size="small" startIcon={<FileUpload sx={{ fontSize: '15px !important' }} />}
+                    onClick={() => navigate('/employees/import')}
+                    sx={{
+                      bgcolor: '#002f59', color: '#fff', fontWeight: 700, fontSize: 12,
+                      borderRadius: '8px', px: 2, whiteSpace: 'nowrap',
+                      '&:hover': { bgcolor: '#001f3f' }, transition: 'all 0.2s',
+                    }}>
+                    Importer
                   </Button>
                   <Button size="small" startIcon={<PersonAdd sx={{ fontSize: '15px !important' }} />}
                     onClick={() => openModal('create')}

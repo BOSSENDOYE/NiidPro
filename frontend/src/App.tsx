@@ -14,6 +14,7 @@ import DashboardPage from './pages/dashboard/DashboardPage';
 import EmployeesPage from './pages/employees/EmployeesPage';
 import EmployeeDetailPage from './pages/employees/EmployeeDetailPage';
 import EmployeeFormPage from './pages/employees/EmployeeFormPage';
+import EmployeeImportPage from './pages/employees/EmployeeImportPage';
 
 // Organisation
 import DepartmentsPage from './pages/departments/DepartmentsPage';
@@ -144,6 +145,7 @@ export default function App() {
 
               {/* Gestion RH */}
               <Route path="employees" element={<EmployeesPage />} />
+              <Route path="employees/import" element={<EmployeeImportPage />} />
               <Route path="employees/new" element={<EmployeeFormPage />} />
               <Route path="employees/:id" element={<EmployeeDetailPage />} />
               <Route path="employees/:id/edit" element={<EmployeeFormPage />} />
