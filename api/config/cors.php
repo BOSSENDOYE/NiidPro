@@ -19,12 +19,14 @@ return [
 
     'allowed_methods' => ['*'],
 
-    'allowed_origins' => [
+    'allowed_origins' => array_filter([
         env('FRONTEND_URL', 'http://localhost:5173'),
         'http://localhost:5173',
         'http://localhost:5174',
         'http://localhost:5175',
-    ],
+        'https://rh.lamadoneadn.com',
+        'http://rh.lamadoneadn.com',
+    ]),
 
     'allowed_origins_patterns' => [],
 
