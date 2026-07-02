@@ -11,7 +11,6 @@ return new class extends Migration
         Schema::table('employees', function (Blueprint $table) {
             $table->foreignId('indice_id')
                   ->nullable()
-                  ->after('payroll_template_id')
                   ->constrained('recruitment_indices')
                   ->nullOnDelete();
         });
