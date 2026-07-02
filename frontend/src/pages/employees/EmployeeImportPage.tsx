@@ -196,8 +196,11 @@ export default function EmployeeImportPage() {
       const res = await client.post('/employees/import-json', { rows: payload });
       setResult(res.data);
       setStep(2);
-    } catch {
-      setResult({ created: 0, skipped: ['Erreur serveur lors de l\'import.'] });
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { data?: { message?: string; errors?: Record<string, string[]> }; status?: number } };
+      const msg = axiosErr.response?.data?.message
+        || (axiosErr.response?.status ? `Erreur HTTP ${axiosErr.response.status}` : 'Erreur réseau ou serveur');
+      setResult({ created: 0, skipped: [msg] });
       setStep(2);
     } finally {
       setImporting(false);
