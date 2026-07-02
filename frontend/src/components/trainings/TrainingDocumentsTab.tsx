@@ -8,6 +8,7 @@ import {
 import {
   UploadFile, Delete, Download, WorkspacePremium, InsertDriveFile,
 } from '@mui/icons-material';
+import ConfirmDialog from '../shared/ConfirmDialog';
 import { trainingsApi } from '../../api/trainings';
 import { formatDate } from '../../utils/format';
 import type { Training, TrainingDocument } from '../../types';
@@ -37,6 +38,7 @@ export default function TrainingDocumentsTab({ training }: Props) {
   const qc = useQueryClient();
   const fileRef = useRef<HTMLInputElement>(null);
   const [category, setCategory] = useState<string>('piece_jointe');
+  const [toDel, setToDel] = useState<number | null>(null);
 
   const { data: documents = [], isLoading } = useQuery({
     queryKey: ['trainings', training.id, 'documents'],
@@ -162,7 +164,7 @@ export default function TrainingDocumentsTab({ training }: Props) {
                           </Tooltip>
                         )}
                         <Tooltip title="Supprimer">
-                          <IconButton size="small" onClick={() => { if (confirm('Supprimer ce document ?')) deleteMutation.mutate(doc.id); }} sx={{ color: '#DC2626' }}>
+                          <IconButton size="small" onClick={() => setToDel(doc.id)} sx={{ color: '#DC2626' }}>
                             <Delete sx={{ fontSize: 16 }} />
                           </IconButton>
                         </Tooltip>
@@ -175,6 +177,13 @@ export default function TrainingDocumentsTab({ training }: Props) {
           </TableBody>
         </Table>
       </TableContainer>
+
+      <ConfirmDialog
+        open={toDel !== null}
+        message="Supprimer ce document définitivement ?"
+        onConfirm={() => toDel !== null && deleteMutation.mutate(toDel)}
+        onClose={() => setToDel(null)}
+      />
     </Box>
   );
 }

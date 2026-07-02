@@ -16,6 +16,9 @@ export const documentsApi = {
       data: normalizeArray<DocumentTemplate>(r.data),
     })),
 
+  getTemplate: (id: number) =>
+    client.get<DocumentTemplate>(`/documents/templates/${id}`),
+
   createTemplate: (data: Partial<DocumentTemplate>) =>
     client.post<DocumentTemplate>('/documents/templates', data),
 

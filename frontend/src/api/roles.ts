@@ -7,9 +7,20 @@ export interface AppRole {
   permissions: string[];
 }
 
+export interface PermEntry {
+  name: string;
+  label: string;
+}
+
+export interface PermModule {
+  label: string;
+  icon: string;
+  perms: PermEntry[];
+}
+
 export interface RolesResponse {
   roles: AppRole[];
-  permissions: string[];
+  modules: PermModule[];
 }
 
 export interface RolePayload {

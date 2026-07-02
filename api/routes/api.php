@@ -25,6 +25,8 @@ use App\Http\Controllers\Api\RecruitmentParamsController;
 use App\Http\Controllers\Api\PlanRecrutementController;
 use App\Http\Controllers\Api\PlanFormationController;
 use App\Http\Controllers\Api\EvaluationController;
+use App\Http\Controllers\Api\CarriereController;
+use App\Http\Controllers\Api\PayrollTemplateController;
 use Illuminate\Support\Facades\Route;
 
 // Health check
@@ -86,10 +88,14 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('departments', DepartmentController::class);
 
     // Employees
-    Route::get('/employees/counts',            [EmployeeController::class, 'counts']);
-    Route::get('/employees/export',            [EmployeeController::class, 'export']);
-    Route::post('/employees/import',           [EmployeeController::class, 'import']);
-    Route::post('/employees/{employee}/photo', [EmployeeController::class, 'uploadPhoto']);
+    Route::get('/employees/counts',                    [EmployeeController::class, 'counts']);
+    Route::get('/employees/export',                    [EmployeeController::class, 'export']);
+    Route::post('/employees/import',                   [EmployeeController::class, 'import']);
+    Route::get('/employees/{employee}/paye-data',      [EmployeeController::class, 'payeData']);
+    Route::post('/employees/{employee}/calcul-irpp',   [EmployeeController::class, 'calculIrpp']);
+    Route::get('/employees/{employee}/heures-sup',     [EmployeeController::class, 'heuresSup']);
+    Route::get('/employees/{employee}/heures-coupure', [EmployeeController::class, 'heuresCoupure']);
+    Route::post('/employees/{employee}/photo',         [EmployeeController::class, 'uploadPhoto']);
     Route::apiResource('employees', EmployeeController::class);
 
     // Emails (envoi intégré à la plateforme)
@@ -253,6 +259,42 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/recruitment-params/augmentations/{augmentation}',       [RecruitmentParamsController::class, 'updateAugmentation']);
     Route::delete('/recruitment-params/augmentations/{augmentation}',    [RecruitmentParamsController::class, 'destroyAugmentation']);
 
+    // Augmentations — import bulk
+    Route::post('/recruitment-params/augmentations/import', [RecruitmentParamsController::class, 'importAugmentations']);
+
+    // Indices — import bulk
+    Route::post('/recruitment-params/indices/import', [RecruitmentParamsController::class, 'importIndices']);
+
+    // Barèmes — import bulk
+    Route::post('/recruitment-params/baremes/import', [RecruitmentParamsController::class, 'importBaremes']);
+
+    // Hiérarchies / Classes / Échelons — import bulk Excel
+    Route::post('/recruitment-params/hierarchies-import', [RecruitmentParamsController::class, 'importHierarchieClassesEchelons']);
+
+    // Cotisations
+    Route::get('/recruitment-params/cotisations',                        [RecruitmentParamsController::class, 'cotisations']);
+    Route::post('/recruitment-params/cotisations',                       [RecruitmentParamsController::class, 'storeCotisation']);
+    Route::put('/recruitment-params/cotisations/{cotisation}',           [RecruitmentParamsController::class, 'updateCotisation']);
+    Route::delete('/recruitment-params/cotisations/{cotisation}',        [RecruitmentParamsController::class, 'destroyCotisation']);
+
+    // Autres rubriques
+    Route::get('/recruitment-params/autres-rubriques',                        [RecruitmentParamsController::class, 'autresRubriques']);
+    Route::post('/recruitment-params/autres-rubriques',                       [RecruitmentParamsController::class, 'storeAutreRubrique']);
+    Route::put('/recruitment-params/autres-rubriques/{autreRubrique}',        [RecruitmentParamsController::class, 'updateAutreRubrique']);
+    Route::delete('/recruitment-params/autres-rubriques/{autreRubrique}',     [RecruitmentParamsController::class, 'destroyAutreRubrique']);
+
+    // Classes
+    Route::get('/recruitment-params/classes',                    [RecruitmentParamsController::class, 'classes']);
+    Route::post('/recruitment-params/classes',                   [RecruitmentParamsController::class, 'storeClasse']);
+    Route::put('/recruitment-params/classes/{classe}',           [RecruitmentParamsController::class, 'updateClasse']);
+    Route::delete('/recruitment-params/classes/{classe}',        [RecruitmentParamsController::class, 'destroyClasse']);
+
+    // Échelons
+    Route::get('/recruitment-params/echelons',                   [RecruitmentParamsController::class, 'echelons']);
+    Route::post('/recruitment-params/echelons',                  [RecruitmentParamsController::class, 'storeEchelon']);
+    Route::put('/recruitment-params/echelons/{echelon}',         [RecruitmentParamsController::class, 'updateEchelon']);
+    Route::delete('/recruitment-params/echelons/{echelon}',      [RecruitmentParamsController::class, 'destroyEchelon']);
+
     // Barèmes
     Route::get('/recruitment-params/baremes',                    [RecruitmentParamsController::class, 'baremes']);
     Route::post('/recruitment-params/baremes',                   [RecruitmentParamsController::class, 'storeBareme']);
@@ -342,6 +384,39 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/evaluations',                      [PlanFormationController::class, 'evaluations']);
         Route::post('/evaluations',                     [PlanFormationController::class, 'createEvaluation']);
     });
+
+    // ── Gestion des Carrières ────────────────────────────────────────────────
+    Route::prefix('carrieres')->group(function () {
+        // Évaluations annuelles
+        Route::get('/evaluations',                   [CarriereController::class, 'evaluations']);
+        Route::post('/evaluations',                  [CarriereController::class, 'storeEvaluation']);
+        Route::put('/evaluations/{evaluation}',      [CarriereController::class, 'updateEvaluation']);
+
+        // Avancements
+        Route::get('/avancements/eligibles',         [CarriereController::class, 'eligiblesAvancement']);
+        Route::get('/avancements',                   [CarriereController::class, 'avancements']);
+        Route::post('/avancements',                  [CarriereController::class, 'storeAvancement']);
+        Route::patch('/avancements/{avancement}/valider', [CarriereController::class, 'validerAvancement']);
+
+        // Promotions
+        Route::get('/promotions',                    [CarriereController::class, 'promotions']);
+        Route::post('/promotions',                   [CarriereController::class, 'storePromotion']);
+        Route::patch('/promotions/{promotion}/valider', [CarriereController::class, 'validerPromotion']);
+
+        // PDI
+        Route::get('/pdis',                          [CarriereController::class, 'pdis']);
+        Route::post('/pdis',                         [CarriereController::class, 'storePdi']);
+        Route::put('/pdis/{pdi}',                    [CarriereController::class, 'updatePdi']);
+
+        // Mobilité interne
+        Route::get('/mobilites',                     [CarriereController::class, 'mobilites']);
+        Route::post('/mobilites',                    [CarriereController::class, 'storeMobilite']);
+        Route::patch('/mobilites/{mobilite}/valider', [CarriereController::class, 'validerMobilite']);
+    });
+
+    // ── Modèles de Fiche de Paie ────────────────────────────────────────────
+    Route::get('/payroll-templates/rubriques/{type}',  [PayrollTemplateController::class, 'rubriques']);
+    Route::apiResource('payroll-templates', PayrollTemplateController::class);
 
     // ── Évaluations période d'essai ──────────────────────────────────────────
     Route::prefix('evaluations')->group(function () {

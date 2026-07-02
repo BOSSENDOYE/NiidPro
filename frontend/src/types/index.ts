@@ -67,6 +67,12 @@ export interface Employee {
   a_medaille_travail?:     boolean;
   anciennete_recrutement?: string;
   family_members?:         EmployeeFamilyMember[];
+  payroll_template_id?:    number | null;
+  indice_id?:              number | null;
+  indice?:                 RecruitmentIndice;
+  // Carrière
+  categorie_emploi?: string;
+  echelon?: string;
 }
 
 export interface EmployeeFamilyMember {
@@ -213,7 +219,7 @@ export interface DocumentTemplateSettings {
 
 export interface DocumentTemplate {
   id: number;
-  type: 'attestation' | 'note_service';
+  type: string;
   name: string;
   content: string;
   status: 'active' | 'archived';
@@ -232,7 +238,7 @@ export interface GeneratedDocument {
   template?: DocumentTemplate;
   employee_id: number;
   employee?: Employee;
-  type: 'attestation' | 'note_service';
+  type: string;
   reference: string;
   content_final: string;
   generated_by?: number;
@@ -583,13 +589,63 @@ export interface RecruitmentHierarchy {
   created_at: string;
 }
 
+export interface PaieClasse {
+  id: number;
+  hierarchy_id: number;
+  hierarchy?: RecruitmentHierarchy;
+  code: string;
+  libelle: string;
+  description?: string;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface PaieEchelon {
+  id: number;
+  class_id: number;
+  classe?: PaieClasse;
+  numero: number;
+  libelle?: string;
+  description?: string;
+  is_active: boolean;
+  created_at: string;
+}
+
 export interface RecruitmentAugmentation {
   id: number;
   libelle: string;
   type: 'indiciaire' | 'indemnitaire' | 'prime' | 'autre';
-  taux: number;
-  unite: 'pourcentage' | 'montant';
+  taux?: number | null;
+  unite?: 'pourcentage' | 'montant' | null;
   date_effet?: string;
+  description?: string;
+  is_active: boolean;
+  created_at: string;
+  pivot?: { montant?: number | null };
+}
+
+export interface PayrollCotisation {
+  id: number;
+  code?: string | null;
+  libelle: string;
+  type: 'IPRES' | 'CSS' | 'IPM' | 'IR' | 'TRIMF' | 'autre';
+  taux_salarial?: number | null;
+  taux_patronal?: number | null;
+  plafond?: number | null;
+  assiette: 'brut' | 'net' | 'autre';
+  description?: string;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface PayrollAutreRubrique {
+  id: number;
+  code?: string | null;
+  libelle: string;
+  type: 'prime' | 'avantage_nature' | 'deduction' | 'retenue' | 'allocation' | 'autre';
+  sens: 'gain' | 'retenue';
+  unite?: 'pourcentage' | 'montant' | null;
+  valeur?: number | null;
   description?: string;
   is_active: boolean;
   created_at: string;

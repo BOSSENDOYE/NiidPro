@@ -5,6 +5,8 @@ import type {
   RecruitmentStatistics, PaginatedResponse,
   RecruitmentIndice, RecruitmentHierarchy,
   RecruitmentAugmentation, RecruitmentBareme,
+  PaieClasse, PaieEchelon,
+  PayrollCotisation, PayrollAutreRubrique,
 } from '../types';
 
 const api = axios.create({
@@ -158,6 +160,26 @@ export const recruitmentApi = {
   deleteAugmentation: (id: number) =>
     api.delete(`/recruitment-params/augmentations/${id}`),
 
+  // Cotisations
+  getCotisations: () =>
+    api.get<PayrollCotisation[]>('/recruitment-params/cotisations'),
+  createCotisation: (data: Partial<PayrollCotisation>) =>
+    api.post<PayrollCotisation>('/recruitment-params/cotisations', data),
+  updateCotisation: (id: number, data: Partial<PayrollCotisation>) =>
+    api.put<PayrollCotisation>(`/recruitment-params/cotisations/${id}`, data),
+  deleteCotisation: (id: number) =>
+    api.delete(`/recruitment-params/cotisations/${id}`),
+
+  // Autres rubriques
+  getAutresRubriques: () =>
+    api.get<PayrollAutreRubrique[]>('/recruitment-params/autres-rubriques'),
+  createAutreRubrique: (data: Partial<PayrollAutreRubrique>) =>
+    api.post<PayrollAutreRubrique>('/recruitment-params/autres-rubriques', data),
+  updateAutreRubrique: (id: number, data: Partial<PayrollAutreRubrique>) =>
+    api.put<PayrollAutreRubrique>(`/recruitment-params/autres-rubriques/${id}`, data),
+  deleteAutreRubrique: (id: number) =>
+    api.delete(`/recruitment-params/autres-rubriques/${id}`),
+
   // Barèmes
   getBaremes: (hierarchyId?: number) =>
     api.get<RecruitmentBareme[]>('/recruitment-params/baremes', {
@@ -169,4 +191,60 @@ export const recruitmentApi = {
     api.put<RecruitmentBareme>(`/recruitment-params/baremes/${id}`, data),
   deleteBareme: (id: number) =>
     api.delete(`/recruitment-params/baremes/${id}`),
+  importAugmentations: (rows: {
+    libelle: string;
+    type?: string;
+    taux?: number | null;
+    unite?: string | null;
+    date_effet?: string | null;
+    description?: string | null;
+  }[]) =>
+    api.post<{ imported: number; skipped: number }>('/recruitment-params/augmentations/import', { rows }),
+
+  importIndices: (rows: {
+    hierarchy_code: string;
+    valeur: number;
+    valeur_point?: number;
+    solde_mensuelle?: number;
+    classe?: string;
+    echelon_label?: string;
+    garde?: string;
+    augmentations?: Record<string, number>;
+  }[]) =>
+    api.post<{ imported: number; skipped: number; augmentations: number }>('/recruitment-params/indices/import', { rows }),
+
+  importBaremes: (rows: Record<string, number>[]) =>
+    api.post<{ imported: number }>('/recruitment-params/baremes/import', { rows }),
+
+  importHierarchieClassesEchelons: (data: {
+    hierarchies: { ordre?: number; code: string; libelle: string; description?: string }[];
+    classes:     { code_hierarchie: string; code: string; libelle: string; description?: string }[];
+    echelons:    { code_hierarchie: string; code_classe: string; numero: number; libelle?: string; description?: string }[];
+  }) =>
+    api.post<{ hierarchies: number; classes: number; echelons: number }>(
+      '/recruitment-params/hierarchies-import',
+      data,
+    ),
+
+  // Classes
+  getClasses: (hierarchyId?: number) =>
+    api.get<PaieClasse[]>('/recruitment-params/classes', {
+      params: hierarchyId ? { hierarchy_id: hierarchyId } : undefined,
+    }),
+  createClasse: (data: Partial<PaieClasse>) =>
+    api.post<PaieClasse>('/recruitment-params/classes', data),
+  updateClasse: (id: number, data: Partial<PaieClasse>) =>
+    api.put<PaieClasse>(`/recruitment-params/classes/${id}`, data),
+  deleteClasse: (id: number) =>
+    api.delete(`/recruitment-params/classes/${id}`),
+
+  // Échelons
+  getEchelons: (params?: { class_id?: number; hierarchy_id?: number }) =>
+    api.get<PaieEchelon[]>('/recruitment-params/echelons', { params }),
+  createEchelon: (data: Partial<PaieEchelon>) =>
+    api.post<PaieEchelon>('/recruitment-params/echelons', data),
+  updateEchelon: (id: number, data: Partial<PaieEchelon>) =>
+    api.put<PaieEchelon>(`/recruitment-params/echelons/${id}`, data),
+  deleteEchelon: (id: number) =>
+    api.delete(`/recruitment-params/echelons/${id}`),
 };

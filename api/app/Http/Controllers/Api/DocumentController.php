@@ -26,7 +26,7 @@ class DocumentController extends Controller
     public function storeTemplate(Request $request)
     {
         $data = $request->validate([
-            'type'        => ['required', 'in:attestation,note_service'],
+            'type'        => ['required', 'string', 'max:50'],
             'name'        => ['required', 'string', 'max:255'],
             'content'     => ['required', 'string'],
             'description' => ['nullable', 'string', 'max:500'],
@@ -49,7 +49,7 @@ class DocumentController extends Controller
     public function updateTemplate(Request $request, DocumentTemplate $template)
     {
         $data = $request->validate([
-            'type'        => ['sometimes', 'in:attestation,note_service'],
+            'type'        => ['sometimes', 'string', 'max:50'],
             'name'        => ['sometimes', 'string', 'max:255'],
             'content'     => ['sometimes', 'string'],
             'description' => ['nullable', 'string', 'max:500'],
@@ -147,7 +147,17 @@ class DocumentController extends Controller
 
     private function generateReference(string $type): string
     {
-        $prefix = $type === 'attestation' ? 'ATT' : 'NS';
+        $prefixes = [
+            'attestation'          => 'ATT',
+            'attestation_salaire'  => 'ATS',
+            'attestation_presence' => 'ATP',
+            'note_service'         => 'NS',
+            'lettre_mission'       => 'LM',
+            'decision_avancement'  => 'DA',
+            'ordre_mission'        => 'OM',
+            'contrat'              => 'CONT',
+        ];
+        $prefix = $prefixes[$type] ?? strtoupper(substr($type, 0, 4));
         $year   = now()->format('Y');
         $count  = GeneratedDocument::where('type', $type)
             ->whereYear('created_at', $year)

@@ -95,8 +95,20 @@ export default function LeaveAttestationTab({ searchText = '' }: Props) {
                   getOptionLabel={(e) => `${e.employee_number} — ${e.first_name} ${e.last_name}`}
                   value={selectedEmp}
                   onChange={(_, v) => { setSelectedEmp(v); setLastGenerated(null); }}
+                  filterOptions={(opts, { inputValue }) => {
+                    const q = inputValue.trim();
+                    if (q.length < 2) return [];
+                    const ql = q.toLowerCase();
+                    return opts.filter(e =>
+                      e.employee_number.toLowerCase().includes(ql) ||
+                      (e.phone_professional ?? e.phone ?? '').replace(/\s+/g, '').toLowerCase().includes(ql.replace(/\s+/g, '')) ||
+                      (e.phone_personal ?? '').replace(/\s+/g, '').toLowerCase().includes(ql.replace(/\s+/g, '')) ||
+                      e.first_name.toLowerCase().startsWith(ql)
+                    );
+                  }}
+                  noOptionsText="Tapez 2 caractères (matricule, téléphone ou prénom)…"
                   renderInput={(p) => (
-                    <TextField {...p} label="Agent" size="small" placeholder="Rechercher par matricule ou nom…" />
+                    <TextField {...p} label="Agent" size="small" placeholder="Matricule, téléphone ou 2 lettres du prénom…" />
                   )}
                 />
 

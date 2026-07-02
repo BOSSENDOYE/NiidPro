@@ -7,6 +7,7 @@ import {
   CircularProgress, Tooltip, Alert,
 } from '@mui/material';
 import { Add, Edit, Delete, Group, PersonAdd } from '@mui/icons-material';
+import ConfirmDialog from '../../../components/shared/ConfirmDialog';
 import { usersApi, type ManagedUser, type UserPayload } from '../../../api/users';
 import { rolesApi } from '../../../api/roles';
 import SectionCard from '../SectionCard';
@@ -23,6 +24,7 @@ export default function UsersTab() {
   const [editing, setEditing] = useState<ManagedUser | null>(null);
   const [form, setForm] = useState<UserPayload>(EMPTY);
   const [error, setError] = useState<string | null>(null);
+  const [toDel, setToDel] = useState<{ id: number; name: string } | null>(null);
 
   const { data: users = [], isLoading } = useQuery({
     queryKey: ['users'],
@@ -108,7 +110,7 @@ export default function UsersTab() {
                   <TableCell>
                     <Stack direction="row" spacing={0.25}>
                       <Tooltip title="Modifier"><IconButton size="small" onClick={() => openEdit(u)}><Edit sx={{ fontSize: 16, color: '#2563EB' }} /></IconButton></Tooltip>
-                      <Tooltip title="Supprimer"><IconButton size="small" onClick={() => { if (confirm(`Supprimer ${u.name} ?`)) deleteMut.mutate(u.id); }}><Delete sx={{ fontSize: 16, color: '#EF4444' }} /></IconButton></Tooltip>
+                      <Tooltip title="Supprimer"><IconButton size="small" onClick={() => setToDel({ id: u.id, name: u.name })}><Delete sx={{ fontSize: 16, color: '#EF4444' }} /></IconButton></Tooltip>
                     </Stack>
                   </TableCell>
                 </TableRow>
@@ -154,6 +156,13 @@ export default function UsersTab() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      <ConfirmDialog
+        open={toDel !== null}
+        message={toDel ? `Supprimer l'utilisateur « ${toDel.name} » ?` : ''}
+        onConfirm={() => toDel && deleteMut.mutate(toDel.id)}
+        onClose={() => setToDel(null)}
+      />
     </SectionCard>
   );
 }

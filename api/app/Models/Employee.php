@@ -23,6 +23,10 @@ class Employee extends Model
         // Congés
         'nbre_jour_conge', 'nbre_jour_restant', 'date_dernier_calcul_conge',
         'anciennete_recrutement', 'nombre_enfants_charge', 'a_medaille_travail',
+        // Carrière
+        'categorie_emploi', 'echelon', 'date_entree_echelon',
+        // Paie
+        'payroll_template_id', 'indice_id', 'part_trimf', 'part_ir',
     ];
 
     protected function casts(): array
@@ -35,6 +39,9 @@ class Employee extends Model
             'base_salary'                 => 'decimal:2',
             'nbre_jour_restant'           => 'decimal:1',
             'a_medaille_travail'          => 'boolean',
+            'date_entree_echelon'         => 'date',
+            'part_trimf'                  => 'decimal:1',
+            'part_ir'                     => 'decimal:1',
         ];
     }
 
@@ -69,6 +76,16 @@ class Employee extends Model
     {
         if (!$this->photo) return null;
         return Storage::disk('public')->url($this->photo);
+    }
+
+    public function indice()
+    {
+        return $this->belongsTo(\App\Models\RecruitmentIndice::class, 'indice_id');
+    }
+
+    public function payrollTemplate()
+    {
+        return $this->belongsTo(\App\Models\PayrollTemplate::class, 'payroll_template_id');
     }
 
     public function user()
@@ -140,5 +157,31 @@ class Employee extends Model
     public function availabilities()
     {
         return $this->hasMany(Availability::class);
+    }
+
+    // ── Carrière ────────────────────────────────────────────────────────────
+    public function evaluationsAnnuelles()
+    {
+        return $this->hasMany(EvaluationAnnuelle::class);
+    }
+
+    public function avancements()
+    {
+        return $this->hasMany(Avancement::class);
+    }
+
+    public function promotions()
+    {
+        return $this->hasMany(Promotion::class);
+    }
+
+    public function pdis()
+    {
+        return $this->hasMany(PlanDeveloppementIndividuel::class);
+    }
+
+    public function mobilites()
+    {
+        return $this->hasMany(MobiliteInterne::class);
     }
 }

@@ -6,6 +6,7 @@ import {
   IconButton, Tooltip, Dialog, DialogTitle, DialogContent, DialogActions, Chip,
 } from '@mui/material';
 import { Add, Edit, Delete } from '@mui/icons-material';
+import ConfirmDialog from '../shared/ConfirmDialog';
 import { trainingsApi } from '../../api/trainings';
 import { departmentsApi } from '../../api/departments';
 import type {
@@ -279,10 +280,14 @@ export default function TrainingSettingsTab() {
 }
 
 function RowActions({ onEdit, onDelete }: { onEdit: () => void; onDelete: () => void }) {
+  const [open, setOpen] = useState(false);
   return (
-    <Stack direction="row" spacing={0.5} justifyContent="center">
-      <Tooltip title="Modifier"><IconButton size="small" onClick={onEdit} sx={{ color: ACT }}><Edit sx={{ fontSize: 16 }} /></IconButton></Tooltip>
-      <Tooltip title="Supprimer"><IconButton size="small" onClick={() => { if (confirm('Supprimer cet élément ?')) onDelete(); }} sx={{ color: '#DC2626' }}><Delete sx={{ fontSize: 16 }} /></IconButton></Tooltip>
-    </Stack>
+    <>
+      <Stack direction="row" spacing={0.5} justifyContent="center">
+        <Tooltip title="Modifier"><IconButton size="small" onClick={onEdit} sx={{ color: ACT }}><Edit sx={{ fontSize: 16 }} /></IconButton></Tooltip>
+        <Tooltip title="Supprimer"><IconButton size="small" onClick={() => setOpen(true)} sx={{ color: '#DC2626' }}><Delete sx={{ fontSize: 16 }} /></IconButton></Tooltip>
+      </Stack>
+      <ConfirmDialog open={open} message="Confirmer la suppression de cet élément ?" onConfirm={onDelete} onClose={() => setOpen(false)} />
+    </>
   );
 }

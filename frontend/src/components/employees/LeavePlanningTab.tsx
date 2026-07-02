@@ -201,13 +201,14 @@ export default function LeavePlanningTab() {
                 options={employees}
                 /* filtre sur matricule OU prénom OU nom */
                 filterOptions={(opts, { inputValue }) => {
-                  const q = inputValue.toLowerCase().trim();
-                  if (!q) return opts.slice(0, 20);
+                  const q = inputValue.trim();
+                  if (q.length < 2) return [];
+                  const ql = q.toLowerCase();
                   return opts.filter((e) =>
-                    e.employee_number.toLowerCase().includes(q) ||
-                    e.first_name.toLowerCase().includes(q) ||
-                    e.last_name.toLowerCase().includes(q) ||
-                    `${e.first_name} ${e.last_name}`.toLowerCase().includes(q)
+                    e.employee_number.toLowerCase().includes(ql) ||
+                    (e.phone_professional ?? e.phone ?? '').replace(/\s+/g, '').toLowerCase().includes(ql.replace(/\s+/g, '')) ||
+                    (e.phone_personal ?? '').replace(/\s+/g, '').toLowerCase().includes(ql.replace(/\s+/g, '')) ||
+                    e.first_name.toLowerCase().startsWith(ql)
                   );
                 }}
                 getOptionLabel={(e) =>
@@ -215,7 +216,7 @@ export default function LeavePlanningTab() {
                 }
                 value={employees.find((e) => e.id === employeeId) ?? null}
                 onChange={(_, val) => setEmployeeId(val?.id ?? '')}
-                noOptionsText="Aucun agent trouvé"
+                noOptionsText="Tapez 2 caractères (matricule, téléphone ou prénom)…"
                 renderInput={(params) => (
                   <TextField
                     {...params}

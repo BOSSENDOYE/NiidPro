@@ -14,6 +14,7 @@ import {
 } from '@mui/icons-material';
 import { evaluationApi } from '../../api/evaluations';
 import { employeesApi } from '../../api/employees';
+import AgentAutocomplete from '../common/AgentAutocomplete';
 import type {
   EvaluationPeriodeEssai,
   AppreciationEvaluation,
@@ -200,17 +201,13 @@ function CreateDialog({ open, onClose, employees }: CreateDialogProps) {
       <DialogContent sx={{ pt: 2 }}>
         {error && <Alert severity="error" sx={{ mb: 2, fontSize: 13 }}>{error}</Alert>}
         <Stack spacing={2}>
-          <FormControl fullWidth size="small">
-            <InputLabel>Agent *</InputLabel>
-            <Select label="Agent *" value={form.employee_id}
-              onChange={e => setForm(f => ({ ...f, employee_id: e.target.value as string }))}>
-              {employees.map(emp => (
-                <MenuItem key={emp.id} value={emp.id}>
-                  {emp.first_name} {emp.last_name} — {emp.employee_number}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
+          <AgentAutocomplete
+            employees={employees}
+            value={employees.find(e => e.id === Number(form.employee_id)) ?? null}
+            onChange={(emp) => setForm(f => ({ ...f, employee_id: emp ? String(emp.id) : '' }))}
+            label="Agent *"
+            required
+          />
 
           <Stack direction="row" spacing={1.5}>
             <FormControl fullWidth size="small">

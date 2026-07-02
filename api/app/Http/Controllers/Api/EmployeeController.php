@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Employee;
 use App\Models\EmployeeFamilyMember;
+use App\Services\IrppCalculatorService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
@@ -23,7 +24,7 @@ class EmployeeController extends Controller
 
     public function index(Request $request)
     {
-        $query = Employee::with(['department', 'position', 'manager', 'activeContract'])
+        $query = Employee::with(['department', 'position', 'manager', 'activeContract', 'indice.hierarchy'])
             ->when($request->search, fn($q, $s) => $q->where(fn($q) =>
                 $q->where('first_name', 'like', "%{$s}%")
                   ->orWhere('last_name', 'like', "%{$s}%")
@@ -81,7 +82,7 @@ class EmployeeController extends Controller
     public function show(Employee $employee)
     {
         return response()->json(
-            $employee->load(['department', 'position', 'manager', 'contracts', 'user', 'familyMembers'])
+            $employee->load(['department', 'position', 'manager', 'contracts', 'user', 'familyMembers', 'indice.hierarchy', 'indice.augmentations'])
         );
     }
 
@@ -108,7 +109,16 @@ class EmployeeController extends Controller
             'base_salary'        => ['nullable', 'numeric', 'min:0'],
             'annual_leave_days'  => ['nullable', 'integer', 'min:0'],
             'status'             => ['nullable', 'in:active,inactive,on_leave,terminated'],
-            'manager_id'         => ['nullable', 'exists:employees,id'],
+            'manager_id'              => ['nullable', 'exists:employees,id'],
+            // Carrière
+            'categorie_emploi'        => ['nullable', 'string', 'max:100'],
+            'echelon'                 => ['nullable', 'string', 'max:100'],
+            'date_entree_echelon'     => ['nullable', 'date'],
+            // Paie
+            'payroll_template_id'     => ['nullable', 'exists:payroll_templates,id'],
+            'indice_id'               => ['nullable', 'exists:recruitment_indices,id'],
+            'part_trimf'              => ['nullable', 'numeric', 'min:1', 'max:5'],
+            'part_ir'                 => ['nullable', 'numeric', 'min:1', 'max:5'],
         ] + $this->familyRules());
 
         $family = $data['family_members'] ?? null;
@@ -120,7 +130,7 @@ class EmployeeController extends Controller
             $this->syncFamilyMembers($employee, $family);
         }
 
-        return response()->json($employee->fresh()->load(['department', 'position', 'familyMembers']));
+        return response()->json($employee->fresh()->load(['department', 'position', 'familyMembers', 'indice.hierarchy']));
     }
 
     /** Règles de validation des membres de la famille (onglet Conjoints/Enfants) */
@@ -263,6 +273,87 @@ class EmployeeController extends Controller
             'created' => $created,
             'skipped' => $skipped,
             'message' => "$created agent(s) importé(s) avec succès.",
+        ]);
+    }
+
+    // ── Paie : données de paie de l'agent ────────────────────────────────────
+    public function payeData(Employee $employee)
+    {
+        $employee->load(['indice.augmentations', 'payrollTemplate']);
+        $indice = $employee->indice;
+
+        return response()->json([
+            'employee_id'         => $employee->id,
+            'matricule'           => $employee->employee_number,
+            'nom_complet'         => $employee->full_name,
+            'salaire_base'        => (int) ($employee->base_salary ?? 0),
+            'sursalaire'          => 0,
+            'payroll_template_id' => $employee->payroll_template_id,
+            'modele_libelle'      => $employee->payrollTemplate?->name,
+            'Part_TRIMF'          => $employee->part_trimf ? (float) $employee->part_trimf : 0,
+            'Part_IR'             => $employee->part_ir   ? (float) $employee->part_ir   : 0,
+            'Part_Sociale'        => 0,
+            'categorie_agent'     => $employee->categorie_emploi ?? null,
+            'Prime_de_sujection'  => 0,
+            'rapel_avancement'    => 0,
+            'indice_code'         => $indice
+                ? ($indice->garde ? "{$indice->garde} — {$indice->code}" : $indice->code)
+                : null,
+            'mld_solde'           => $indice ? (int) ($indice->solde_mensuelle ?? 0) : 0,
+        ]);
+    }
+
+    // ── Paie : calcul IRPP / TRIMF ───────────────────────────────────────────
+    public function calculIrpp(Request $request, Employee $employee): \Illuminate\Http\JsonResponse
+    {
+        $request->validate([
+            'sal_brut_social'    => ['required', 'integer', 'min:0'],
+            'indem_risque_sante' => ['required', 'integer', 'min:0'],
+            'transport'          => ['required', 'integer', 'min:0'],
+        ]);
+
+        $result = app(IrppCalculatorService::class)->calculate(
+            partIr:           (float) ($employee->part_ir    ?? 1),
+            salBrutSocial:    $request->integer('sal_brut_social'),
+            indemRisqueSante: $request->integer('indem_risque_sante'),
+            transport:        $request->integer('transport'),
+            partTrimf:        (float) ($employee->part_trimf ?? 1),
+        );
+
+        return response()->json($result);
+    }
+
+    // ── Paie : heures supplémentaires du mois ────────────────────────────────
+    public function heuresSup(Request $request, Employee $employee)
+    {
+        $mois  = (int) $request->input('mois',  now()->month);
+        $annee = (int) $request->input('annee', now()->year);
+
+        $minutes = \App\Models\Attendance::where('employee_id', $employee->id)
+            ->whereYear('date',  $annee)
+            ->whereMonth('date', $mois)
+            ->sum('overtime_minutes');
+
+        return response()->json([
+            'nbr_heure_sup'     => round($minutes / 60, 2),
+            'montant_heure_sup' => 0,
+        ]);
+    }
+
+    // ── Paie : heures de coupure du mois ────────────────────────────────────
+    public function heuresCoupure(Request $request, Employee $employee)
+    {
+        $mois  = (int) $request->input('mois',  now()->month);
+        $annee = (int) $request->input('annee', now()->year);
+
+        $joursAbsents = \App\Models\Attendance::where('employee_id', $employee->id)
+            ->whereYear('date',  $annee)
+            ->whereMonth('date', $mois)
+            ->whereIn('status', ['absent'])
+            ->count();
+
+        return response()->json([
+            'nbr_heure_coupure' => $joursAbsents * 8,
         ]);
     }
 

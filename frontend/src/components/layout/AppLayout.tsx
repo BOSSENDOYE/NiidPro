@@ -13,6 +13,7 @@ import {
   CameraAlt, BeachAccess, AssignmentLate, AccountTree, CheckBox,
   Payments, BarChart, Hub, PhoneAndroid, KeyboardArrowDown,
   Article, QrCodeScanner, Archive, School, PersonSearch, EventNote,
+  WorkspacePremium,
 } from '@mui/icons-material';
 import { useAuthStore } from '../../store/auth.store';
 import { authApi } from '../../api/auth';
@@ -51,7 +52,8 @@ const NAV: NavSection[] = [
       { path: '/recruitment',        label: 'Recrutements',      icon: <PersonSearch />,  color: '#0EA5E9' },
       { path: '/plan-recrutement',   label: 'Plan de recrutement', icon: <EventNote />,     color: '#6366F1' },
       { path: '/plan-formation',     label: 'Plan de formation',   icon: <School />,        color: '#10B981' },
-      { path: '/evaluations',        label: 'Évaluation essai',    icon: <AssignmentLate />, color: '#F59E0B' },
+      { path: '/evaluations',        label: 'Évaluation essai',    icon: <AssignmentLate />,   color: '#F59E0B' },
+      { path: '/carrieres',          label: 'Carrières',            icon: <WorkspacePremium />, color: '#7C3AED' },
       { path: '/justifications',label: 'Justifications',    icon: <AssignmentLate />, color: '#F87171' },
     ],
   },
@@ -108,6 +110,7 @@ const PAGE_LABELS: Record<string, string> = {
   '/plan-recrutement':     'Plan de Recrutement',
   '/plan-formation':       'Plan de Formation',
   '/evaluations':          'Évaluation Période d\'Essai',
+  '/carrieres':            'Gestion des Carrières',
   '/justifications':    'Justifications',
   '/organigramme':      'Organigramme',
   '/departments':       'Directions',

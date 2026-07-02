@@ -4,7 +4,7 @@ import {
   Box, Typography, Chip, Avatar, IconButton, Tooltip, Button,
   TextField, InputAdornment, MenuItem, Select, FormControl,
   Dialog, DialogTitle, DialogContent, DialogActions,
-  LinearProgress, Collapse,
+  LinearProgress, Collapse, TablePagination,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
   Skeleton, Stack,
 } from '@mui/material';
@@ -139,6 +139,8 @@ export default function ContractsPage() {
   const [typeFilter,   setTypeFilter]   = useState('all');
   const [statusFilter, setStatusFilter] = useState('active');
   const [alertOpen,    setAlertOpen]    = useState(true);
+  const [page,         setPage]         = useState(0);
+  const [rowsPerPage,  setRowsPerPage]  = useState(10);
   const [dialogOpen,   setDialogOpen]   = useState(false);
   const [editTarget,   setEditTarget]   = useState<Contract | null>(null);
   const [form,         setForm]         = useState<ContractForm>(EMPTY_FORM);
@@ -350,14 +352,14 @@ export default function ContractsPage() {
           placeholder="Rechercher un agent, un type…"
           size="small"
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={(e) => { setSearch(e.target.value); setPage(0); }}
           sx={{ flexGrow: 1, maxWidth: 320 }}
           InputProps={{
             startAdornment: <InputAdornment position="start"><Search sx={{ fontSize: 17, color: '#94A3B8' }} /></InputAdornment>,
           }}
         />
         <FormControl size="small" sx={{ minWidth: 130 }}>
-          <Select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}
+          <Select value={typeFilter} onChange={(e) => { setTypeFilter(e.target.value); setPage(0); }}
             displayEmpty renderValue={(v) => v === 'all' ? 'Tous les types' : TYPE_CONFIG[v]?.label ?? v}
             sx={{ fontSize: 13 }}>
             <MenuItem value="all">Tous les types</MenuItem>
@@ -365,7 +367,7 @@ export default function ContractsPage() {
           </Select>
         </FormControl>
         <FormControl size="small" sx={{ minWidth: 120 }}>
-          <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} sx={{ fontSize: 13 }}>
+          <Select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setPage(0); }} sx={{ fontSize: 13 }}>
             <MenuItem value="all">Tous statuts</MenuItem>
             <MenuItem value="active">Actifs</MenuItem>
             <MenuItem value="inactive">Inactifs</MenuItem>
@@ -406,7 +408,7 @@ export default function ContractsPage() {
                       </TableCell>
                     </TableRow>
                   )
-                  : filtered.map((c) => {
+                  : filtered.slice(page * rowsPerPage, (page + 1) * rowsPerPage).map((c) => {
                     const days    = daysLeft(c.end_date);
                     const prog    = contractDuration(c.start_date, c.end_date);
                     const isExpi  = expiring.some((e) => e.id === c.id);
@@ -543,6 +545,22 @@ export default function ContractsPage() {
             </TableBody>
           </Table>
         </TableContainer>
+        <TablePagination
+          component="div"
+          count={filtered.length}
+          page={page}
+          rowsPerPage={rowsPerPage}
+          onPageChange={(_, p) => setPage(p)}
+          onRowsPerPageChange={(e) => { setRowsPerPage(parseInt(e.target.value, 10)); setPage(0); }}
+          rowsPerPageOptions={[5, 10, 25, 50]}
+          labelRowsPerPage="Lignes :"
+          labelDisplayedRows={({ from, to, count }) => `${from}–${to} sur ${count}`}
+          sx={{
+            borderTop: '1px solid #E2E8F0',
+            '& .MuiTablePagination-toolbar': { fontSize: 12 },
+            '& .MuiTablePagination-selectLabel, & .MuiTablePagination-displayedRows': { fontSize: 12 },
+          }}
+        />
       </Box>
 
       {/* ── PDF Viewer ── */}

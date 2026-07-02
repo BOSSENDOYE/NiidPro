@@ -19,7 +19,9 @@ import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { employeesApi } from '../../api/employees';
 import { departmentsApi } from '../../api/departments';
-import type { Employee } from '../../types';
+import { getPayrollTemplates, type PayrollTemplate } from '../../api/payrollTemplates';
+import { recruitmentApi } from '../../api/recruitment';
+import type { Employee, RecruitmentIndice } from '../../types';
 
 /* ─── Types ─── */
 interface TableRow { id: string; [col: string]: string }
@@ -43,6 +45,10 @@ const schema = z.object({
   city:               z.string().optional(),
   country:            z.string().optional(),
   birth_place:        z.string().optional(),
+  payroll_template_id: z.number().nullable().optional(),
+  indice_id:           z.number().nullable().optional(),
+  part_trimf:          z.number().nullable().optional(),
+  part_ir:             z.number().nullable().optional(),
 });
 type FormData = z.infer<typeof schema>;
 
@@ -260,6 +266,10 @@ function empToForm(e: Employee): FormData {
     city:               e.city           ?? '',
     country:            e.country        ?? '',
     birth_place:        e.birth_place    ?? '',
+    payroll_template_id: e.payroll_template_id ?? null,
+    indice_id:           e.indice_id ?? null,
+    part_trimf:          e.part_trimf   ? Number(e.part_trimf)   : null,
+    part_ir:             e.part_ir      ? Number(e.part_ir)      : null,
   };
 }
 
@@ -297,6 +307,25 @@ export default function EmployeeCreateModal({ open, onClose, mode = 'create', em
     }),
   });
 
+  const { data: payrollTemplates = [] } = useQuery({
+    queryKey: ['payroll-templates'],
+    queryFn: getPayrollTemplates,
+  });
+
+  /* ── Indices (Grade) ── */
+  const [selectedIndice, setSelectedIndice] = useState<RecruitmentIndice | null>(
+    employee?.indice ?? null
+  );
+
+  const { data: indices = [] } = useQuery<RecruitmentIndice[]>({
+    queryKey: ['payroll', 'params', 'indices'],
+    queryFn: () => recruitmentApi.getIndices().then(r => r.data),
+  });
+
+  /* Valeurs calculées automatiquement depuis l'indice sélectionné */
+  const complement20 = selectedIndice?.solde_mensuelle ? Math.round(selectedIndice.solde_mensuelle * 0.20) : 0;
+  const indemnite14  = selectedIndice?.solde_mensuelle ? Math.round(selectedIndice.solde_mensuelle * 0.14) : 0;
+
   /* ── Formulaire ── */
   /*
    * `values` (option react-hook-form ≥ v7.28) synchronise les valeurs à chaque rendu.
@@ -309,9 +338,10 @@ export default function EmployeeCreateModal({ open, onClose, mode = 'create', em
     : { status: 'active', annual_leave_days: 30, base_salary: 0, department_id: 0,
         first_name: '', last_name: '', professional_email: '', phone: '',
         hire_date: '', birth_date: '', nationality: '', gender: '',
-        employee_number: '', city: '', country: '', birth_place: '' };
+        employee_number: '', city: '', country: '', birth_place: '',
+        payroll_template_id: null, part_trimf: null, part_ir: null };
 
-  const { register, handleSubmit, control, watch, reset, formState: { errors } } = useForm<FormData>({
+  const { register, handleSubmit, control, watch, reset, setValue, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema),
     values: formValues,
     mode: 'onSubmit',
@@ -934,36 +964,197 @@ export default function EmployeeCreateModal({ open, onClose, mode = 'create', em
                       <Grid item xs={12} sm={4}><Typography variant="caption" sx={labelSx}>Mode de paiement</Typography>
                         <SF select disabled={isView}>{['Virement','Espèces','Chèque'].map(m => <MenuItem key={m} value={m}>{m}</MenuItem>)}</SF>
                       </Grid>
-                      <Grid item xs={6} sm={3}><Typography variant="caption" sx={labelSx}>Type modèle de paie</Typography><SF select disabled={isView}><MenuItem value="">—</MenuItem></SF></Grid>
-                      <Grid item xs={6} sm={2}><Typography variant="caption" sx={labelSx}>Part TRIMF</Typography><SF select disabled={isView}><MenuItem value="">—</MenuItem></SF></Grid>
-                      <Grid item xs={6} sm={2}><Typography variant="caption" sx={labelSx}>Part IR</Typography><SF select disabled={isView}><MenuItem value="">—</MenuItem></SF></Grid>
+                      <Grid item xs={6} sm={3}>
+                        <Typography variant="caption" sx={labelSx}>Modèle de bulletin de paie</Typography>
+                        <Controller name="payroll_template_id" control={control} render={({ field }) => (
+                          <FormControl size="small" fullWidth sx={inputSx}>
+                            <Select
+                              value={field.value ?? ''}
+                              onChange={e => field.onChange(e.target.value === '' ? null : Number(e.target.value))}
+                              displayEmpty
+                              disabled={isView}
+                            >
+                              <MenuItem value=""><em style={{ color: '#94A3B8', fontStyle: 'normal', fontSize: 13 }}>— Non affecté —</em></MenuItem>
+                              {(payrollTemplates as PayrollTemplate[]).filter(t => t.is_active).map(t => (
+                                <MenuItem key={t.id} value={t.id} sx={{ fontSize: 13 }}>{t.name}</MenuItem>
+                              ))}
+                            </Select>
+                          </FormControl>
+                        )} />
+                      </Grid>
+                      <Grid item xs={6} sm={2}>
+                        <Typography variant="caption" sx={labelSx}>Part TRIMF</Typography>
+                        <Controller name="part_trimf" control={control} render={({ field }) => (
+                          <SF select disabled={isView} value={field.value ?? ''} onChange={e => field.onChange(e.target.value === '' ? null : Number(e.target.value))}>
+                            <MenuItem value="">—</MenuItem>
+                            {Array.from({ length: 9 }, (_, i) => 1 + i * 0.5).map(v => <MenuItem key={v} value={v} sx={{ fontSize: 13 }}>{v}</MenuItem>)}
+                          </SF>
+                        )} />
+                      </Grid>
+                      <Grid item xs={6} sm={2}>
+                        <Typography variant="caption" sx={labelSx}>Part IR</Typography>
+                        <Controller name="part_ir" control={control} render={({ field }) => (
+                          <SF select disabled={isView} value={field.value ?? ''} onChange={e => field.onChange(e.target.value === '' ? null : Number(e.target.value))}>
+                            <MenuItem value="">—</MenuItem>
+                            {Array.from({ length: 9 }, (_, i) => 1 + i * 0.5).map(v => <MenuItem key={v} value={v} sx={{ fontSize: 13 }}>{v}</MenuItem>)}
+                          </SF>
+                        )} />
+                      </Grid>
                       <Grid item xs={6} sm={1}><FormControlLabel control={<Checkbox size="small" disabled={isView} />} label={<Typography sx={{ fontSize: 11, fontWeight: 700 }}>Médecin</Typography>} sx={{ m: 0, mt: 1.5 }} /></Grid>
                     </Grid>
                   </Grid>
                   <Grid item xs={12}><Divider /></Grid>
                   <Grid item xs={12} md={6}>
-                    <SectionBox title="Indice d'agent" color="#9333EA" icon={<BarChart />}>
+                    <SectionBox title="Grade / Indice" color="#9333EA" icon={<BarChart />}>
                       <Grid container spacing={1.25}>
-                        <Grid item xs={12} sm={6}><Typography variant="caption" sx={labelSx}>Indice d'agent</Typography><SF select disabled={isView}><MenuItem value="">—</MenuItem></SF></Grid>
-                        <Grid item xs={6} sm={3}><Typography variant="caption" sx={labelSx}>Hiérarchie</Typography><SF disabled sx={{ bgcolor: '#F1F5F9' }} /></Grid>
-                        <Grid item xs={6} sm={3}><Typography variant="caption" sx={labelSx}>Indemnité sujétion</Typography><SF type="number" defaultValue={0} disabled={isView} /></Grid>
-                        <Grid item xs={4}><Typography variant="caption" sx={labelSx}>Classe</Typography><SF disabled defaultValue={0} sx={{ bgcolor: '#F1F5F9' }} /></Grid>
-                        <Grid item xs={4}><Typography variant="caption" sx={labelSx}>Échelon</Typography><SF disabled defaultValue={0} sx={{ bgcolor: '#F1F5F9' }} /></Grid>
-                        <Grid item xs={4}><Typography variant="caption" sx={labelSx}>Grade</Typography><SF disabled defaultValue={0} sx={{ bgcolor: '#F1F5F9' }} /></Grid>
-                        <Grid item xs={4}><Typography variant="caption" sx={labelSx}>Valeur indice</Typography><SF type="number" disabled defaultValue={0} sx={{ bgcolor: '#F1F5F9' }} /></Grid>
-                        <Grid item xs={4}><Typography variant="caption" sx={labelSx}>Indice</Typography><SF type="number" disabled defaultValue={0} sx={{ bgcolor: '#F1F5F9' }} /></Grid>
-                        <Grid item xs={4}><Typography variant="caption" sx={labelSx}>Rappel avancement</Typography><SF type="number" defaultValue={0} disabled={isView} /></Grid>
+
+                        {/* ── Grade (sélecteur principal) ── */}
+                        <Grid item xs={12} sm={8}>
+                          <Typography variant="caption" sx={labelSx}>Grade</Typography>
+                          <FormControl size="small" fullWidth sx={inputSx}>
+                            <Select
+                              value={selectedIndice?.id ?? ''}
+                              onChange={e => {
+                                const id = e.target.value === '' ? null : Number(e.target.value);
+                                const found = id ? ((indices as RecruitmentIndice[]).find(i => i.id === id) ?? null) : null;
+                                setSelectedIndice(found);
+                                setValue('indice_id', id);
+                              }}
+                              displayEmpty
+                              disabled={isView}
+                            >
+                              <MenuItem value=""><em style={{ color: '#94A3B8', fontStyle: 'normal', fontSize: 13 }}>— Sélectionner un grade —</em></MenuItem>
+                              {(indices as RecruitmentIndice[]).filter(i => i.is_active).map(i => (
+                                <MenuItem key={i.id} value={i.id} sx={{ fontSize: 13 }}>
+                                  {i.garde ? `${i.garde} — ${i.code}` : i.code}
+                                </MenuItem>
+                              ))}
+                            </Select>
+                          </FormControl>
+                        </Grid>
+
+                        {/* Indemnité sujétion (saisie libre) */}
+                        <Grid item xs={12} sm={4}>
+                          <Typography variant="caption" sx={labelSx}>Indemnité sujétion</Typography>
+                          <SF type="number" defaultValue={0} disabled={isView} />
+                        </Grid>
+
+                        {/* Hiérarchie (auto) */}
+                        <Grid item xs={6} sm={4}>
+                          <Typography variant="caption" sx={labelSx}>Hiérarchie</Typography>
+                          <SF
+                            value={selectedIndice?.hierarchy?.libelle ?? ''}
+                            disabled
+                            sx={{ bgcolor: '#F1F5F9' }}
+                            InputProps={{ readOnly: true }}
+                          />
+                        </Grid>
+
+                        {/* Classe (auto) */}
+                        <Grid item xs={6} sm={4}>
+                          <Typography variant="caption" sx={labelSx}>Classe</Typography>
+                          <SF
+                            value={selectedIndice?.classe ?? ''}
+                            disabled
+                            sx={{ bgcolor: '#F1F5F9' }}
+                            InputProps={{ readOnly: true }}
+                          />
+                        </Grid>
+
+                        {/* Échelon (auto) */}
+                        <Grid item xs={6} sm={4}>
+                          <Typography variant="caption" sx={labelSx}>Échelon</Typography>
+                          <SF
+                            value={selectedIndice?.echelon_label ?? ''}
+                            disabled
+                            sx={{ bgcolor: '#F1F5F9' }}
+                            InputProps={{ readOnly: true }}
+                          />
+                        </Grid>
+
+                        {/* Valeur indiciaire (auto) */}
+                        <Grid item xs={6} sm={4}>
+                          <Typography variant="caption" sx={labelSx}>Valeur indiciaire</Typography>
+                          <SF
+                            type="number"
+                            value={selectedIndice?.valeur ?? 0}
+                            disabled
+                            sx={{ bgcolor: '#F1F5F9' }}
+                            InputProps={{ readOnly: true }}
+                          />
+                        </Grid>
+
+                        {/* Indice code (auto) */}
+                        <Grid item xs={6} sm={4}>
+                          <Typography variant="caption" sx={labelSx}>Code indice</Typography>
+                          <SF
+                            value={selectedIndice?.code ?? ''}
+                            disabled
+                            sx={{ bgcolor: '#F1F5F9', '& input': { fontFamily: 'monospace', fontWeight: 700 } }}
+                            InputProps={{ readOnly: true }}
+                          />
+                        </Grid>
+
+                        {/* Rappel avancement (saisie libre) */}
+                        <Grid item xs={6} sm={4}>
+                          <Typography variant="caption" sx={labelSx}>Rappel avancement</Typography>
+                          <SF type="number" defaultValue={0} disabled={isView} />
+                        </Grid>
+
                       </Grid>
                     </SectionBox>
                   </Grid>
                   <Grid item xs={12} md={6}>
                     <SectionBox title="Information du paiement" color="#D97706" icon={<AccountBalance />}>
                       <Grid container spacing={1.25}>
-                        <Grid item xs={6}><Typography variant="caption" sx={labelSx}>Complément spécial 20%</Typography><SF type="number" disabled defaultValue={0} sx={{ bgcolor: '#FFFBEB' }} /></Grid>
-                        <Grid item xs={6}><Typography variant="caption" sx={labelSx}>Indemnité résidence 14%</Typography><SF type="number" disabled defaultValue={0} sx={{ bgcolor: '#FFFBEB' }} /></Grid>
-                        <Grid item xs={6}><Typography variant="caption" sx={labelSx}>Hiérarchie</Typography><SF disabled sx={{ bgcolor: '#F1F5F9' }} /></Grid>
-                        <Grid item xs={6}><Typography variant="caption" sx={labelSx}>Indice code</Typography><SF disabled defaultValue={0} sx={{ bgcolor: '#F1F5F9' }} /></Grid>
-                        <Grid item xs={12}><Typography variant="caption" sx={labelSx}>Solde mensuelle indiciaire assimilés</Typography><SF type="number" disabled defaultValue={0} sx={{ bgcolor: '#FFFBEB', '& input': { fontWeight: 700 } }} /></Grid>
+                        <Grid item xs={6}>
+                          <Typography variant="caption" sx={labelSx}>Complément spécial 20%</Typography>
+                          <SF
+                            type="number"
+                            value={complement20}
+                            disabled
+                            sx={{ bgcolor: '#FFFBEB' }}
+                            InputProps={{ readOnly: true }}
+                          />
+                        </Grid>
+                        <Grid item xs={6}>
+                          <Typography variant="caption" sx={labelSx}>Indemnité résidence 14%</Typography>
+                          <SF
+                            type="number"
+                            value={indemnite14}
+                            disabled
+                            sx={{ bgcolor: '#FFFBEB' }}
+                            InputProps={{ readOnly: true }}
+                          />
+                        </Grid>
+                        <Grid item xs={6}>
+                          <Typography variant="caption" sx={labelSx}>Hiérarchie</Typography>
+                          <SF
+                            value={selectedIndice?.hierarchy?.libelle ?? ''}
+                            disabled
+                            sx={{ bgcolor: '#F1F5F9' }}
+                            InputProps={{ readOnly: true }}
+                          />
+                        </Grid>
+                        <Grid item xs={6}>
+                          <Typography variant="caption" sx={labelSx}>Code indice</Typography>
+                          <SF
+                            value={selectedIndice?.code ?? ''}
+                            disabled
+                            sx={{ bgcolor: '#F1F5F9', '& input': { fontFamily: 'monospace' } }}
+                            InputProps={{ readOnly: true }}
+                          />
+                        </Grid>
+                        <Grid item xs={12}>
+                          <Typography variant="caption" sx={labelSx}>Solde mensuelle indiciaire</Typography>
+                          <SF
+                            type="number"
+                            value={selectedIndice?.solde_mensuelle ?? 0}
+                            disabled
+                            sx={{ bgcolor: '#FFFBEB', '& input': { fontWeight: 700 } }}
+                            InputProps={{ readOnly: true }}
+                          />
+                        </Grid>
                       </Grid>
                     </SectionBox>
                     <SectionBox title="Partie médecin" color="#0891B2" icon={<HealthAndSafety />}>

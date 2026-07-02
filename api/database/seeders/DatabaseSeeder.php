@@ -15,41 +15,56 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
         // ── Roles & Permissions ─────────────────────────────────────────────
-        $permissions = [
-            'view employees', 'create employees', 'edit employees', 'delete employees',
-            'view contracts', 'create contracts', 'edit contracts',
-            'view attendances', 'manage attendances',
-            'view leaves', 'create leaves', 'approve leaves',
-            'view payslips', 'manage payslips',
-            'view dashboard', 'view reports',
-            'manage users', 'manage settings',
-        ];
-
-        foreach ($permissions as $perm) {
-            Permission::firstOrCreate(['name' => $perm]);
+        // Synchronise toutes les permissions depuis config/permissions.php
+        $catalog = config('permissions');
+        foreach ($catalog as $module) {
+            foreach (array_keys($module['perms']) as $permName) {
+                Permission::firstOrCreate(['name' => $permName, 'guard_name' => 'web']);
+            }
         }
 
-        $superAdmin = Role::firstOrCreate(['name' => 'super_admin']);
-        $adminRh    = Role::firstOrCreate(['name' => 'admin_rh']);
-        $manager    = Role::firstOrCreate(['name' => 'manager']);
-        $employe    = Role::firstOrCreate(['name' => 'employe']);
+        $superAdmin = Role::firstOrCreate(['name' => 'super_admin', 'guard_name' => 'web']);
+        $adminRh    = Role::firstOrCreate(['name' => 'admin_rh',    'guard_name' => 'web']);
+        $manager    = Role::firstOrCreate(['name' => 'manager',     'guard_name' => 'web']);
+        $employe    = Role::firstOrCreate(['name' => 'employe',     'guard_name' => 'web']);
 
         $adminRh->syncPermissions([
-            'view employees', 'create employees', 'edit employees', 'delete employees',
-            'view contracts', 'create contracts', 'edit contracts',
-            'view attendances', 'manage attendances',
-            'view leaves', 'create leaves', 'approve leaves',
-            'view payslips', 'manage payslips',
-            'view dashboard', 'view reports',
+            'dashboard.voir',
+            'employes.voir', 'employes.creer', 'employes.modifier', 'employes.supprimer',
+            'contrats.voir', 'contrats.creer', 'contrats.modifier',
+            'pointage.voir', 'pointage.gerer',
+            'conges.voir', 'conges.approuver',
+            'bulletins.voir', 'bulletins.gerer',
+            'sanctions.voir', 'sanctions.gerer',
+            'taches.voir', 'taches.gerer',
+            'documents.voir', 'documents.gerer',
+            'formations.voir', 'formations.creer', 'formations.approuver', 'formations.gerer',
+            'plan_formation.voir', 'plan_formation.gerer',
+            'recrutement.voir', 'recrutement.creer', 'recrutement.approuver', 'recrutement.gerer',
+            'plan_recrutement.voir', 'plan_recrutement.gerer',
+            'evaluations.voir', 'evaluations.creer', 'evaluations.gerer',
+            'carrieres.voir', 'carrieres.evaluer', 'carrieres.avancement', 'carrieres.promotion', 'carrieres.pdi', 'carrieres.mobilite',
+            'rapports.voir',
         ]);
 
         $manager->syncPermissions([
-            'view employees', 'view attendances', 'manage attendances',
-            'view leaves', 'approve leaves', 'view dashboard',
+            'dashboard.voir',
+            'employes.voir',
+            'pointage.voir', 'pointage.gerer',
+            'conges.voir', 'conges.approuver',
+            'taches.voir', 'taches.gerer',
+            'formations.voir',
+            'recrutement.voir',
+            'evaluations.voir',
+            'carrieres.voir', 'carrieres.evaluer',
         ]);
 
         $employe->syncPermissions([
-            'view leaves', 'create leaves', 'view payslips',
+            'conges.voir', 'conges.creer',
+            'bulletins.voir',
+            'taches.voir',
+            'documents.voir',
+            'formations.voir', 'formations.creer',
         ]);
 
         // ── Users ───────────────────────────────────────────────────────────
@@ -271,6 +286,12 @@ class DatabaseSeeder extends Seeder
 
         // ── Module Évaluation Période d'Essai ────────────────────────────────
         $this->call(EvaluationSeeder::class);
+
+        // ── Hiérarchies / Classes / Échelons ────────────────────────────────────
+        $this->call(HierarchieClasseEchelonSeeder::class);
+
+        // ── Module Gestion des Carrières ──────────────────────────────────────
+        $this->call(CarriereSeeder::class);
 
         $this->command->info('RH+PAIE database seeded successfully!');
         $this->command->table(

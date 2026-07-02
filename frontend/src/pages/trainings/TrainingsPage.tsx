@@ -5,7 +5,7 @@ import {
   TableRow, Typography, Skeleton, Button, TextField, MenuItem,
   Select, FormControl, InputLabel, Stack, Dialog,
   DialogTitle, DialogContent, DialogActions,
-  Chip, Tabs, Tab, Tooltip, IconButton,
+  Chip, Tabs, Tab, Tooltip, IconButton, TablePagination,
 } from '@mui/material';
 import {
   Add, Search, Clear, CheckCircle, Cancel, School,
@@ -18,6 +18,7 @@ import TrainingParticipantsTab from '../../components/trainings/TrainingParticip
 import TrainingAttendanceTab from '../../components/trainings/TrainingAttendanceTab';
 import TrainingEvaluationTab from '../../components/trainings/TrainingEvaluationTab';
 import TrainingDocumentsTab from '../../components/trainings/TrainingDocumentsTab';
+import ConfirmDialog from '../../components/shared/ConfirmDialog';
 import TrainingStatsTab from '../../components/trainings/TrainingStatsTab';
 import TrainingSettingsTab from '../../components/trainings/TrainingSettingsTab';
 import { formatDate } from '../../utils/format';
@@ -104,6 +105,9 @@ export default function TrainingsPage() {
   const { name: companyName } = useCompany();
   const [tab, setTab] = useState(0);
   const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [toDel, setToDel] = useState<number | null>(null);
+  const [page,        setPage]        = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
 
   /* recherche globale */
   const [globalSearch, setGlobalSearch] = useState('');
@@ -317,6 +321,7 @@ export default function TrainingsPage() {
     }
 
     const rows = tab === 1 ? filteredPending : filtered;
+    const paged = rows.slice(page * rowsPerPage, (page + 1) * rowsPerPage);
 
     return (
       <Box>
@@ -335,7 +340,7 @@ export default function TrainingsPage() {
             </Typography>
             <Stack direction="row" spacing={1.5} flexWrap="wrap" useFlexGap alignItems="flex-end">
               <TextField label="Titre" size="small" value={globalSearch}
-                onChange={e => setGlobalSearch(e.target.value)} sx={{ bgcolor: '#fff', width: 180 }} />
+                onChange={e => { setGlobalSearch(e.target.value); setPage(0); }} sx={{ bgcolor: '#fff', width: 180 }} />
               <TextField label="De" type="date" size="small" value={dateFrom}
                 onChange={e => setDateFrom(e.target.value)} InputLabelProps={{ shrink: true }}
                 sx={{ bgcolor: '#fff', width: 155 }} />
@@ -344,7 +349,7 @@ export default function TrainingsPage() {
                 sx={{ bgcolor: '#fff', width: 155 }} />
               <FormControl size="small" sx={{ bgcolor: '#fff', width: 150 }}>
                 <InputLabel>Statut</InputLabel>
-                <Select value={statusFilter} label="Statut" onChange={e => setStatusFilter(e.target.value)}>
+                <Select value={statusFilter} label="Statut" onChange={e => { setStatusFilter(e.target.value); setPage(0); }}>
                   <MenuItem value="">Tous</MenuItem>
                   {Object.entries(STATUS_CONFIG).map(([k, v]) => (
                     <MenuItem key={k} value={k}>{v.label}</MenuItem>
@@ -353,7 +358,7 @@ export default function TrainingsPage() {
               </FormControl>
               <FormControl size="small" sx={{ bgcolor: '#fff', width: 150 }}>
                 <InputLabel>Priorité</InputLabel>
-                <Select value={priorityFilter} label="Priorité" onChange={e => setPriorityFilter(e.target.value)}>
+                <Select value={priorityFilter} label="Priorité" onChange={e => { setPriorityFilter(e.target.value); setPage(0); }}>
                   <MenuItem value="">Tous</MenuItem>
                   {Object.entries(PRIORITY_CONFIG).map(([k, v]) => (
                     <MenuItem key={k} value={k}>{v.label}</MenuItem>
@@ -414,7 +419,7 @@ export default function TrainingsPage() {
                   </TableCell>
                 </TableRow>
               ) : (
-                rows.map((training) => (
+                paged.map((training) => (
                   <TableRow key={training.id} hover sx={{ '&:hover': { bgcolor: 'rgba(30,58,95,0.05)' } }}>
                     <TableCell sx={{ fontSize: 12, fontWeight: 600, color: '#0F172A' }}>{training.title}</TableCell>
                     <TableCell sx={{ fontSize: 11, color: '#64748B' }}>
@@ -548,9 +553,7 @@ export default function TrainingsPage() {
                               </IconButton>
                             </Tooltip>
                             <Tooltip title="Supprimer">
-                              <IconButton size="small" onClick={() => {
-                                if (confirm('Êtes-vous sûr ?')) deleteMutation.mutate(training.id);
-                              }} sx={{ color: '#DC2626' }}>
+                              <IconButton size="small" onClick={() => setToDel(training.id)} sx={{ color: '#DC2626' }}>
                                 <Delete sx={{ fontSize: 16 }} />
                               </IconButton>
                             </Tooltip>
@@ -564,6 +567,22 @@ export default function TrainingsPage() {
             </TableBody>
           </Table>
         </TableContainer>
+        <TablePagination
+          component="div"
+          count={rows.length}
+          page={page}
+          rowsPerPage={rowsPerPage}
+          onPageChange={(_, p) => setPage(p)}
+          onRowsPerPageChange={(e) => { setRowsPerPage(parseInt(e.target.value, 10)); setPage(0); }}
+          rowsPerPageOptions={[5, 10, 25, 50]}
+          labelRowsPerPage="Lignes :"
+          labelDisplayedRows={({ from, to, count }) => `${from}–${to} sur ${count}`}
+          sx={{
+            borderTop: '1px solid #CBD5E1',
+            '& .MuiTablePagination-toolbar': { fontSize: 12 },
+            '& .MuiTablePagination-selectLabel, & .MuiTablePagination-displayedRows': { fontSize: 12 },
+          }}
+        />
       </Box>
     );
   };
@@ -596,7 +615,7 @@ export default function TrainingsPage() {
       {/* ══ Onglets ══ */}
       <Box sx={{ bgcolor: '#F1F5F9', px: 2.5, pt: 2, pb: 0, display: 'flex', gap: 1, flexWrap: 'wrap', borderBottom: `2px solid ${NAV}` }}>
         {TABS.map((t, i) => (
-          <NavTab key={i} label={t.label} icon={t.icon} active={tab === i} onClick={() => setTab(i)} />
+          <NavTab key={i} label={t.label} icon={t.icon} active={tab === i} onClick={() => { setTab(i); setPage(0); }} />
         ))}
       </Box>
 
@@ -924,6 +943,13 @@ export default function TrainingsPage() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      <ConfirmDialog
+        open={toDel !== null}
+        message="Supprimer cette formation définitivement ?"
+        onConfirm={() => toDel !== null && deleteMutation.mutate(toDel)}
+        onClose={() => setToDel(null)}
+      />
     </Box>
   );
 }

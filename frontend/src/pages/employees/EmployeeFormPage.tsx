@@ -19,6 +19,7 @@ import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { employeesApi } from '../../api/employees';
 import { departmentsApi } from '../../api/departments';
+import { getPayrollTemplates, type PayrollTemplate } from '../../api/payrollTemplates';
 
 /* ─── Zod schema ─── */
 const schema = z.object({
@@ -37,9 +38,12 @@ const schema = z.object({
   status:             z.enum(['active', 'inactive', 'suspended']),
   city:               z.string().optional(),
   country:            z.string().optional(),
-  annual_leave_days:  z.number().min(0),
-  employee_number:    z.string().optional(),
-  position_id:        z.number().optional(),
+  annual_leave_days:     z.number().min(0),
+  employee_number:       z.string().optional(),
+  position_id:           z.number().optional(),
+  payroll_template_id:   z.number().nullable().optional(),
+  part_trimf:            z.number().nullable().optional(),
+  part_ir:               z.number().nullable().optional(),
 });
 type FormData = z.infer<typeof schema>;
 
@@ -225,6 +229,11 @@ export default function EmployeeFormPage() {
     }),
   });
 
+  const { data: payrollTemplates = [] } = useQuery({
+    queryKey: ['payroll-templates'],
+    queryFn: getPayrollTemplates,
+  });
+
   const { data: employee, isLoading: loadingEmp } = useQuery({
     queryKey: ['employees', id],
     queryFn: () => employeesApi.get(Number(id)).then((r) => r.data),
@@ -263,6 +272,7 @@ export default function EmployeeFormPage() {
         country: employee.country ?? '',
         annual_leave_days: employee.annual_leave_days,
         employee_number: employee.employee_number ?? '',
+        payroll_template_id: employee.payroll_template_id ?? null,
       });
       if (employee.photo_url) setPhotoUrl(employee.photo_url);
 
@@ -931,19 +941,44 @@ export default function EmployeeFormPage() {
                     </TextField>
                   </Grid>
                   <Grid item xs={6} sm={3}>
-                    <TextField label="Type de modèle de paie" select size="small" fullWidth sx={{ bgcolor: '#fff' }}>
-                      <MenuItem value="">—</MenuItem>
-                    </TextField>
+                    <Controller name="payroll_template_id" control={control} render={({ field }) => (
+                      <FormControl size="small" fullWidth>
+                        <InputLabel>Modèle de bulletin de paie</InputLabel>
+                        <Select
+                          label="Modèle de bulletin de paie"
+                          value={field.value ?? ''}
+                          onChange={e => field.onChange(e.target.value === '' ? null : Number(e.target.value))}
+                          sx={{ bgcolor: '#fff' }}
+                        >
+                          <MenuItem value=""><em style={{ color: '#94A3B8', fontStyle: 'normal' }}>— Non affecté —</em></MenuItem>
+                          {(payrollTemplates as PayrollTemplate[]).filter(t => t.is_active).map(t => (
+                            <MenuItem key={t.id} value={t.id} sx={{ fontSize: 13 }}>{t.name}</MenuItem>
+                          ))}
+                        </Select>
+                      </FormControl>
+                    )} />
                   </Grid>
                   <Grid item xs={6} sm={2}>
-                    <TextField label="Part TRIMF" select size="small" fullWidth sx={{ bgcolor: '#fff' }}>
-                      <MenuItem value="">—</MenuItem>
-                    </TextField>
+                    <Controller name="part_trimf" control={control} render={({ field }) => (
+                      <TextField label="Part TRIMF" select size="small" fullWidth sx={{ bgcolor: '#fff' }}
+                        value={field.value ?? ''} onChange={e => field.onChange(e.target.value === '' ? null : Number(e.target.value))}>
+                        <MenuItem value="">—</MenuItem>
+                        {Array.from({ length: 9 }, (_, i) => 1 + i * 0.5).map(v => (
+                          <MenuItem key={v} value={v} sx={{ fontSize: 13 }}>{v}</MenuItem>
+                        ))}
+                      </TextField>
+                    )} />
                   </Grid>
                   <Grid item xs={6} sm={2}>
-                    <TextField label="Part IR" select size="small" fullWidth sx={{ bgcolor: '#fff' }}>
-                      <MenuItem value="">—</MenuItem>
-                    </TextField>
+                    <Controller name="part_ir" control={control} render={({ field }) => (
+                      <TextField label="Part IR" select size="small" fullWidth sx={{ bgcolor: '#fff' }}
+                        value={field.value ?? ''} onChange={e => field.onChange(e.target.value === '' ? null : Number(e.target.value))}>
+                        <MenuItem value="">—</MenuItem>
+                        {Array.from({ length: 9 }, (_, i) => 1 + i * 0.5).map(v => (
+                          <MenuItem key={v} value={v} sx={{ fontSize: 13 }}>{v}</MenuItem>
+                        ))}
+                      </TextField>
+                    )} />
                   </Grid>
                   <Grid item xs={6} sm={1}>
                     <FormControlLabel control={<Checkbox size="small" />}

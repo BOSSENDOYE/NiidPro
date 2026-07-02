@@ -5,7 +5,7 @@ import {
   DialogContent, DialogActions, TextField, MenuItem, Grid, Card,
   CardContent, IconButton, Tooltip, Table, TableBody, TableCell,
   TableContainer, TableHead, TableRow, Select, FormControl,
-  InputLabel, CircularProgress, Divider, Stack, Alert,
+  InputLabel, CircularProgress, Divider, Stack, Alert, TablePagination,
 } from '@mui/material';
 import {
   Add, Check, Close, Work, People, CalendarMonth,
@@ -76,6 +76,12 @@ function StatCard({ label, value, icon, color }: { label: string; value: number;
 export default function RecruitmentsPage() {
   const qc = useQueryClient();
   const [tab, setTab] = useState(0);
+
+  const REC_RPP = 10;
+  const [reqPage,  setReqPage]  = useState(0);
+  const [postPage, setPostPage] = useState(0);
+  const [appPage,  setAppPage]  = useState(0);
+  const [ivPage,   setIvPage]   = useState(0);
 
   // �"? Dialog states �"?
   const [requestDialog, setRequestDialog]       = useState(false);
@@ -297,7 +303,7 @@ export default function RecruitmentsPage() {
       <Card elevation={0} sx={{ borderRadius: 2, border: '1px solid #E2E8F0', bgcolor: '#fff' }}>
         <Tabs
           value={tab}
-          onChange={(_, v) => setTab(v)}
+          onChange={(_, v) => { setTab(v); setReqPage(0); setPostPage(0); setAppPage(0); setIvPage(0); }}
           sx={{
             borderBottom: '1px solid #E2E8F0', px: 2,
             '& .MuiTab-root': { textTransform: 'none', fontWeight: 600, fontSize: 13, minHeight: 52 },
@@ -371,7 +377,7 @@ export default function RecruitmentsPage() {
                       </TableCell>
                     </TableRow>
                   )}
-                  {requests.map((req: RecruitmentRequest) => {
+                  {requests.slice(reqPage * REC_RPP, (reqPage + 1) * REC_RPP).map((req: RecruitmentRequest) => {
                     const s = REQUEST_STATUS_LABELS[req.status] ?? { label: req.status, color: 'default' as const };
                     return (
                       <TableRow key={req.id} hover>
@@ -408,6 +414,10 @@ export default function RecruitmentsPage() {
                   })}
                 </TableBody>
               </Table>
+              <TablePagination component="div" count={requests.length} page={reqPage} rowsPerPage={REC_RPP}
+                onPageChange={(_, p) => setReqPage(p)} rowsPerPageOptions={[REC_RPP]}
+                labelDisplayedRows={({ from, to, count }) => `${from}–${to} sur ${count}`}
+                sx={{ borderTop: '1px solid #E2E8F0', '& .MuiTablePagination-toolbar': { fontSize: 12 }, '& .MuiTablePagination-displayedRows': { fontSize: 12 } }} />
             </TableContainer>
           )}
 
@@ -435,7 +445,7 @@ export default function RecruitmentsPage() {
                       </TableCell>
                     </TableRow>
                   )}
-                  {postings.map((p: JobPosting) => {
+                  {postings.slice(postPage * REC_RPP, (postPage + 1) * REC_RPP).map((p: JobPosting) => {
                     const s = POSTING_STATUS_LABELS[p.status] ?? { label: p.status, color: 'default' as const };
                     const pubMap: Record<string, string> = { internal: 'Interne', external: 'Externe', both: 'Interne + Externe' };
                     return (
@@ -483,6 +493,10 @@ export default function RecruitmentsPage() {
                   })}
                 </TableBody>
               </Table>
+              <TablePagination component="div" count={postings.length} page={postPage} rowsPerPage={REC_RPP}
+                onPageChange={(_, p) => setPostPage(p)} rowsPerPageOptions={[REC_RPP]}
+                labelDisplayedRows={({ from, to, count }) => `${from}–${to} sur ${count}`}
+                sx={{ borderTop: '1px solid #E2E8F0', '& .MuiTablePagination-toolbar': { fontSize: 12 }, '& .MuiTablePagination-displayedRows': { fontSize: 12 } }} />
             </TableContainer>
           )}
 
@@ -511,7 +525,7 @@ export default function RecruitmentsPage() {
                       </TableCell>
                     </TableRow>
                   )}
-                  {applications.map((app: JobApplication) => {
+                  {applications.slice(appPage * REC_RPP, (appPage + 1) * REC_RPP).map((app: JobApplication) => {
                     const s = APP_STATUS_LABELS[app.status] ?? { label: app.status, color: 'default' as const };
                     return (
                       <TableRow key={app.id} hover>
@@ -546,6 +560,10 @@ export default function RecruitmentsPage() {
                   })}
                 </TableBody>
               </Table>
+              <TablePagination component="div" count={applications.length} page={appPage} rowsPerPage={REC_RPP}
+                onPageChange={(_, p) => setAppPage(p)} rowsPerPageOptions={[REC_RPP]}
+                labelDisplayedRows={({ from, to, count }) => `${from}–${to} sur ${count}`}
+                sx={{ borderTop: '1px solid #E2E8F0', '& .MuiTablePagination-toolbar': { fontSize: 12 }, '& .MuiTablePagination-displayedRows': { fontSize: 12 } }} />
             </TableContainer>
           )}
 
@@ -574,7 +592,7 @@ export default function RecruitmentsPage() {
                       </TableCell>
                     </TableRow>
                   )}
-                  {interviews.map((iv: Interview) => {
+                  {interviews.slice(ivPage * REC_RPP, (ivPage + 1) * REC_RPP).map((iv: Interview) => {
                     const typeMap: Record<string, string> = { entretien: 'Entretien', test_technique: 'Test technique', test_psychotechnique: 'Test psycho.' };
                     const resultMap: Record<string, { label: string; color: 'default' | 'success' | 'error' | 'warning' }> = {
                       pending: { label: 'En attente', color: 'default' },
@@ -620,6 +638,10 @@ export default function RecruitmentsPage() {
                   })}
                 </TableBody>
               </Table>
+              <TablePagination component="div" count={interviews.length} page={ivPage} rowsPerPage={REC_RPP}
+                onPageChange={(_, p) => setIvPage(p)} rowsPerPageOptions={[REC_RPP]}
+                labelDisplayedRows={({ from, to, count }) => `${from}–${to} sur ${count}`}
+                sx={{ borderTop: '1px solid #E2E8F0', '& .MuiTablePagination-toolbar': { fontSize: 12 }, '& .MuiTablePagination-displayedRows': { fontSize: 12 } }} />
             </TableContainer>
           )}
         </Box>

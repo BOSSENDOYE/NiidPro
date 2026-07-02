@@ -26,7 +26,7 @@ function qrPayload(emp: Employee): string {
 /* ════════════════════════════ RECTO ════════════════════════════ */
 function Recto({ emp, cardRef }: { emp: Employee; cardRef?: React.RefObject<HTMLDivElement | null> }) {
   const initials = `${emp.first_name?.[0] ?? ''}${emp.last_name?.[0] ?? ''}`.toUpperCase();
-  const { name: companyName, legalName } = useCompany();
+  const { name: companyName, legalName, logoUrl } = useCompany();
 
   return (
     <Box ref={cardRef} id="badge-recto" sx={{
@@ -62,33 +62,43 @@ function Recto({ emp, cardRef }: { emp: Employee; cardRef?: React.RefObject<HTML
           </Typography>
         </Box>
 
-        {/* Droite : Logo ANASER */}
+        {/* Droite : Logo */}
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mt: 0.25 }}>
-          <Box sx={{ textAlign: 'right' }}>
-            <Typography sx={{ fontSize: 6, color: '#555', lineHeight: 1.35 }}>
-              Sénégal<br />
-              <strong>AGENCE NATIONALE</strong><br />
-              DE SÉCURITÉ ROUTIÈRE
-            </Typography>
-          </Box>
-          {/* Icône stylisée ANASER (croix orange + texte bleu) */}
-          <Box sx={{ position: 'relative', width: 44, height: 38 }}>
-            {/* Barre diagonale orange */}
-            <Box sx={{
-              position: 'absolute', width: 3, height: 36,
-              bgcolor: '#F97316', top: 1, left: 22,
-              transform: 'rotate(-20deg)',
-              borderRadius: 1,
-            }} />
-            <Typography sx={{
-              position: 'absolute', bottom: 0, left: 0, right: 0,
-              fontSize: 14, fontWeight: 900, color: '#1D4ED8',
-              letterSpacing: '-0.5px', fontStyle: 'italic',
-              textAlign: 'center', lineHeight: 1,
-            }}>
-              {companyName}
-            </Typography>
-          </Box>
+          {logoUrl ? (
+            <Box sx={{ width: 56, height: 46, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <img
+                src={logoUrl}
+                alt={companyName}
+                style={{ maxWidth: 56, maxHeight: 46, objectFit: 'contain', display: 'block' }}
+              />
+            </Box>
+          ) : (
+            <>
+              <Box sx={{ textAlign: 'right' }}>
+                <Typography sx={{ fontSize: 6, color: '#555', lineHeight: 1.35 }}>
+                  Sénégal<br />
+                  <strong>AGENCE NATIONALE</strong><br />
+                  DE SÉCURITÉ ROUTIÈRE
+                </Typography>
+              </Box>
+              <Box sx={{ position: 'relative', width: 44, height: 38 }}>
+                <Box sx={{
+                  position: 'absolute', width: 3, height: 36,
+                  bgcolor: '#F97316', top: 1, left: 22,
+                  transform: 'rotate(-20deg)',
+                  borderRadius: 1,
+                }} />
+                <Typography sx={{
+                  position: 'absolute', bottom: 0, left: 0, right: 0,
+                  fontSize: 14, fontWeight: 900, color: '#1D4ED8',
+                  letterSpacing: '-0.5px', fontStyle: 'italic',
+                  textAlign: 'center', lineHeight: 1,
+                }}>
+                  {companyName}
+                </Typography>
+              </Box>
+            </>
+          )}
         </Box>
       </Box>
 

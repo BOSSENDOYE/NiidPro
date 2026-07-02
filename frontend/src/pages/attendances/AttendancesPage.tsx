@@ -16,6 +16,7 @@ import { useNavigate } from 'react-router-dom';
 import { attendancesApi } from '../../api/attendances';
 import { employeesApi } from '../../api/employees';
 import type { Attendance, Employee } from '../../types';
+import AgentAutocomplete from '../../components/common/AgentAutocomplete';
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 const fmtTime = (dt?: string | null) =>
@@ -100,7 +101,7 @@ function StatCard({ label, value, total, color, bg, icon }: {
 function ManualDialog({ open, onClose, employees, onSuccess }: {
   open: boolean; onClose: () => void; employees: Employee[]; onSuccess: () => void;
 }) {
-  const [empId, setEmpId]       = useState<number | ''>('');
+  const [selectedEmp, setSelectedEmp] = useState<Employee | null>(null);
   const [date,  setDate]        = useState(dayjs().format('YYYY-MM-DD'));
   const [status,setStatus]      = useState('present');
   const [checkIn, setCheckIn]   = useState('');
@@ -109,7 +110,7 @@ function ManualDialog({ open, onClose, employees, onSuccess }: {
 
   const storeMut = useMutation({
     mutationFn: () => attendancesApi.store({
-      employee_id: empId,
+      employee_id: selectedEmp?.id ?? 0,
       date,
       status,
       check_in:  checkIn  || undefined,
@@ -130,23 +131,12 @@ function ManualDialog({ open, onClose, employees, onSuccess }: {
       </DialogTitle>
       <DialogContent>
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 1 }}>
-          <FormControl size="small" fullWidth>
-            <Select value={empId} onChange={(e) => setEmpId(e.target.value as number)}
-              displayEmpty renderValue={(v) => {
-                if (!v) return <em style={{ color: '#94A3B8' }}>Choisir un agent</em>;
-                const e = employees.find((x) => x.id === v);
-                return e ? `${e.first_name} ${e.last_name}` : String(v);
-              }}>
-              {employees.map((e) => (
-                <MenuItem key={e.id} value={e.id} sx={{ gap: 1.5 }}>
-                  <EmpAvatar emp={e} />
-                  <Box><Typography sx={{ fontSize: 13, fontWeight: 600 }}>{e.first_name} {e.last_name}</Typography>
-                    <Typography sx={{ fontSize: 10.5, color: '#94A3B8' }}>{e.employee_number}</Typography>
-                  </Box>
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
+          <AgentAutocomplete
+            employees={employees}
+            value={selectedEmp}
+            onChange={(emp) => setSelectedEmp(emp)}
+            label="Choisir un agent"
+          />
 
           <Box sx={{ display: 'flex', gap: 1.5 }}>
             <TextField type="date" label="Date" size="small" fullWidth value={date}
@@ -173,7 +163,7 @@ function ManualDialog({ open, onClose, employees, onSuccess }: {
       </DialogContent>
       <DialogActions sx={{ px: 2.5, pb: 2.5, gap: 1 }}>
         <Button size="small" onClick={onClose} sx={{ borderRadius: '8px' }}>Annuler</Button>
-        <Button size="small" variant="contained" disabled={!empId || storeMut.isPending}
+        <Button size="small" variant="contained" disabled={!selectedEmp || storeMut.isPending}
           onClick={() => storeMut.mutate()} sx={{ borderRadius: '8px', px: 2 }}>
           Enregistrer
         </Button>

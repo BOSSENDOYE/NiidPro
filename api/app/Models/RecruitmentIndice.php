@@ -36,7 +36,7 @@ class RecruitmentIndice extends Model
             'recruitment_indice_augmentation',
             'indice_id',
             'augmentation_id'
-        );
+        )->withPivot('montant');
     }
 
     public function baremes(): HasMany

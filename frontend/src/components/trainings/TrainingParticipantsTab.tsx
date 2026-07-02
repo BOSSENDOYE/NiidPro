@@ -7,6 +7,7 @@ import {
   Autocomplete, IconButton, Tooltip,
 } from '@mui/material';
 import { Delete, PersonAdd } from '@mui/icons-material';
+import ConfirmDialog from '../shared/ConfirmDialog';
 import { trainingsApi } from '../../api/trainings';
 import { employeesApi } from '../../api/employees';
 import type { Training, Employee } from '../../types';
@@ -21,6 +22,7 @@ export default function TrainingParticipantsTab({ training, refreshTraining }: P
   const [addOpen, setAddOpen] = useState(false);
   const [selectedEmployees, setSelectedEmployees] = useState<Employee[]>([]);
   const [search, setSearch] = useState('');
+  const [toDel, setToDel] = useState<number | null>(null);
 
   const { data: employees = [] } = useQuery({
     queryKey: ['employees', 1, '', 'all'],
@@ -51,11 +53,15 @@ export default function TrainingParticipantsTab({ training, refreshTraining }: P
   const participants = training.participants ?? [];
 
   const filteredEmployees = employees.filter((e) => {
-    if (!search) return true;
-    const s = search.toLowerCase();
-    const name = `${e.first_name} ${e.last_name}`.toLowerCase();
-    const matricule = (e.employee_number ?? '').toLowerCase();
-    return name.includes(s) || matricule.includes(s);
+    const q = search.trim();
+    if (q.length < 2) return false;
+    const ql = q.toLowerCase();
+    const tel = ((e.phone_professional ?? e.phone ?? '') + (e.phone_personal ?? '')).replace(/\s+/g, '').toLowerCase();
+    return (
+      e.employee_number.toLowerCase().includes(ql) ||
+      tel.includes(ql.replace(/\s+/g, '')) ||
+      e.first_name.toLowerCase().startsWith(ql)
+    );
   });
 
   return (
@@ -134,11 +140,7 @@ export default function TrainingParticipantsTab({ training, refreshTraining }: P
                     <Tooltip title="Retirer">
                       <IconButton
                         size="small"
-                        onClick={() => {
-                          if (confirm('Êtes-vous sûr de vouloir retirer ce participant ?')) {
-                            removeParticipantMutation.mutate(p.employee_id);
-                          }
-                        }}
+                        onClick={() => setToDel(p.employee_id)}
                         sx={{ color: '#DC2626' }}
                       >
                         <Delete sx={{ fontSize: 16 }} />
@@ -165,7 +167,7 @@ export default function TrainingParticipantsTab({ training, refreshTraining }: P
             fullWidth
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Nom, matricule..."
+            placeholder="Matricule, téléphone ou 2 lettres du prénom…"
             sx={{ mb: 2 }}
           />
 
@@ -210,6 +212,14 @@ export default function TrainingParticipantsTab({ training, refreshTraining }: P
           </Button>
         </DialogActions>
       </Dialog>
+
+      <ConfirmDialog
+        open={toDel !== null}
+        message="Retirer ce participant de la formation ?"
+        confirmLabel="Retirer"
+        onConfirm={() => toDel !== null && removeParticipantMutation.mutate(toDel)}
+        onClose={() => setToDel(null)}
+      />
     </Box>
   );
 }

@@ -20,7 +20,7 @@ class RoleController extends Controller
             ->pluck('c', 'role_id');
     }
 
-    /** Liste des rôles avec leurs permissions + catalogue de toutes les permissions. */
+    /** Liste des rôles avec leurs permissions + catalogue groupé par module. */
     public function index()
     {
         $counts = $this->roleCounts();
@@ -35,11 +35,21 @@ class RoleController extends Controller
                 'permissions' => $r->permissions->pluck('name'),
             ]);
 
-        $permissions = Permission::orderBy('name')->pluck('name');
+        // Catalogue groupé depuis config/permissions.php
+        // Seules les permissions réellement en base sont incluses (cohérence après migrations)
+        $inDb = Permission::pluck('name')->flip();
+        $modules = collect(config('permissions'))->map(fn ($module) => [
+            'label' => $module['label'],
+            'icon'  => $module['icon'],
+            'perms' => collect($module['perms'])
+                ->filter(fn ($label, $key) => $inDb->has($key))
+                ->map(fn ($label, $key) => ['name' => $key, 'label' => $label])
+                ->values(),
+        ])->filter(fn ($m) => $m['perms']->isNotEmpty())->values();
 
         return response()->json([
-            'roles'       => $roles,
-            'permissions' => $permissions,
+            'roles'   => $roles,
+            'modules' => $modules,
         ]);
     }
 

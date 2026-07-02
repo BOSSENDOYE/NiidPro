@@ -16,7 +16,12 @@
       "Bash(\"C:\\\\Program Files\\\\MySQL\\\\MySQL Server 8.0\\\\bin\\\\mysql.exe\" -u c2793226c_bamba -p\"Senmed@2026\" -h 127.0.0.1 -P 3306 -e \"SELECT 'OK' AS status;\")",
       "Bash(tasklist /fi \"imagename eq mysqld.exe\")",
       "Bash(findstr \"3306\")",
-      "PowerShell(New-Item -ItemType File -Path \"C:\\\\Users\\\\5340\\\\OneDrive\\\\Desktop\\\\PROJET\\\\niidpro\\\\api\\\\database\\\\database.sqlite\" -Force)"
+      "PowerShell(New-Item -ItemType File -Path \"C:\\\\Users\\\\5340\\\\OneDrive\\\\Desktop\\\\PROJET\\\\niidpro\\\\api\\\\database\\\\database.sqlite\" -Force)",
+      "Bash(node -e \"require\\('react-draggable'\\); console.log\\('ok'\\)\")",
+      "Bash(Get-Content \"C:\\\\Users\\\\BAMBA\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\e--CODING-DSTCOMPUTING-Plateforme-NIIT-PRO-NiidPro\\\\ad449b5b-354b-4e10-aadd-c09646fec1be\\\\tasks\\\\bg9uxjmcl.output\" -Raw)",
+      "Bash(Get-Content \"e:\\\\CODING\\\\DSTCOMPUTING\\\\Plateforme\\\\NIIT_PRO\\\\NiidPro\\\\api\\\\storage\\\\logs\\\\laravel.log\" -Tail 40)",
+      "PowerShell($log = Get-Content \"e:\\\\CODING\\\\DSTCOMPUTING\\\\Plateforme\\\\NIIT_PRO\\\\NiidPro\\\\api\\\\storage\\\\logs\\\\laravel.log\" -Raw; $log -split '\\\\[' | Where-Object { $_ -match '500|ERROR|SQLSTATE|Data truncated' } | Select-Object -Last 3)",
+      "Bash(git add *)"
     ]
   }
 }

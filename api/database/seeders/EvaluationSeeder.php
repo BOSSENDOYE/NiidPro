@@ -7,16 +7,19 @@ use App\Models\EvaluationHistorique;
 use App\Models\EvaluationNote;
 use App\Models\EvaluationPeriodeEssai;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\Schema;
 
 class EvaluationSeeder extends Seeder
 {
     public function run(): void
     {
-        // Nettoyage (ordre inverse des FK)
+        // Nettoyage (FK désactivées le temps du truncate)
+        Schema::disableForeignKeyConstraints();
         EvaluationHistorique::truncate();
         EvaluationNote::truncate();
         EvaluationPeriodeEssai::truncate();
         EvaluationCritere::truncate();
+        Schema::enableForeignKeyConstraints();
 
         // ── Critères ANASER-RH-GE-2025-002 ──────────────────────────────────
         // Poids global = poids_section × poids_groupe

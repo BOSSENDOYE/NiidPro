@@ -45,6 +45,9 @@ import PlanFormationPage from './pages/planFormation/PlanFormationPage';
 // Évaluations période d'essai
 import EvaluationsPage from './pages/evaluations/EvaluationsPage';
 
+// Carrières
+import CarrieresPage from './pages/carrieres/CarrieresPage';
+
 // Justifications
 import JustificationsPage from './pages/justifications/JustificationsPage';
 
@@ -68,6 +71,7 @@ import OrganigrammePage from './pages/organigramme/OrganigrammePage';
 
 // Documents de service
 import DocumentsPage from './pages/documents/DocumentsPage';
+import DocumentStudio from './pages/documents/DocumentStudio';
 
 // Profil
 import ProfilePage from './pages/profile/ProfilePage';
@@ -157,6 +161,7 @@ export default function App() {
               <Route path="plan-recrutement" element={<PlanRecrutementPage />} />
               <Route path="plan-formation" element={<PlanFormationPage />} />
               <Route path="evaluations" element={<EvaluationsPage />} />
+              <Route path="carrieres" element={<CarrieresPage />} />
               <Route path="justifications" element={<JustificationsPage />} />
 
               {/* Organisation */}
@@ -168,6 +173,8 @@ export default function App() {
 
               {/* Documents de service */}
               <Route path="documents" element={<DocumentsPage />} />
+              <Route path="documents/studio" element={<DocumentStudio />} />
+              <Route path="documents/studio/:id" element={<DocumentStudio />} />
 
               {/* Configuration */}
               <Route path="configuration" element={<ConfigurationPage />} />

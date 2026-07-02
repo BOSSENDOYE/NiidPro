@@ -14,6 +14,7 @@ import {
   Grade, Assignment, HowToVote, Archive, Send, Edit, Print,
 } from '@mui/icons-material';
 import { evaluationApi } from '../../api/evaluations';
+import { useCompany } from '../../hooks/useCompany';
 import type {
   EvaluationCritere, EvaluationPeriodeEssai, GroupeCritere,
   AppreciationEvaluation, DecisionEvaluation, StatutEvaluation,
@@ -1304,6 +1305,7 @@ function FicheEvaluation({
   open: boolean;
   onClose: () => void;
 }) {
+  const { logoUrl, name: companyName } = useCompany();
   const notationsMap = new Map(
     (ev.notations ?? []).map(n => [n.critere_id, n])
   );
@@ -1335,6 +1337,11 @@ function FicheEvaluation({
     if (!el) return;
     const w = window.open('', '_blank', 'width=900,height=700');
     if (!w) return;
+    const logoHtml = logoUrl
+      ? `<div style="display:flex;align-items:center;justify-content:flex-end;margin-bottom:6px">
+           <img src="${logoUrl}" alt="${companyName}" style="height:64px;max-width:130px;object-fit:contain" />
+         </div>`
+      : '';
     w.document.write(`
       <html><head><title>Fiche Évaluation ANASER</title>
       <style>
@@ -1353,7 +1360,7 @@ function FicheEvaluation({
         .legend { font-size: 10px; color: #555; margin: 4px 0; }
         .note-glob { font-size: 18px; font-weight: bold; }
         @media print { body { margin: 10px; } }
-      </style></head><body>${el.innerHTML}</body></html>
+      </style></head><body>${logoHtml}${el.innerHTML}</body></html>
     `);
     w.document.close();
     w.focus();

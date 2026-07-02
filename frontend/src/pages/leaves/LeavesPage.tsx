@@ -5,7 +5,7 @@ import {
   TableRow, Typography, Skeleton, Button, TextField, MenuItem,
   Select, FormControl, InputLabel, Stack, Paper, Dialog,
   DialogTitle, DialogContent, DialogActions, Checkbox,
-  Autocomplete, Chip, Alert, CircularProgress,
+  Autocomplete, Chip, Alert, CircularProgress, TablePagination,
 } from '@mui/material';
 import { Add, Search, Clear, CheckCircle, Cancel, Print, Description } from '@mui/icons-material';
 import { leavesApi } from '../../api/leaves';
@@ -28,6 +28,8 @@ export default function LeavesPage() {
   const qc = useQueryClient();
   const [tab, setTab]         = useState(0);
   const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [page,        setPage]        = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
 
   /* recherche globale */
   const [globalSearch, setGlobalSearch] = useState('');
@@ -151,6 +153,7 @@ export default function LeavesPage() {
     if (tab === 4) return <LeaveBalanceTab />;
 
     const rows = tab === 1 ? filteredPending : filtered;
+    const paged = rows.slice(page * rowsPerPage, (page + 1) * rowsPerPage);
 
     return (
       <Box>
@@ -269,7 +272,7 @@ export default function LeavesPage() {
                         </TableCell>
                       </TableRow>
                     )
-                  : rows.map((leave, idx) => (
+                  : paged.map((leave, idx) => (
                       <TableRow
                         key={leave.id}
                         hover
@@ -336,6 +339,22 @@ export default function LeavesPage() {
               </TableBody>
             </Table>
           </TableContainer>
+          <TablePagination
+            component="div"
+            count={rows.length}
+            page={page}
+            rowsPerPage={rowsPerPage}
+            onPageChange={(_, p) => setPage(p)}
+            onRowsPerPageChange={(e) => { setRowsPerPage(parseInt(e.target.value, 10)); setPage(0); }}
+            rowsPerPageOptions={[5, 10, 25, 50]}
+            labelRowsPerPage="Lignes :"
+            labelDisplayedRows={({ from, to, count }) => `${from}–${to} sur ${count}`}
+            sx={{
+              borderTop: '1px solid #CBD5E1',
+              '& .MuiTablePagination-toolbar': { fontSize: 12 },
+              '& .MuiTablePagination-selectLabel, & .MuiTablePagination-displayedRows': { fontSize: 12 },
+            }}
+          />
         </Box>
       </Box>
     );
@@ -398,7 +417,7 @@ export default function LeavesPage() {
           return (
             <Box
               key={i}
-              onClick={() => setTab(i)}
+              onClick={() => { setTab(i); setPage(0); }}
               sx={{
                 px: 2, py: 1, cursor: 'pointer', borderRadius: '8px 8px 0 0',
                 fontWeight: 700, fontSize: 13, userSelect: 'none',

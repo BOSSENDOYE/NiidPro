@@ -175,15 +175,18 @@ function LeaveModal({ open, onClose, leave, employees, leaveTypes }: ModalProps)
                   defaultValue={defaultEmp}
                   getOptionLabel={emp => `${emp.first_name} ${emp.last_name} — ${emp.employee_number}`}
                   filterOptions={(opts, { inputValue }) => {
-                    const q = inputValue.toLowerCase();
+                    const q = inputValue.trim();
+                    if (q.length < 2) return [];
+                    const ql = q.toLowerCase();
                     return opts.filter(e =>
-                      `${e.first_name} ${e.last_name}`.toLowerCase().includes(q) ||
-                      e.employee_number.toLowerCase().includes(q) ||
-                      (e.department?.name ?? '').toLowerCase().includes(q)
+                      e.employee_number.toLowerCase().includes(ql) ||
+                      (e.phone_professional ?? e.phone ?? '').replace(/\s+/g, '').toLowerCase().includes(ql.replace(/\s+/g, '')) ||
+                      (e.phone_personal ?? '').replace(/\s+/g, '').toLowerCase().includes(ql.replace(/\s+/g, '')) ||
+                      e.first_name.toLowerCase().startsWith(ql)
                     );
                   }}
                   onChange={(_, val) => field.onChange(val ? val.id : null)}
-                  noOptionsText="Aucun agent trouvé"
+                  noOptionsText="Tapez 2 caractères (matricule, téléphone ou prénom)…"
                   renderOption={(props, emp) => {
                     const { key, ...optProps } = props as typeof props & { key: React.Key };
                     return (
