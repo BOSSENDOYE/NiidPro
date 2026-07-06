@@ -13,14 +13,38 @@ import client from '../../api/client';
 
 // ── Mapping colonnes Excel → champs internes ─────────────────────────────────
 const COLUMN_MAP: Record<string, string> = {
+  // Numéro de ligne — ignoré
+  'n°':              '_skip',
+  'no':              '_skip',
+  // Matricule
   'matr':            'employee_number',
   'matr.':           'employee_number',
   'matricule':       'employee_number',
+  // Prénom
+  'prénoms':         'first_name',
+  'prenoms':         'first_name',
   'prénom':          'first_name',
   'prenom':          'first_name',
   'prénom(s)':       'first_name',
   'prenom(s)':       'first_name',
+  // Nom
   'nom':             'last_name',
+  // Service / Département
+  'service':         'department',
+  'département':     'department',
+  'departement':     'department',
+  // Type contrat — géré séparément
+  'type contrat':    '_skip',
+  'type de contrat': '_skip',
+  // Cadre
+  'cadre':           'cadre',
+  // Sexe / Genre
+  'sexe':            'gender',
+  'genre':           'gender',
+  // OBS — ignoré
+  'obs':             '_skip',
+  'observations':    '_skip',
+  // Dates
   'date naiss':      'birth_date',
   'date naiss.':     'birth_date',
   'date naissance':  'birth_date',
@@ -30,37 +54,47 @@ const COLUMN_MAP: Record<string, string> = {
   'date emb':        'hire_date',
   'date emb.':       'hire_date',
   'date embauche':   'hire_date',
+  // Ancienneté (valeurs décimales acceptées : 3,6 → 3.6)
   'ancienneté':        'anciennete_recrutement',
   'anciennete':        'anciennete_recrutement',
   'ancienneté (ans)':  'anciennete_recrutement',
   'anciennete (ans)':  'anciennete_recrutement',
-  'âge':             '_skip',
-  'age':             '_skip',
-  'fonction':        'fonction',
+  // Catégorie
   'catégorie':       'categorie_emploi',
   'categorie':       'categorie_emploi',
-  'qualification':   'qualification',
-  'niveau rh':       'niveau_rh',
-  'cadre':           'cadre',
+  // Diplôme
+  'diplomé':         'diplome',
+  'diplômé':         'diplome',
   'diplôme':         'diplome',
   'diplome':         'diplome',
   'diplome(s)':      'diplome',
   'diplôme(s)':      'diplome',
+  // Paie
   'parts fisc':      'part_ir',
   'parts fisc.':     'part_ir',
   'parts fiscales':  'part_ir',
   'part ir':         'part_ir',
+  // Famille
+  'nb épouse(s)':    'nombre_femmes',
+  'nb épouses':      'nombre_femmes',
+  'nb epouse(s)':    'nombre_femmes',
+  'nb epouses':      'nombre_femmes',
   'femme':           'nombre_femmes',
   'femme(s)':        'nombre_femmes',
   'femmes':          'nombre_femmes',
+  'nb enfants':      'nombre_enfants_charge',
+  'nb enfant(s)':    'nombre_enfants_charge',
   'enfant':          'nombre_enfants_charge',
   'enfant(s)':       'nombre_enfants_charge',
   'enfants':         'nombre_enfants_charge',
+  // Autres
+  'fonction':        'fonction',
+  'qualification':   'qualification',
+  'niveau rh':       'niveau_rh',
   'email':           'professional_email',
-  'département':     'department',
-  'departement':     'department',
-  'genre':           'gender',
-  'sexe':            'gender',
+  // Âge — calculé, ignoré
+  'âge':             '_skip',
+  'age':             '_skip',
 };
 
 const FIELD_LABELS: Record<string, string> = {
@@ -165,12 +199,29 @@ export default function EmployeeImportPage() {
           const val = cells[idx];
           if (key === 'birth_date' || key === 'hire_date') {
             row[key] = parseDate(val);
-          } else if (key === 'part_ir' || key === 'nombre_femmes' || key === 'nombre_enfants_charge') {
-            row[key] = val !== '' && val != null ? Number(val) : null;
+          } else if (
+            key === 'part_ir' || key === 'nombre_femmes' ||
+            key === 'nombre_enfants_charge' || key === 'anciennete_recrutement'
+          ) {
+            if (val !== '' && val != null) {
+              // Gérer séparateur décimal français (virgule → point)
+              const normalized = String(val).replace(',', '.');
+              row[key] = isNaN(Number(normalized)) ? null : Number(normalized);
+            } else {
+              row[key] = null;
+            }
+          } else if (key === 'employee_number') {
+            // Ignorer "-" comme matricule (sera auto-généré)
+            const s = String(val ?? '').trim();
+            row[key] = (s && s !== '-') ? s : null;
           } else {
             row[key] = val !== '' && val != null ? String(val).trim() : null;
           }
         });
+
+        // Ignorer silencieusement les lignes d'en-tête de section
+        // (ex : "PRÉSIDENCE DU CONSEIL DE SURVEILLANCE")
+        if (!row.first_name && !row.last_name) continue;
 
         const errors = validateRow(row);
         row._errors = errors;
@@ -247,7 +298,10 @@ export default function EmployeeImportPage() {
       <Alert severity="info" sx={{ mt: 3, borderRadius: 2 }}>
         <Typography variant="body2" fontWeight={600} mb={0.5}>Colonnes reconnues automatiquement :</Typography>
         <Typography variant="body2">
-          Matr. · Prénom(s) · Nom · Date Naiss. · Lieu Naiss. · Date Emb. · Fonction · Catégorie · Qualification · Niveau RH · Parts Fisc. · Femme(s) · Enfant(s)
+          Matr · Prénoms · NOM · SERVICE · Type contrat · Cadre · Sexe · OBS · Date Naiss. · Lieu Naiss. · Date Emb. · Ancienneté (ans) · Catégorie · Diplomé · Parts Fisc. · Nb épouse(s) · Nb enfants · Âge
+        </Typography>
+        <Typography variant="body2" color="text.secondary" mt={0.5}>
+          Les lignes d'en-tête de section et les colonnes non reconnues sont ignorées automatiquement.
         </Typography>
       </Alert>
 
@@ -497,8 +551,16 @@ export default function EmployeeImportPage() {
 
 // ── Télécharger modèle Excel ──────────────────────────────────────────────────
 function downloadTemplate() {
-  const headers = ['Matr.','Prénom(s)','Nom','Date Naiss.','Lieu Naiss.','Date Emb.','Fonction','Catégorie','Qualification','Niveau RH','Parts Fisc.','Femme(s)','Enfant(s)'];
-  const example = ['0001','PRÉNOM','NOM','01/01/1990','DAKAR','01/01/2020','CHEF DE BUREAU','9A','Agent technique','N2 - Encadrement','2','0','1'];
+  const headers = [
+    'N°','Matr','Prénoms','NOM','SERVICE','Type contrat','Cadre','Sexe','OBS',
+    'Date Naiss.','Lieu Naiss.','Date Emb.','Ancienneté (ans)','Catégorie',
+    'Diplomé','Parts Fisc.','Nb épouse(s)','Nb enfants','Âge',
+  ];
+  const example = [
+    '1','0001','PRÉNOM','NOM','DIRECTION GENERALE','CDI','OUI','M','',
+    '01/01/1990','DAKAR','01/01/2020','3.5','9A',
+    'Ingénieur','2.5','0','1','35',
+  ];
   const ws = XLSX.utils.aoa_to_sheet([headers, example]);
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Agents');

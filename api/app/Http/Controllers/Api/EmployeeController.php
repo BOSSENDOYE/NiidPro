@@ -320,7 +320,7 @@ class EmployeeController extends Controller
                     'niveau_rh'             => $row['niveau_rh']  ?? null,
                     'cadre'                 => $row['cadre']      ?? null,
                     'diplome'               => $row['diplome']    ?? null,
-                    'anciennete_recrutement'=> is_numeric($row['anciennete_recrutement'] ?? null) ? (int)$row['anciennete_recrutement'] : 0,
+                    'anciennete_recrutement'=> is_numeric($row['anciennete_recrutement'] ?? null) ? (float)$row['anciennete_recrutement'] : 0,
                     'part_ir'               => is_numeric($row['part_ir'] ?? null) ? (float)$row['part_ir'] : null,
                     'part_trimf'            => is_numeric($row['part_trimf'] ?? null) ? (float)$row['part_trimf'] : null,
                     'nombre_enfants_charge' => is_numeric($row['nombre_enfants_charge'] ?? null) ? (int)$row['nombre_enfants_charge'] : 0,
