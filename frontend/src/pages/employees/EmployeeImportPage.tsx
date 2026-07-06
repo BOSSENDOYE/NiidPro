@@ -391,9 +391,10 @@ export default function EmployeeImportPage() {
                     </Tooltip>
                   )}
                 </TableCell>
-                {Object.keys(FIELD_LABELS)
-                  .filter(k => headers.includes(FIELD_LABELS[k]))
-                  .map(key => (
+                {headers.map(label => {
+                  const key = Object.keys(FIELD_LABELS).find(k => FIELD_LABELS[k] === label);
+                  if (!key) return null;
+                  return (
                     <TableCell
                       key={key}
                       sx={{
@@ -409,7 +410,8 @@ export default function EmployeeImportPage() {
                           : <Typography component="span" sx={{ color: '#aaa', fontSize: 11 }}>—</Typography>
                       )}
                     </TableCell>
-                  ))}
+                  );
+                })}
               </TableRow>
             ))}
           </TableBody>
