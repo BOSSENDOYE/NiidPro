@@ -33,9 +33,9 @@ const COLUMN_MAP: Record<string, string> = {
   'service':         'department',
   'département':     'department',
   'departement':     'department',
-  // Type contrat — géré séparément
-  'type contrat':    '_skip',
-  'type de contrat': '_skip',
+  // Type contrat — utilisé pour créer le contrat automatiquement
+  'type contrat':    'type_contrat',
+  'type de contrat': 'type_contrat',
   // Cadre
   'cadre':           'cadre',
   // Sexe / Genre
@@ -101,6 +101,7 @@ const FIELD_LABELS: Record<string, string> = {
   employee_number:       'Matricule',
   first_name:            'Prénom(s)',
   last_name:             'Nom',
+  type_contrat:          'Type contrat',
   birth_date:            'Date Naiss.',
   birth_place:           'Lieu Naiss.',
   hire_date:             'Date Emb.',

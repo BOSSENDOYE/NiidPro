@@ -11,11 +11,13 @@ import {
 import {
   Add, Search, Edit, Delete, Description, Warning,
   CheckCircle, CalendarToday, AccessTime, ExpandMore, ExpandLess, PictureAsPdf, Close,
+  PersonOff,
 } from '@mui/icons-material';
 import dayjs from 'dayjs';
 import { contractsApi } from '../../api/contracts';
 import { employeesApi } from '../../api/employees';
 import type { Contract, Employee } from '../../types';
+import ConfirmDialog from '../../components/shared/ConfirmDialog';
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
@@ -188,6 +190,8 @@ export default function ContractsPage() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['contracts'] }),
   });
 
+  const [noContractOpen, setNoContractOpen] = useState(false);
+  const [delTarget, setDelTarget] = useState<{ id: number; name: string } | null>(null);
   const [pdfLoading, setPdfLoading] = useState<number | null>(null);
   const [pdfUrl,     setPdfUrl]     = useState<string | null>(null);
   const [pdfLabel,   setPdfLabel]   = useState('');
@@ -229,6 +233,16 @@ export default function ContractsPage() {
   const cdiCount  = contracts.filter((c) => c.type === 'CDI'  && c.is_active).length;
   const cddCount  = contracts.filter((c) => c.type === 'CDD'  && c.is_active).length;
   const actives   = contracts.filter((c) => c.is_active).length;
+
+  // Agents sans aucun contrat
+  const employeeIdsWithContract = useMemo(
+    () => new Set(contracts.map((c) => c.employee_id)),
+    [contracts],
+  );
+  const employeesWithoutContract = useMemo(
+    () => employees.filter((e) => !employeeIdsWithContract.has(e.id)),
+    [employees, employeeIdsWithContract],
+  );
 
   // ── dialog helpers ──
   const openCreate = () => {
@@ -298,7 +312,72 @@ export default function ContractsPage() {
         <StatCard icon={<CheckCircle />}  label="CDI actifs"       value={cdiCount}  color="#059669" bg="#ECFDF5" />
         <StatCard icon={<CalendarToday />}label="CDD en cours"     value={cddCount}  color="#D97706" bg="#FFFBEB" />
         <StatCard icon={<Warning />}      label="Expirent bientôt" value={expiring.length} color="#DC2626" bg="#FEF2F2" />
+        {employeesWithoutContract.length > 0 && (
+          <Box
+            onClick={() => setNoContractOpen((o) => !o)}
+            sx={{
+              flex: 1, minWidth: 140, cursor: 'pointer',
+              bgcolor: '#fff', border: '1px solid #FECACA', borderRadius: '12px',
+              p: 2, display: 'flex', alignItems: 'center', gap: 1.5,
+              boxShadow: '0 1px 4px rgba(0,0,0,0.04)',
+              '&:hover': { bgcolor: '#FEF2F2' }, transition: 'background 0.12s',
+            }}
+          >
+            <Box sx={{ width: 40, height: 40, borderRadius: '10px', bgcolor: '#FEF2F2', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <PersonOff sx={{ fontSize: 20, color: '#DC2626' }} />
+            </Box>
+            <Box sx={{ flexGrow: 1 }}>
+              <Typography sx={{ fontSize: 20, fontWeight: 800, color: '#DC2626', lineHeight: 1.1 }}>{employeesWithoutContract.length}</Typography>
+              <Typography sx={{ fontSize: 11.5, color: '#64748B', lineHeight: 1.3 }}>Sans contrat</Typography>
+            </Box>
+            {noContractOpen ? <ExpandLess sx={{ fontSize: 16, color: '#94A3B8' }} /> : <ExpandMore sx={{ fontSize: 16, color: '#94A3B8' }} />}
+          </Box>
+        )}
       </Box>
+
+      {/* ── Agents sans contrat ── */}
+      <Collapse in={noContractOpen && employeesWithoutContract.length > 0}>
+        <Box sx={{ mb: 2.5 }}>
+          <Box sx={{ border: '1.5px solid #FECACA', borderRadius: '10px', bgcolor: '#fff', overflow: 'hidden' }}>
+            <Box sx={{ px: 2, py: 1.25, bgcolor: '#FEF2F2', borderBottom: '1px solid #FECACA', display: 'flex', alignItems: 'center', gap: 1 }}>
+              <PersonOff sx={{ fontSize: 16, color: '#DC2626' }} />
+              <Typography sx={{ fontSize: 13, fontWeight: 700, color: '#991B1B', flexGrow: 1 }}>
+                {employeesWithoutContract.length} agent{employeesWithoutContract.length > 1 ? 's' : ''} sans contrat
+              </Typography>
+            </Box>
+            {employeesWithoutContract.map((emp, i) => (
+              <Box key={emp.id} sx={{
+                display: 'flex', alignItems: 'center', gap: 2, px: 2, py: 1,
+                borderTop: i > 0 ? '1px solid #FEE2E2' : 'none',
+              }}>
+                <EmployeeAvatar emp={emp} />
+                <Box sx={{ flexGrow: 1, minWidth: 0 }}>
+                  <Typography sx={{ fontSize: 13, fontWeight: 600, color: '#0F172A' }} noWrap>
+                    {emp.first_name} {emp.last_name}
+                  </Typography>
+                  <Typography sx={{ fontSize: 11, color: '#64748B' }}>
+                    {emp.employee_number}
+                    {(emp as unknown as { department?: { name: string } }).department && ` · ${(emp as unknown as { department: { name: string } }).department.name}`}
+                  </Typography>
+                </Box>
+                <Button
+                  size="small"
+                  variant="outlined"
+                  startIcon={<Add sx={{ fontSize: 13 }} />}
+                  onClick={() => {
+                    setForm({ ...EMPTY_FORM, employee_id: emp.id });
+                    setEditTarget(null);
+                    setDialogOpen(true);
+                  }}
+                  sx={{ fontSize: 11, py: 0.4, px: 1.25, borderColor: '#2563EB', color: '#2563EB', borderRadius: '7px', flexShrink: 0 }}
+                >
+                  Créer contrat
+                </Button>
+              </Box>
+            ))}
+          </Box>
+        </Box>
+      </Collapse>
 
       {/* ── Expiring alert ── */}
       {expiring.length > 0 && (
@@ -532,7 +611,11 @@ export default function ContractsPage() {
                               </IconButton>
                             </Tooltip>
                             <Tooltip title="Supprimer">
-                              <IconButton size="small" onClick={() => deleteMut.mutate(c.id)} sx={{ p: 0.5 }}>
+                              <IconButton
+                                size="small"
+                                onClick={() => setDelTarget({ id: c.id, name: `${c.employee?.first_name ?? ''} ${c.employee?.last_name ?? ''}`.trim() })}
+                                sx={{ p: 0.5 }}
+                              >
                                 <Delete sx={{ fontSize: 15, color: '#EF4444' }} />
                               </IconButton>
                             </Tooltip>
@@ -733,6 +816,14 @@ export default function ContractsPage() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      <ConfirmDialog
+        open={delTarget !== null}
+        title="Supprimer ce contrat"
+        message={delTarget ? `Voulez-vous vraiment supprimer le contrat de « ${delTarget.name} » ? Cette action est irréversible.` : ''}
+        onConfirm={() => { if (delTarget) { deleteMut.mutate(delTarget.id); setDelTarget(null); } }}
+        onClose={() => setDelTarget(null)}
+      />
     </Box>
   );
 }

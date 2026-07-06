@@ -49,7 +49,7 @@ export default defineConfig({
     allowedHosts: true,    // accepte les hôtes de tunnel (localtunnel / ngrok)
     proxy: {
       '/api': {
-        target: 'http://localhost:8000',
+        target: 'http://localhost:8001',
         changeOrigin: true,
       },
     },

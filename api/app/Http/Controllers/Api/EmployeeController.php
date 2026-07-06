@@ -306,14 +306,15 @@ class EmployeeController extends Controller
 
             try {
                 $dept = !empty($row['department']) ? \App\Models\Department::where('name', trim($row['department']))->first() : null;
+                $hireDate = $row['hire_date'] ?? now()->format('Y-m-d');
 
-                Employee::create([
+                $employee = Employee::create([
                     'employee_number'       => $matricule ?: $this->generateEmployeeNumber(),
                     'first_name'            => $prenom,
                     'last_name'             => $nom,
                     'birth_date'            => $row['birth_date']  ?? null,
                     'birth_place'           => $row['birth_place'] ?? null,
-                    'hire_date'             => $row['hire_date']   ?? now()->format('Y-m-d'),
+                    'hire_date'             => $hireDate,
                     'categorie_emploi'      => $row['categorie_emploi'] ?? null,
                     'fonction'              => $row['fonction']    ?? null,
                     'qualification'         => $row['qualification'] ?? null,
@@ -331,6 +332,14 @@ class EmployeeController extends Controller
                     'professional_email'    => $row['professional_email'] ?? null,
                     'gender'                => $row['gender'] ?? null,
                 ]);
+
+                \App\Models\Contract::create([
+                    'employee_id' => $employee->id,
+                    'type'        => $this->normalizeContractType($row['type_contrat'] ?? null),
+                    'start_date'  => $hireDate,
+                    'is_active'   => true,
+                ]);
+
                 $created++;
             } catch (\Exception $e) {
                 $skipped[] = "Ligne $line : " . $e->getMessage();
@@ -445,6 +454,23 @@ class EmployeeController extends Controller
     {
         $employee->delete();
         return response()->json(['message' => 'Employé supprimé.']);
+    }
+
+    private function normalizeContractType(?string $raw): string
+    {
+        if (!$raw) return 'CDI';
+        $map = [
+            'cdi'          => 'CDI',
+            'cdd'          => 'CDD',
+            'decret'       => 'DECRET',
+            'décret'       => 'DECRET',
+            'detachement'  => 'DETACHEMENT',
+            'détachement'  => 'DETACHEMENT',
+            'stage'        => 'Stage',
+            'alternance'   => 'Alternance',
+            'prestation'   => 'Prestation',
+        ];
+        return $map[strtolower(trim($raw))] ?? 'Autre';
     }
 
     private function generateEmployeeNumber(): string

@@ -13,8 +13,8 @@ import { employeesApi } from '../../api/employees';
 import { documentsApi } from '../../api/documents';
 import StatusChip from '../../components/common/StatusChip';
 import LeavePlanningTab from '../../components/employees/LeavePlanningTab';
-import LeaveAttestationTab from '../../components/employees/LeaveAttestationTab';
 import LeaveBalanceTab from '../../components/employees/LeaveBalanceTab';
+import LeaveParamsTab from './LeaveParamsTab';
 import { formatDate } from '../../utils/format';
 import type { Leave, GeneratedDocument } from '../../types';
 
@@ -141,6 +141,11 @@ export default function LeavesPage() {
     [pendingLeaves, globalSearch],
   );
 
+  const filteredHistory = useMemo(
+    () => filtered.filter((l) => l.status !== 'pending'),
+    [filtered],
+  );
+
   const handleSearch = () => { /* filtrage réactif */ };
   const handleClear  = () => { setDateFrom(''); setDateTo(''); setService(''); setTypeFilter(''); setMatricule(''); };
 
@@ -148,11 +153,11 @@ export default function LeavesPage() {
 
   /* ─── render tab content ─── */
   const renderContent = () => {
-    if (tab === 2) return <LeaveAttestationTab searchText={globalSearch} />;
     if (tab === 3) return <LeavePlanningTab />;
     if (tab === 4) return <LeaveBalanceTab />;
+    if (tab === 5) return <LeaveParamsTab />;
 
-    const rows = tab === 1 ? filteredPending : filtered;
+    const rows = tab === 1 ? filteredPending : tab === 2 ? filteredHistory : filtered;
     const paged = rows.slice(page * rowsPerPage, (page + 1) * rowsPerPage);
 
     return (
@@ -160,12 +165,12 @@ export default function LeavesPage() {
         {/* ── Titre section ── */}
         <Box sx={{ bgcolor: TH, px: 2.5, py: 1.25, mb: 0 }}>
           <Typography sx={{ color: '#fff', fontWeight: 700, fontSize: 14 }}>
-            {tab === 0 ? 'Gestion des Demandes de congés annuel' : 'Congés en attente de validation'}
+            {tab === 0 ? 'Gestion des demandes de congé' : tab === 1 ? 'Congés en attente de validation' : 'Historique des congés'}
           </Typography>
         </Box>
 
-        {/* ── Filtres (tab 0 uniquement) ── */}
-        {tab === 0 && (
+        {/* ── Filtres (tab 0 et Historique) ── */}
+        {tab !== 1 && (
           <Box sx={{ border: '1px solid #CBD5E1', borderTop: 'none', p: 2, bgcolor: '#F8FAFC' }}>
             <Typography sx={{ fontSize: 11, fontWeight: 700, color: '#64748B', mb: 1.5, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
               Chercher
@@ -209,11 +214,13 @@ export default function LeavesPage() {
           display: 'flex', justifyContent: 'flex-end', gap: 1,
           px: 2, py: 1, bgcolor: '#F1F5F9', border: '1px solid #CBD5E1', borderTop: 'none',
         }}>
-          <Button variant="contained" size="small" startIcon={<Add sx={{ fontSize: '14px !important' }} />}
-            onClick={() => setNewOpen(true)}
-            sx={{ bgcolor: TH, '&:hover': { bgcolor: '#0D2A40' }, borderRadius: '6px', fontSize: 12, fontWeight: 700, minWidth: 90 }}>
-            Nouveau
-          </Button>
+          {tab !== 2 && (
+            <Button variant="contained" size="small" startIcon={<Add sx={{ fontSize: '14px !important' }} />}
+              onClick={() => setNewOpen(true)}
+              sx={{ bgcolor: TH, '&:hover': { bgcolor: '#0D2A40' }, borderRadius: '6px', fontSize: 12, fontWeight: 700, minWidth: 90 }}>
+              Nouveau
+            </Button>
+          )}
           <Button variant="outlined" size="small"
             disabled={!selectedId}
             onClick={() => setDetailOpen(true)}
@@ -388,27 +395,32 @@ export default function LeavesPage() {
       <Box sx={{ bgcolor: '#F1F5F9', px: 2.5, pt: 2, pb: 0, display: 'flex', gap: 1, flexWrap: 'wrap', borderBottom: `2px solid ${NAV}` }}>
         {[
           {
-            label: 'Demande Congé',
+            label: 'Demande',
             count: allLeaves.length,
             dot: false,
           },
           {
-            label: 'Valider Congé',
+            label: 'Valider',
             count: pendingLeaves.length,
             dot: pendingLeaves.length > 0,
           },
           {
-            label: 'Historique Congé',
+            label: 'Historique',
+            count: filteredHistory.length,
+            dot: false,
+          },
+          {
+            label: 'Planning',
             count: null,
             dot: false,
           },
           {
-            label: 'Planning Congés',
+            label: 'Solde',
             count: null,
             dot: false,
           },
           {
-            label: 'Solde par Agent',
+            label: 'Paramètres',
             count: null,
             dot: false,
           },
@@ -466,8 +478,8 @@ export default function LeavesPage() {
         })}
       </Box>
 
-      {/* ══ Barre de recherche globale ══ */}
-      <Box sx={{
+      {/* ══ Barre de recherche globale (masquée sur Paramètres) ══ */}
+      {tab !== 5 && <Box sx={{
         border: '1px solid #CBD5E1', borderTop: 'none',
         px: 2, py: 1, bgcolor: '#F8FAFC',
         display: 'flex', alignItems: 'center', gap: 1.5,
@@ -494,11 +506,10 @@ export default function LeavesPage() {
         )}
         {globalSearch && (
           <Typography sx={{ fontSize: 11, color: '#64748B', whiteSpace: 'nowrap' }}>
-            {tab === 0 ? filtered.length : tab === 1 ? filteredPending.length : ''}
-            {(tab === 0 || tab === 1) ? ' résultat(s)' : ''}
+            {tab === 0 ? filtered.length : tab === 1 ? filteredPending.length : filteredHistory.length} résultat(s)
           </Typography>
         )}
-      </Box>
+      </Box>}
 
       {/* ══ Contenu ══ */}
       <Box sx={{ bgcolor: '#fff', border: '1px solid #CBD5E1', borderTop: 'none', borderRadius: '0 0 12px 12px', overflow: 'hidden' }}>

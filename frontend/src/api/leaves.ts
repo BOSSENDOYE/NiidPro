@@ -114,3 +114,18 @@ export const leavesApi = {
   submitJustification: (id: number) =>
     client.post(`/leaves/${id}/justification`),
 };
+
+// ── CRUD Types de congé ──────────────────────────────────────────────────────
+export const leaveTypesApi = {
+  list: () =>
+    client.get<LeaveType[]>('/leave-types').then((r) => ({ ...r, data: normalizeArray<LeaveType>(r.data) })),
+
+  create: (data: Partial<LeaveType>) =>
+    client.post<LeaveType>('/leave-types', data),
+
+  update: (id: number, data: Partial<LeaveType>) =>
+    client.put<LeaveType>(`/leave-types/${id}`, data),
+
+  delete: (id: number) =>
+    client.delete(`/leave-types/${id}`),
+};

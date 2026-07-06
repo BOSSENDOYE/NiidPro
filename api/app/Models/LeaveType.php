@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 class LeaveType extends Model
 {
     protected $fillable = [
-        'name', 'code', 'color', 'requires_justification', 'paid', 'max_days_per_year', 'is_active',
+        'name', 'code', 'category', 'color', 'requires_justification', 'paid', 'max_days_per_year', 'is_active',
     ];
 
     protected function casts(): array

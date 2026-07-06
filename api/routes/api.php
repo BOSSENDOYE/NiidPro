@@ -12,6 +12,7 @@ use App\Http\Controllers\Api\EmailController;
 use App\Http\Controllers\Api\EmployeeController;
 use App\Http\Controllers\Api\JustificationController;
 use App\Http\Controllers\Api\LeaveController;
+use App\Http\Controllers\Api\LeaveTypeController;
 use App\Http\Controllers\Api\MeController;
 use App\Http\Controllers\Api\SanctionController;
 use App\Http\Controllers\Api\SettingsController;
@@ -133,6 +134,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/leaves/{leave}/reject',        [LeaveController::class, 'reject']);
     Route::post('/leaves/{leave}/justification', [LeaveController::class, 'submitJustification']);
     Route::apiResource('leaves', LeaveController::class);
+    Route::apiResource('leave-types', LeaveTypeController::class)->except(['show']);
 
     // Justifications
     Route::get('/justifications/pending', [JustificationController::class, 'pending']);

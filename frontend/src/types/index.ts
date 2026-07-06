@@ -123,10 +123,12 @@ export interface LeaveType {
   id: number;
   name: string;
   code: string;
+  category?: string;
   color: string;
   paid: boolean;
-  max_days_per_year?: number;
+  max_days_per_year?: number | null;
   requires_justification?: boolean;
+  is_active?: boolean;
 }
 
 export interface Leave {

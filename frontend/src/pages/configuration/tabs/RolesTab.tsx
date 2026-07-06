@@ -4,7 +4,7 @@ import {
   Box, Typography, Button, Stack, Chip, IconButton, Grid,
   Dialog, DialogTitle, DialogContent, DialogActions, TextField,
   FormControlLabel, Checkbox, CircularProgress, Tooltip, Alert, Divider,
-  Accordion, AccordionSummary, AccordionDetails, Badge,
+  Accordion, AccordionSummary, AccordionDetails, Badge, Snackbar,
 } from '@mui/material';
 import {
   Add, Edit, Delete, Security, AdminPanelSettings, ExpandMore,
@@ -37,7 +37,8 @@ export default function RolesTab() {
   const [name, setName] = useState('');
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
-  const [toDel, setToDel] = useState<{ id: number; label: string } | null>(null);
+  const [toDel,    setToDel]    = useState<{ id: number; label: string } | null>(null);
+  const [snackErr, setSnackErr] = useState('');
 
   const { data, isLoading } = useQuery({
     queryKey: ['roles'],
@@ -82,7 +83,7 @@ export default function RolesTab() {
     mutationFn: (id: number) => rolesApi.remove(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['roles'] }),
     onError: (e: { response?: { data?: { message?: string } } }) =>
-      alert(e.response?.data?.message ?? 'Suppression impossible.'),
+      setSnackErr(e.response?.data?.message ?? 'Suppression impossible.'),
   });
 
   return (
@@ -249,10 +250,22 @@ export default function RolesTab() {
 
       <ConfirmDialog
         open={toDel !== null}
-        message={toDel ? `Supprimer le profil « ${toDel.label} » ?` : ''}
+        title="Supprimer ce profil"
+        message={toDel ? `Voulez-vous vraiment supprimer le profil « ${toDel.label} » ? Cette action est irréversible.` : ''}
         onConfirm={() => toDel && deleteMut.mutate(toDel.id)}
         onClose={() => setToDel(null)}
       />
+
+      <Snackbar
+        open={!!snackErr}
+        autoHideDuration={5000}
+        onClose={() => setSnackErr('')}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert severity="error" onClose={() => setSnackErr('')} sx={{ borderRadius: '10px' }}>
+          {snackErr}
+        </Alert>
+      </Snackbar>
     </SectionCard>
   );
 }
