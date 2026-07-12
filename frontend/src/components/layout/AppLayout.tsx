@@ -11,8 +11,8 @@ import {
   ChevronLeft, ChevronRight, Logout, Person, Settings,
   NotificationsNone, Dashboard, Groups, Description, AccessTime,
   CameraAlt, BeachAccess, AssignmentLate, AccountTree, CheckBox,
-  Payments, BarChart, Hub, PhoneAndroid, KeyboardArrowDown,
-  Article, QrCodeScanner, Archive, School, PersonSearch, EventNote,
+  Payments, BarChart, PhoneAndroid, KeyboardArrowDown,
+  Article, QrCodeScanner, School, PersonSearch,
   WorkspacePremium,
 } from '@mui/icons-material';
 import { useAuthStore } from '../../store/auth.store';
@@ -46,15 +46,11 @@ const NAV: NavSection[] = [
     items: [
       { path: '/employees',     label: 'Agents',            icon: <Groups />,         color: '#F97316' },
       { path: '/contracts',          label: 'Contrats',         icon: <Description />, color: '#A78BFA' },
-      { path: '/contracts/archives', label: 'Archive contrat',  icon: <Archive />,     color: '#C4B5FD', sub: true },
       { path: '/leaves',        label: 'Congés & Absences', icon: <BeachAccess />,    color: '#FCD34D' },
       { path: '/trainings',     label: 'Gestion Formation', icon: <School />,         color: '#8B5CF6' },
       { path: '/recruitment',        label: 'Recrutements',      icon: <PersonSearch />,  color: '#0EA5E9' },
-      { path: '/plan-recrutement',   label: 'Plan de recrutement', icon: <EventNote />,     color: '#6366F1' },
-      { path: '/plan-formation',     label: 'Plan de formation',   icon: <School />,        color: '#10B981' },
-      { path: '/evaluations',        label: 'Évaluation essai',    icon: <AssignmentLate />,   color: '#F59E0B' },
+      { path: '/evaluations',        label: 'Évaluation',           icon: <AssignmentLate />,   color: '#F59E0B' },
       { path: '/carrieres',          label: 'Carrières',            icon: <WorkspacePremium />, color: '#7C3AED' },
-      { path: '/justifications',label: 'Justifications',    icon: <AssignmentLate />, color: '#F87171' },
     ],
   },
   {
@@ -69,7 +65,6 @@ const NAV: NavSection[] = [
     label: 'ORGANISATION',
     items: [
       { path: '/departments',   label: 'Directions & Services', icon: <AccountTree />, color: '#818CF8' },
-      { path: '/organigramme',  label: 'Organigramme',          icon: <Hub />,         color: '#38BDF8' },
       { path: '/tasks',         label: 'Tâches',                icon: <CheckBox />,    color: '#4ADE80' },
       { path: '/payroll',       label: 'Gestion de la paie',    icon: <Payments />,    color: '#FBBF24' },
       { path: '/social-report', label: 'Bilan social',          icon: <BarChart />,    color: '#38BDF8' },
@@ -100,19 +95,14 @@ const PAGE_LABELS: Record<string, string> = {
   '/dashboard':         'Tableau de bord',
   '/employees':         'Gestion des Agents',
   '/contracts':          'Contrats & Alertes',
-  '/contracts/archives': 'Archives Contrats',
   '/attendances':        'Pointage — Tableau de bord',
   '/attendance-scanner': 'Terminal de Badgeage QR',
   '/attendance-visual':  'Pointage — Calendrier',
   '/leaves':            'Congés & Absences',
   '/trainings':         'Gestion des Formations',
   '/recruitment':          'Gestion des Recrutements',
-  '/plan-recrutement':     'Plan de Recrutement',
-  '/plan-formation':       'Plan de Formation',
-  '/evaluations':          'Évaluation Période d\'Essai',
+  '/evaluations':          'Évaluation',
   '/carrieres':            'Gestion des Carrières',
-  '/justifications':    'Justifications',
-  '/organigramme':      'Organigramme',
   '/departments':       'Directions',
   '/tasks':             'Gestion des Tâches',
   '/payroll':           'Paie & Bulletins',
@@ -234,7 +224,7 @@ export default function AppLayout() {
             >
               {company?.logo_url
                 ? <img src={company.logo_url} alt={companyName}
-                    style={{ maxWidth: '100%', maxHeight: '100%', width: 'auto', height: 'auto', objectFit: 'contain', display: 'block' }} />
+                    style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }} />
                 : <Typography sx={{ color: '#fff', fontWeight: 900, fontSize: 16, letterSpacing: '-1px' }}>
                     {companyName[0]?.toUpperCase() ?? 'N'}
                   </Typography>}

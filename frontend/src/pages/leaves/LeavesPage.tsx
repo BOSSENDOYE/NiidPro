@@ -15,6 +15,8 @@ import StatusChip from '../../components/common/StatusChip';
 import LeavePlanningTab from '../../components/employees/LeavePlanningTab';
 import LeaveBalanceTab from '../../components/employees/LeaveBalanceTab';
 import LeaveParamsTab from './LeaveParamsTab';
+import LeaveCarryoverTab from './LeaveCarryoverTab';
+import JustificationsPage from '../justifications/JustificationsPage';
 import { formatDate } from '../../utils/format';
 import type { Leave, GeneratedDocument } from '../../types';
 
@@ -155,7 +157,9 @@ export default function LeavesPage() {
   const renderContent = () => {
     if (tab === 3) return <LeavePlanningTab />;
     if (tab === 4) return <LeaveBalanceTab />;
-    if (tab === 5) return <LeaveParamsTab />;
+    if (tab === 5) return <LeaveCarryoverTab />;
+    if (tab === 6) return <LeaveParamsTab />;
+    if (tab === 7) return <JustificationsPage />;
 
     const rows = tab === 1 ? filteredPending : tab === 2 ? filteredHistory : filtered;
     const paged = rows.slice(page * rowsPerPage, (page + 1) * rowsPerPage);
@@ -165,7 +169,7 @@ export default function LeavesPage() {
         {/* ── Titre section ── */}
         <Box sx={{ bgcolor: TH, px: 2.5, py: 1.25, mb: 0 }}>
           <Typography sx={{ color: '#fff', fontWeight: 700, fontSize: 14 }}>
-            {tab === 0 ? 'Gestion des demandes de congé' : tab === 1 ? 'Congés en attente de validation' : 'Historique des congés'}
+            {tab === 0 ? 'Gestion des demandes de congé' : tab === 1 ? 'Congés Validée' : 'Historique des congés'}
           </Typography>
         </Box>
 
@@ -400,7 +404,7 @@ export default function LeavesPage() {
             dot: false,
           },
           {
-            label: 'Valider',
+            label: 'Validée',
             count: pendingLeaves.length,
             dot: pendingLeaves.length > 0,
           },
@@ -420,7 +424,17 @@ export default function LeavesPage() {
             dot: false,
           },
           {
+            label: 'Report',
+            count: null,
+            dot: false,
+          },
+          {
             label: 'Paramètres',
+            count: null,
+            dot: false,
+          },
+          {
+            label: 'Justifications',
             count: null,
             dot: false,
           },
@@ -478,8 +492,8 @@ export default function LeavesPage() {
         })}
       </Box>
 
-      {/* ══ Barre de recherche globale (masquée sur Paramètres) ══ */}
-      {tab !== 5 && <Box sx={{
+      {/* ══ Barre de recherche globale (masquée sur Report et Paramètres) ══ */}
+      {tab !== 5 && tab !== 6 && tab !== 7 && <Box sx={{
         border: '1px solid #CBD5E1', borderTop: 'none',
         px: 2, py: 1, bgcolor: '#F8FAFC',
         display: 'flex', alignItems: 'center', gap: 1.5,

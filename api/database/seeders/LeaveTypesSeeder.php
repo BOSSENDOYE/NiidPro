@@ -18,7 +18,7 @@ class LeaveTypesSeeder extends Seeder
 
         $types = [
             // ── Congés ────────────────────────────────────────────────────────────
-            ['category' => 'Congés', 'name' => 'Congé annuel',                              'code' => 'CA',          'color' => '#10B981', 'paid' => true,  'requires_justification' => false, 'max_days_per_year' => 30, 'is_active' => true],
+            ['category' => 'Congés', 'name' => 'Congé annuel',                              'code' => 'CA',          'color' => '#10B981', 'paid' => true,  'requires_justification' => false, 'max_days_per_year' => 24, 'is_active' => true],
             ['category' => 'Congés', 'name' => 'Congé de maladie',                          'code' => 'CM',          'color' => '#F59E0B', 'paid' => true,  'requires_justification' => true,  'max_days_per_year' => null, 'is_active' => true],
             ['category' => 'Congés', 'name' => 'Congé de maternité',                        'code' => 'CMAT',        'color' => '#EC4899', 'paid' => true,  'requires_justification' => true,  'max_days_per_year' => 98,  'is_active' => true],
             ['category' => 'Congés', 'name' => 'Congé de paternité',                        'code' => 'CPAT',        'color' => '#6366F1', 'paid' => true,  'requires_justification' => true,  'max_days_per_year' => 3,   'is_active' => true],

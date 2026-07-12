@@ -43,7 +43,7 @@ return new class extends Migration
             $table->enum('status', ['active', 'inactive', 'on_leave', 'terminated'])->default('active');
             $table->decimal('base_salary', 10, 2)->nullable();
             $table->string('bank_account')->nullable();
-            $table->integer('annual_leave_days')->default(25);
+            $table->integer('annual_leave_days')->default(24);
             $table->integer('rtt_days')->default(0);
 
             $table->timestamps();

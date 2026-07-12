@@ -389,7 +389,7 @@ const LEGEND = [
 ];
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
-export default function OrganigrammePage() {
+export default function OrganigrammePage({ embeddedMode = false }: { embeddedMode?: boolean }) {
   const { name: companyName } = useCompany();
   const [org, setOrg] = useState<OrgNode>(loadOrg);
   const [editTarget, setEditTarget] = useState<EditTarget | null>(null);
@@ -436,41 +436,43 @@ export default function OrganigrammePage() {
     <Box>
       <GlobalStyles styles={connectorStyles} />
 
-      <Box sx={{ display: 'flex', alignItems: 'flex-start', mb: 3.5, gap: 2 }}>
-        <Box sx={{ flexGrow: 1 }}>
-          <Typography sx={{ fontSize: 22, fontWeight: 800, color: '#0F172A', letterSpacing: '-0.4px' }}>
-            Organigramme {companyName}
-          </Typography>
-          <Typography sx={{ fontSize: 13, color: '#64748B', mt: 0.5 }}>
-            Survolez un nœud et cliquez sur <Edit sx={{ fontSize: 11, verticalAlign: 'middle' }} /> pour modifier son intitulé
-          </Typography>
+      {!embeddedMode && (
+        <Box sx={{ display: 'flex', alignItems: 'flex-start', mb: 3.5, gap: 2 }}>
+          <Box sx={{ flexGrow: 1 }}>
+            <Typography sx={{ fontSize: 22, fontWeight: 800, color: '#0F172A', letterSpacing: '-0.4px' }}>
+              Organigramme {companyName}
+            </Typography>
+            <Typography sx={{ fontSize: 13, color: '#64748B', mt: 0.5 }}>
+              Survolez un nœud et cliquez sur <Edit sx={{ fontSize: 11, verticalAlign: 'middle' }} /> pour modifier son intitulé
+            </Typography>
+          </Box>
+          <Box sx={{ display: 'flex', gap: 1, flexShrink: 0 }} className="oc-no-print">
+            <Tooltip title="Imprimer / Exporter PDF">
+              <Button
+                variant="outlined"
+                size="small"
+                startIcon={<Print />}
+                onClick={() => window.print()}
+                sx={{ borderRadius: '9px', fontSize: 12, textTransform: 'none' }}
+              >
+                Imprimer
+              </Button>
+            </Tooltip>
+            <Tooltip title="Remettre les intitulés par défaut">
+              <Button
+                variant="outlined"
+                color="error"
+                size="small"
+                startIcon={<Restore />}
+                onClick={() => setResetConfirm(true)}
+                sx={{ borderRadius: '9px', fontSize: 12, textTransform: 'none' }}
+              >
+                Réinitialiser
+              </Button>
+            </Tooltip>
+          </Box>
         </Box>
-        <Box sx={{ display: 'flex', gap: 1, flexShrink: 0 }} className="oc-no-print">
-          <Tooltip title="Imprimer / Exporter PDF">
-            <Button
-              variant="outlined"
-              size="small"
-              startIcon={<Print />}
-              onClick={() => window.print()}
-              sx={{ borderRadius: '9px', fontSize: 12, textTransform: 'none' }}
-            >
-              Imprimer
-            </Button>
-          </Tooltip>
-          <Tooltip title="Remettre les intitulés par défaut">
-            <Button
-              variant="outlined"
-              color="error"
-              size="small"
-              startIcon={<Restore />}
-              onClick={() => setResetConfirm(true)}
-              sx={{ borderRadius: '9px', fontSize: 12, textTransform: 'none' }}
-            >
-              Réinitialiser
-            </Button>
-          </Tooltip>
-        </Box>
-      </Box>
+      )}
 
       {/* Chart area */}
       <Box

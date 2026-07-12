@@ -930,20 +930,21 @@ function ProcessusTab() {
 }
 
 // ─── Main page ────────────────────────────────────────────────────────────────
-export default function PlanRecrutementPage() {
+export default function PlanRecrutementPage({ embeddedMode = false }: { embeddedMode?: boolean }) {
   const [tab, setTab] = useState(0);
 
   return (
     <Box>
-      {/* Header */}
-      <Box sx={{ mb: 3 }}>
-        <Typography sx={{ fontSize: 22, fontWeight: 800, color: '#0F172A', letterSpacing: '-0.4px' }}>
-          Plan de Recrutement
-        </Typography>
-        <Typography sx={{ fontSize: 13, color: '#64748B', mt: 0.5 }}>
-          Planification annuelle · Besoins · Processus · Candidatures
-        </Typography>
-      </Box>
+      {!embeddedMode && (
+        <Box sx={{ mb: 3 }}>
+          <Typography sx={{ fontSize: 22, fontWeight: 800, color: '#0F172A', letterSpacing: '-0.4px' }}>
+            Plan de Recrutement
+          </Typography>
+          <Typography sx={{ fontSize: 13, color: '#64748B', mt: 0.5 }}>
+            Planification annuelle · Besoins · Processus · Candidatures
+          </Typography>
+        </Box>
+      )}
 
       {/* Tabs */}
       <Box sx={{ bgcolor: '#fff', border: '1px solid #E2E8F0', borderRadius: '12px', mb: 3, overflow: 'hidden' }}>

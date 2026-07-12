@@ -18,6 +18,7 @@ import { contractsApi } from '../../api/contracts';
 import { employeesApi } from '../../api/employees';
 import type { Contract, Employee } from '../../types';
 import ConfirmDialog from '../../components/shared/ConfirmDialog';
+import ContractArchivePage from './ContractArchivePage';
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
@@ -134,9 +135,14 @@ const EMPTY_FORM: ContractForm = {
 };
 
 // ─── Main page ────────────────────────────────────────────────────────────────
+
+const NAV_CONTRACT = '#0D2137';
+const ACT_CONTRACT = '#2563EB';
+
 export default function ContractsPage() {
   const qc = useQueryClient();
 
+  const [tab,          setTab]          = useState(0);
   const [search,       setSearch]       = useState('');
   const [typeFilter,   setTypeFilter]   = useState('all');
   const [statusFilter, setStatusFilter] = useState('active');
@@ -286,6 +292,52 @@ export default function ContractsPage() {
 
   return (
     <Box>
+      {/* ══ Onglets ══ */}
+      <Box sx={{ bgcolor: '#F1F5F9', px: 2.5, pt: 2, pb: 0, display: 'flex', gap: 1, flexWrap: 'wrap', borderBottom: `2px solid ${NAV_CONTRACT}`, mb: 3 }}>
+        {[
+          { label: 'Gestion des contrats', count: contracts.length },
+          { label: 'Archives',             count: null },
+        ].map((cfg, i) => {
+          const isActive = i === tab;
+          return (
+            <Box
+              key={i}
+              onClick={() => setTab(i)}
+              sx={{
+                px: 2, py: 1, cursor: 'pointer', borderRadius: '8px 8px 0 0',
+                fontWeight: 700, fontSize: 13, userSelect: 'none',
+                bgcolor:      isActive ? ACT_CONTRACT : '#fff',
+                color:        isActive ? '#fff' : NAV_CONTRACT,
+                border:       `1.5px solid ${isActive ? ACT_CONTRACT : '#93C5FD'}`,
+                borderBottom: 'none',
+                boxShadow:    isActive ? '0 -2px 8px rgba(37,99,235,0.2)' : 'none',
+                transition:   'all 0.15s',
+                '&:hover':    { bgcolor: isActive ? ACT_CONTRACT : '#EFF6FF' },
+                display: 'flex', alignItems: 'center', gap: '6px',
+              }}
+            >
+              {cfg.label}
+              {cfg.count !== null && (
+                <Box sx={{
+                  fontSize: 11, fontWeight: 800, px: 0.75, py: 0.15,
+                  borderRadius: '10px', lineHeight: 1.6,
+                  bgcolor: isActive ? 'rgba(255,255,255,0.25)' : '#E0E7FF',
+                  color:   isActive ? '#fff' : ACT_CONTRACT,
+                }}>
+                  {cfg.count}
+                </Box>
+              )}
+            </Box>
+          );
+        })}
+      </Box>
+
+      {/* ══ Contenu onglet Archives ══ */}
+      {tab === 1 && <ContractArchivePage embeddedMode />}
+
+      {/* ══ Contenu onglet Gestion (masqué si archive actif) ══ */}
+      {tab === 0 && <>
+
       {/* ── Header ── */}
       <Box sx={{ display: 'flex', alignItems: 'flex-start', mb: 3, gap: 2 }}>
         <Box sx={{ flexGrow: 1 }}>
@@ -824,6 +876,8 @@ export default function ContractsPage() {
         onConfirm={() => { if (delTarget) { deleteMut.mutate(delTarget.id); setDelTarget(null); } }}
         onClose={() => setDelTarget(null)}
       />
+
+      </> /* fin onglet Gestion */ }
     </Box>
   );
 }

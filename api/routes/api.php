@@ -28,6 +28,8 @@ use App\Http\Controllers\Api\PlanFormationController;
 use App\Http\Controllers\Api\EvaluationController;
 use App\Http\Controllers\Api\CarriereController;
 use App\Http\Controllers\Api\PayrollTemplateController;
+use App\Http\Controllers\Api\NotificationController;
+use App\Http\Controllers\Api\LeaveCarryoverController;
 use Illuminate\Support\Facades\Route;
 
 // Health check
@@ -51,6 +53,11 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('/profile', [AuthController::class, 'updateProfile']);
         Route::put('/password', [AuthController::class, 'changePassword']);
     });
+
+    // Notifications
+    Route::get('/notifications', [NotificationController::class, 'index']);
+    Route::post('/notifications/read-all', [NotificationController::class, 'markAllRead']);
+    Route::post('/notifications/{id}/read', [NotificationController::class, 'markRead']);
 
     // Paramètres de l'entreprise (configuration)
     Route::post('/settings', [SettingsController::class, 'update']);
@@ -135,6 +142,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/leaves/{leave}/justification', [LeaveController::class, 'submitJustification']);
     Route::apiResource('leaves', LeaveController::class);
     Route::apiResource('leave-types', LeaveTypeController::class)->except(['show']);
+
+    // Report de congé (clôture annuelle)
+    Route::get('/leaves-carryover',         [LeaveCarryoverController::class, 'index']);
+    Route::post('/leaves-carryover/apply',  [LeaveCarryoverController::class, 'apply']);
+    Route::get('/leaves-carryover/history', [LeaveCarryoverController::class, 'history']);
 
     // Justifications
     Route::get('/justifications/pending', [JustificationController::class, 'pending']);

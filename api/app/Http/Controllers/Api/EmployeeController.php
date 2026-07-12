@@ -328,7 +328,7 @@ class EmployeeController extends Controller
                     'nombre_femmes'         => is_numeric($row['nombre_femmes'] ?? null) ? (int)$row['nombre_femmes'] : 0,
                     'department_id'         => $dept?->id,
                     'status'                => 'active',
-                    'annual_leave_days'     => 30,
+                    'annual_leave_days'     => 24,
                     'professional_email'    => $row['professional_email'] ?? null,
                     'gender'                => $row['gender'] ?? null,
                 ]);

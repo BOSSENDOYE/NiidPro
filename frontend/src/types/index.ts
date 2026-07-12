@@ -148,6 +148,16 @@ export interface Leave {
   created_at: string;
 }
 
+export interface ExpiringContract {
+  contract_id: number;
+  employee_id: number;
+  employee_name: string;
+  department: string;
+  contract_type: string;
+  end_date: string;
+  days_left: number;
+}
+
 export interface DashboardStats {
   today_attendance: {
     date: string;
@@ -160,6 +170,7 @@ export interface DashboardStats {
   pending_leaves: number;
   pending_justifications: number;
   expiring_contracts: number;
+  expiring_contracts_list: ExpiringContract[];
   total_employees: number;
   by_department: { id: number; name: string; color: string; count: number }[];
   recent_activity: { type: string; message: string; date: string }[];

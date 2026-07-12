@@ -21,6 +21,7 @@ import TrainingDocumentsTab from '../../components/trainings/TrainingDocumentsTa
 import ConfirmDialog from '../../components/shared/ConfirmDialog';
 import TrainingStatsTab from '../../components/trainings/TrainingStatsTab';
 import TrainingSettingsTab from '../../components/trainings/TrainingSettingsTab';
+import PlanFormationPage from '../planFormation/PlanFormationPage';
 import { formatDate } from '../../utils/format';
 import { useCompany } from '../../hooks/useCompany';
 import type { Training } from '../../types';
@@ -79,6 +80,7 @@ const TABS = [
   { label: 'En attente de validation', icon: <Assessment fontSize="small" /> },
   { label: 'Tableaux de bord', icon: <TableChart fontSize="small" /> },
   { label: 'Paramétrage', icon: <Settings fontSize="small" /> },
+  { label: 'Plan de formation', icon: <Event fontSize="small" /> },
 ];
 
 /* ─── Status config ─── */
@@ -318,6 +320,10 @@ export default function TrainingsPage() {
 
     if (tab === 3) {
       return <TrainingSettingsTab />;
+    }
+
+    if (tab === 4) {
+      return <PlanFormationPage embeddedMode />;
     }
 
     const rows = tab === 1 ? filteredPending : filtered;

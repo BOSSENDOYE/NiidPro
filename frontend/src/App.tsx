@@ -21,7 +21,6 @@ import DepartmentsPage from './pages/departments/DepartmentsPage';
 
 // Contrats
 import ContractsPage from './pages/contracts/ContractsPage';
-import ContractArchivePage from './pages/contracts/ContractArchivePage';
 
 // Pointage
 import AttendancesPage from './pages/attendances/AttendancesPage';
@@ -37,20 +36,11 @@ import TrainingsPage from './pages/trainings/TrainingsPage';
 // Recrutements
 import RecruitmentsPage from './pages/recruitment/RecruitmentsPage';
 
-// Plan de Recrutement
-import PlanRecrutementPage from './pages/planRecrutement/PlanRecrutementPage';
-
-// Plan de Formation
-import PlanFormationPage from './pages/planFormation/PlanFormationPage';
-
 // Évaluations période d'essai
 import EvaluationsPage from './pages/evaluations/EvaluationsPage';
 
 // Carrières
 import CarrieresPage from './pages/carrieres/CarrieresPage';
-
-// Justifications
-import JustificationsPage from './pages/justifications/JustificationsPage';
 
 // Tâches
 import TasksPage from './pages/tasks/TasksPage';
@@ -66,9 +56,6 @@ import SchemaPage from './pages/schema/SchemaPage';
 
 // Portail agent
 import AgentPortalPage from './pages/agent-portal/AgentPortalPage';
-
-// Organigramme
-import OrganigrammePage from './pages/organigramme/OrganigrammePage';
 
 // Documents de service
 import DocumentsPage from './pages/documents/DocumentsPage';
@@ -151,7 +138,6 @@ export default function App() {
               <Route path="employees/:id/edit" element={<EmployeeFormPage />} />
 
               <Route path="contracts" element={<ContractsPage />} />
-              <Route path="contracts/archives" element={<ContractArchivePage />} />
 
               <Route path="attendances" element={<AttendancesPage />} />
               <Route path="attendance-visual" element={<AttendanceVisualPage />} />
@@ -160,14 +146,9 @@ export default function App() {
               <Route path="leaves" element={<LeavesPage />} />
               <Route path="trainings" element={<TrainingsPage />} />
               <Route path="recruitment" element={<RecruitmentsPage />} />
-              <Route path="plan-recrutement" element={<PlanRecrutementPage />} />
-              <Route path="plan-formation" element={<PlanFormationPage />} />
-              <Route path="evaluations" element={<EvaluationsPage />} />
+<Route path="evaluations" element={<EvaluationsPage />} />
               <Route path="carrieres" element={<CarrieresPage />} />
-              <Route path="justifications" element={<JustificationsPage />} />
-
               {/* Organisation */}
-              <Route path="organigramme" element={<OrganigrammePage />} />
               <Route path="departments" element={<DepartmentsPage />} />
               <Route path="tasks" element={<TasksPage />} />
               <Route path="payroll" element={<PayrollPage />} />

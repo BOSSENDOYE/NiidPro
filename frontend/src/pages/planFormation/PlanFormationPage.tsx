@@ -221,7 +221,7 @@ function CatalogueTab() {
         <Typography variant="h6" fontWeight={700}>Actions de formation</Typography>
         <Stack direction="row" spacing={1}>
           <TextField select size="small" value={filterCat} onChange={e => setFilterCat(e.target.value)}
-            label="Catégorie" sx={{ minWidth: 180 }}>
+            label="Type de formation" sx={{ minWidth: 180 }}>
             <MenuItem value="">Toutes</MenuItem>
             {(Object.entries(CATEGORIE_LABELS) as [CategorieFormation, string][]).map(([k, v]) =>
               <MenuItem key={k} value={k}>{v}</MenuItem>)}
@@ -237,7 +237,7 @@ function CatalogueTab() {
           <TableHead sx={{ bgcolor: '#F8FAFF' }}>
             <TableRow>
               <TableCell>Intitulé</TableCell>
-              <TableCell>Catégorie</TableCell>
+              <TableCell>Type de formation</TableCell>
               <TableCell>Mode</TableCell>
               <TableCell>Durée</TableCell>
               <TableCell>Caractère</TableCell>
@@ -313,7 +313,7 @@ function CatalogueTab() {
               onChange={e => setFormAction(p => ({ ...p, objectifs_pedagogiques: e.target.value }))} />
             <Grid container spacing={1}>
               <Grid item xs={6}>
-                <TextField select label="Catégorie *" fullWidth size="small" value={formAction.categorie || 'metier'}
+                <TextField select label="Type de formation *" fullWidth size="small" value={formAction.categorie || 'metier'}
                   onChange={e => setFormAction(p => ({ ...p, categorie: e.target.value as CategorieFormation }))}>
                   {(Object.entries(CATEGORIE_LABELS) as [CategorieFormation, string][]).map(([k, v]) =>
                     <MenuItem key={k} value={k}>{v}</MenuItem>)}
@@ -1154,22 +1154,24 @@ function EvaluationsTab() {
 }
 
 // ─── PAGE PRINCIPALE ─────────────────────────────────────────────────────────
-export default function PlanFormationPage() {
+export default function PlanFormationPage({ embeddedMode = false }: { embeddedMode?: boolean }) {
   const [tab, setTab] = useState(0);
 
   return (
-    <Box sx={{ p: { xs: 2, md: 3 } }}>
-      <Stack direction="row" alignItems="center" spacing={1.5} mb={3}>
-        <Box sx={{ p: 1, borderRadius: '10px', bgcolor: '#10B98122', color: '#10B981', display: 'flex' }}>
-          <School />
-        </Box>
-        <Box>
-          <Typography variant="h5" fontWeight={800}>Plan de Formation</Typography>
-          <Typography variant="caption" color="text.secondary">
-            ANASER — Développement des compétences
-          </Typography>
-        </Box>
-      </Stack>
+    <Box sx={embeddedMode ? {} : { p: { xs: 2, md: 3 } }}>
+      {!embeddedMode && (
+        <Stack direction="row" alignItems="center" spacing={1.5} mb={3}>
+          <Box sx={{ p: 1, borderRadius: '10px', bgcolor: '#10B98122', color: '#10B981', display: 'flex' }}>
+            <School />
+          </Box>
+          <Box>
+            <Typography variant="h5" fontWeight={800}>Plan de Formation</Typography>
+            <Typography variant="caption" color="text.secondary">
+              ANASER — Développement des compétences
+            </Typography>
+          </Box>
+        </Stack>
+      )}
 
       <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 3, borderBottom: '1px solid #E5E7EB' }}>
         <Tab label="Tableau de bord" />

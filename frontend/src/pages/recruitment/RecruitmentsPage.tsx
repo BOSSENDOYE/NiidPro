@@ -1,4 +1,4 @@
-import { useState } from 'react';
+﻿import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Box, Typography, Button, Tabs, Tab, Chip, Dialog, DialogTitle,
@@ -6,13 +6,16 @@ import {
   CardContent, IconButton, Tooltip, Table, TableBody, TableCell,
   TableContainer, TableHead, TableRow, Select, FormControl,
   InputLabel, CircularProgress, Divider, Stack, Alert, TablePagination,
+  Avatar, Skeleton, InputAdornment,
 } from '@mui/material';
 import {
   Add, Check, Close, Work, People, CalendarMonth,
   Edit, Publish, Lock, PersonAdd,
-  Assignment, Schedule, CheckCircle,
+  Assignment, Schedule, CheckCircle, Search, Clear,
 } from '@mui/icons-material';
 import { recruitmentApi } from '../../api/recruitment';
+import { employeesApi } from '../../api/employees';
+import PlanRecrutementPage from '../planRecrutement/PlanRecrutementPage';
 import type {
   RecruitmentRequest, JobPosting, JobApplication, Interview,
 } from '../../types';
@@ -82,6 +85,8 @@ export default function RecruitmentsPage() {
   const [postPage, setPostPage] = useState(0);
   const [appPage,  setAppPage]  = useState(0);
   const [ivPage,   setIvPage]   = useState(0);
+  const [regPage,  setRegPage]  = useState(0);
+  const [regSearch, setRegSearch] = useState('');
 
   // �"? Dialog states �"?
   const [requestDialog, setRequestDialog]       = useState(false);
@@ -140,6 +145,11 @@ export default function RecruitmentsPage() {
   const { data: interviewsData, isLoading: loadingInterviews } = useQuery({
     queryKey: ['recruitment', 'interviews'],
     queryFn: () => recruitmentApi.interviews().then((r) => r.data),
+  });
+
+  const { data: employeesReg, isLoading: loadingReg } = useQuery({
+    queryKey: ['employees-registry'],
+    queryFn: () => employeesApi.list({ per_page: 500 }).then(r => r.data.data ?? []),
   });
 
   const { data: departments } = useQuery({
@@ -254,28 +264,28 @@ export default function RecruitmentsPage() {
           </Typography>
         </Box>
         <Stack direction="row" spacing={1.5}>
-          {tab === 1 && (
+          {tab === 2 && (
             <Button variant="contained" startIcon={<Add />}
               onClick={() => { setReqError(null); setRequestDialog(true); }}
               sx={{ borderRadius: '10px', textTransform: 'none', fontWeight: 700 }}>
               Nouvelle demande
             </Button>
           )}
-          {tab === 2 && (
+          {tab === 3 && (
             <Button variant="contained" startIcon={<Add />}
               onClick={() => setPostingDialog(true)}
               sx={{ borderRadius: '10px', textTransform: 'none', fontWeight: 700, bgcolor: '#7C3AED' }}>
               Nouvelle offre
             </Button>
           )}
-          {tab === 3 && selectedPosting && (
+          {tab === 4 && selectedPosting && (
             <Button variant="contained" startIcon={<PersonAdd />}
               onClick={() => setApplicationDialog(true)}
               sx={{ borderRadius: '10px', textTransform: 'none', fontWeight: 700, bgcolor: '#059669' }}>
               Ajouter candidature
             </Button>
           )}
-          {tab === 4 && (
+          {tab === 5 && (
             <Button variant="contained" startIcon={<Schedule />}
               onClick={() => setInterviewDialog(true)}
               sx={{ borderRadius: '10px', textTransform: 'none', fontWeight: 700, bgcolor: '#D97706' }}>
@@ -311,17 +321,156 @@ export default function RecruitmentsPage() {
             '& .MuiTab-root': { textTransform: 'none', fontWeight: 600, fontSize: 13, minHeight: 52 },
           }}
         >
+          <Tab label="Registre de l'employeur" />
           <Tab label="Tableau de bord" />
           <Tab label="Demandes" />
           <Tab label="Offres d'emploi" />
           <Tab label="Candidatures" />
           <Tab label="Entretiens" />
+          <Tab label="Plan de recrutement" />
         </Tabs>
 
         <Box sx={{ p: 2.5 }}>
 
-          {/* �.��.� TAB 0 : DASHBOARD �.��.� */}
-          {tab === 0 && stats && (
+          {/* ── TAB 0 : REGISTRE DE L'EMPLOYEUR ── */}
+          {tab === 0 && (() => {
+            const allEmps = (employeesReg ?? []).slice().sort(
+              (a, b) => new Date(a.hire_date).getTime() - new Date(b.hire_date).getTime(),
+            );
+            const s = regSearch.toLowerCase();
+            const filtered = s
+              ? allEmps.filter(e =>
+                  `${e.first_name} ${e.last_name}`.toLowerCase().includes(s) ||
+                  (e.employee_number ?? '').toLowerCase().includes(s) ||
+                  (e.department?.name ?? '').toLowerCase().includes(s) ||
+                  (e.position?.title ?? '').toLowerCase().includes(s)
+                )
+              : allEmps;
+            const paged = filtered.slice(regPage * REC_RPP, (regPage + 1) * REC_RPP);
+
+            const statusMap: Record<string, { label: string; color: string; bg: string }> = {
+              active:     { label: 'Actif',      color: '#059669', bg: '#ECFDF5' },
+              inactive:   { label: 'Inactif',    color: '#64748B', bg: '#F1F5F9' },
+              suspended:  { label: 'Suspendu',   color: '#D97706', bg: '#FFFBEB' },
+              on_leave:   { label: 'En congé',   color: '#2563EB', bg: '#EFF6FF' },
+              terminated: { label: 'Parti',      color: '#DC2626', bg: '#FEF2F2' },
+            };
+
+            return (
+              <Box>
+                {/* Barre de recherche */}
+                <Stack direction="row" alignItems="center" spacing={1.5} sx={{ mb: 2 }}>
+                  <TextField
+                    size="small"
+                    placeholder="Rechercher par nom, matricule, poste, direction…"
+                    value={regSearch}
+                    onChange={e => { setRegSearch(e.target.value); setRegPage(0); }}
+                    InputProps={{
+                      startAdornment: <InputAdornment position="start"><Search sx={{ fontSize: 16, color: '#94A3B8' }} /></InputAdornment>,
+                    }}
+                    sx={{ width: 360, bgcolor: '#fff' }}
+                  />
+                  {regSearch && (
+                    <IconButton size="small" onClick={() => { setRegSearch(''); setRegPage(0); }}>
+                      <Clear fontSize="small" />
+                    </IconButton>
+                  )}
+                  <Typography sx={{ fontSize: 12, color: '#64748B' }}>
+                    {filtered.length} agent(s) — triés par date de recrutement
+                  </Typography>
+                </Stack>
+
+                <TableContainer>
+                  <Table size="small">
+                    <TableHead>
+                      <TableRow sx={{ '& th': { fontWeight: 700, fontSize: 12, color: '#64748B', borderBottom: '2px solid #E2E8F0', bgcolor: '#F8FAFC' } }}>
+                        <TableCell sx={{ width: 40 }}>N°</TableCell>
+                        <TableCell>Matricule</TableCell>
+                        <TableCell>Agent</TableCell>
+                        <TableCell>Poste</TableCell>
+                        <TableCell>Direction / Service</TableCell>
+                        <TableCell>Date de recrutement</TableCell>
+                        <TableCell>Ancienneté</TableCell>
+                        <TableCell>Statut</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {loadingReg
+                        ? Array.from({ length: 8 }).map((_, i) => (
+                            <TableRow key={i}>
+                              {Array.from({ length: 8 }).map((_, j) => (
+                                <TableCell key={j}><Skeleton height={18} /></TableCell>
+                              ))}
+                            </TableRow>
+                          ))
+                        : filtered.length === 0
+                          ? (
+                            <TableRow>
+                              <TableCell colSpan={8} align="center" sx={{ py: 5, color: '#94A3B8', fontSize: 13 }}>
+                                Aucun agent trouvé
+                              </TableCell>
+                            </TableRow>
+                          )
+                          : paged.map((emp, idx) => {
+                              const st = statusMap[emp.status] ?? { label: emp.status, color: '#475569', bg: '#F1F5F9' };
+                              const initials = `${emp.first_name[0] ?? ''}${emp.last_name[0] ?? ''}`.toUpperCase();
+                              return (
+                                <TableRow key={emp.id} hover sx={{ '&:nth-of-type(even)': { bgcolor: '#F8FAFC' } }}>
+                                  <TableCell sx={{ fontSize: 12, color: '#94A3B8' }}>
+                                    {regPage * REC_RPP + idx + 1}
+                                  </TableCell>
+                                  <TableCell sx={{ fontSize: 12, fontWeight: 700, color: '#1E3A5F' }}>
+                                    {emp.employee_number}
+                                  </TableCell>
+                                  <TableCell>
+                                    <Stack direction="row" alignItems="center" spacing={1}>
+                                      <Avatar src={emp.photo_url ?? undefined} sx={{ width: 28, height: 28, fontSize: 11, fontWeight: 700, bgcolor: '#1E3A5F' }}>
+                                        {initials}
+                                      </Avatar>
+                                      <Typography sx={{ fontSize: 13, fontWeight: 600 }}>
+                                        {emp.first_name} {emp.last_name}
+                                      </Typography>
+                                    </Stack>
+                                  </TableCell>
+                                  <TableCell sx={{ fontSize: 12 }}>{emp.position?.title ?? '—'}</TableCell>
+                                  <TableCell sx={{ fontSize: 12 }}>{emp.department?.name ?? '—'}</TableCell>
+                                  <TableCell sx={{ fontSize: 12, fontWeight: 600 }}>
+                                    {emp.hire_date
+                                      ? new Date(emp.hire_date).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+                                      : '—'}
+                                  </TableCell>
+                                  <TableCell sx={{ fontSize: 12 }}>
+                                    {emp.anciennete_recrutement ?? (emp.hire_date
+                                      ? (() => {
+                                          const ms = Date.now() - new Date(emp.hire_date).getTime();
+                                          const yrs = Math.floor(ms / (1000 * 60 * 60 * 24 * 365.25));
+                                          const mos = Math.floor((ms % (1000 * 60 * 60 * 24 * 365.25)) / (1000 * 60 * 60 * 24 * 30.44));
+                                          return yrs > 0 ? `${yrs} an${yrs > 1 ? 's' : ''}${mos > 0 ? ` ${mos} mois` : ''}` : `${mos} mois`;
+                                        })()
+                                      : '—')}
+                                  </TableCell>
+                                  <TableCell>
+                                    <Chip label={st.label} size="small"
+                                      sx={{ fontSize: 11, fontWeight: 700, bgcolor: st.bg, color: st.color, border: `1px solid ${st.color}30` }} />
+                                  </TableCell>
+                                </TableRow>
+                              );
+                            })}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+                <TablePagination
+                  component="div" count={filtered.length} page={regPage} rowsPerPage={REC_RPP}
+                  onPageChange={(_, p) => setRegPage(p)} rowsPerPageOptions={[REC_RPP]}
+                  labelDisplayedRows={({ from, to, count }) => `${from}–${to} sur ${count}`}
+                  sx={{ borderTop: '1px solid #E2E8F0', '& .MuiTablePagination-toolbar': { fontSize: 12 }, '& .MuiTablePagination-displayedRows': { fontSize: 12 } }}
+                />
+              </Box>
+            );
+          })()}
+
+          {/* ── TAB 1 : DASHBOARD ── */}
+          {tab === 1 && stats && (
             <Grid container spacing={2}>
               <Grid item xs={12} md={6}>
                 <Typography sx={{ fontWeight: 700, mb: 1.5, color: '#374151' }}>Demandes par statut</Typography>
@@ -356,7 +505,7 @@ export default function RecruitmentsPage() {
           )}
 
           {/* �.��.� TAB 1 : DEMANDES �.��.� */}
-          {tab === 1 && (
+          {tab === 2 && (
             loadingRequests ? <CircularProgress /> :
             <TableContainer>
               <Table size="small">
@@ -424,7 +573,7 @@ export default function RecruitmentsPage() {
           )}
 
           {/* �.��.� TAB 2 : OFFRES �.��.� */}
-          {tab === 2 && (
+          {tab === 3 && (
             loadingPostings ? <CircularProgress /> :
             <TableContainer>
               <Table size="small">
@@ -503,7 +652,7 @@ export default function RecruitmentsPage() {
           )}
 
           {/* �.��.� TAB 3 : CANDIDATURES �.��.� */}
-          {tab === 3 && (
+          {tab === 4 && (
             loadingApplications ? <CircularProgress /> :
             <TableContainer>
               <Table size="small">
@@ -570,7 +719,9 @@ export default function RecruitmentsPage() {
           )}
 
           {/* �.��.� TAB 4 : ENTRETIENS �.��.� */}
-          {tab === 4 && (
+          {tab === 6 && <PlanRecrutementPage embeddedMode />}
+
+          {tab === 5 && (
             loadingInterviews ? <CircularProgress /> :
             <TableContainer>
               <Table size="small">

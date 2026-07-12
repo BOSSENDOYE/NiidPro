@@ -9,7 +9,8 @@ import {
 import {
   CloudUpload, Download, Delete, FolderOpen, InsertDriveFile,
   PictureAsPdf, Image, Description, Search, FilterList, Person,
-  CheckCircle, ReportProblem, HelpOutline, AutoFixHigh,
+  CheckCircle, ReportProblem, HelpOutline, AutoFixHigh, Visibility,
+  Close, ZoomIn, ZoomOut,
 } from '@mui/icons-material';
 import { contractArchivesApi, type ContractArchive, type MatchResult } from '../../api/contractArchives';
 import { employeesApi } from '../../api/employees';
@@ -149,9 +150,11 @@ const STATUS_META: Record<MatchRow['status'], { label: string; color: string; bg
 
 // ─── Page principale ─────────────────────────────────────────────────────────
 
-export default function ContractArchivePage() {
+export default function ContractArchivePage({ embeddedMode = false }: { embeddedMode?: boolean }) {
   const qc = useQueryClient();
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef  = useRef<HTMLInputElement>(null);
+  const blobUrlRef    = useRef<string | null>(null);
+
   const [search, setSearch]       = useState('');
   const [empFilter, setEmpFilter] = useState<Employee | null>(null);
   const [uploadOpen, setUploadOpen] = useState(false);
@@ -163,6 +166,14 @@ export default function ContractArchivePage() {
   const [rowFilter, setRowFilter]   = useState<'all' | 'matched' | 'unmatched'>('all');
   const [page, setPage]             = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
+
+  /* ── Lecteur PDF / image ── */
+  const [viewerOpen,    setViewerOpen]    = useState(false);
+  const [viewerUrl,     setViewerUrl]     = useState('');
+  const [viewerMime,    setViewerMime]    = useState('');
+  const [viewerName,    setViewerName]    = useState('');
+  const [viewerLoading, setViewerLoading] = useState(false);
+  const [imgZoom,       setImgZoom]       = useState(1);
 
   const { data: archives = [], isLoading } = useQuery({
     queryKey: ['contract-archives', search, empFilter?.id],
@@ -266,18 +277,70 @@ export default function ContractArchivePage() {
     URL.revokeObjectURL(url);
   };
 
+  const handlePreview = async (archive: ContractArchive) => {
+    setViewerLoading(true);
+    setViewerName(archive.original_name);
+    setViewerMime(archive.mime_type ?? '');
+    setViewerOpen(true);
+    setImgZoom(1);
+    try {
+      // Libérer l'ancienne URL blob si elle existe encore
+      if (blobUrlRef.current) {
+        URL.revokeObjectURL(blobUrlRef.current);
+        blobUrlRef.current = null;
+      }
+      const res = await contractArchivesApi.preview(archive.id);
+      const mime = archive.mime_type || 'application/octet-stream';
+      const blob = new Blob([res.data as BlobPart], { type: mime });
+      const url  = URL.createObjectURL(blob);
+      blobUrlRef.current = url;
+      setViewerUrl(url);
+    } catch {
+      setViewerOpen(false);
+    } finally {
+      setViewerLoading(false);
+    }
+  };
+
+  const closeViewer = () => {
+    setViewerOpen(false);
+    setViewerUrl('');
+    if (blobUrlRef.current) {
+      URL.revokeObjectURL(blobUrlRef.current);
+      blobUrlRef.current = null;
+    }
+  };
+
   const totalSize = archives.reduce((s, a) => s + (a.file_size ?? 0), 0);
   const pagedArchives = archives.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
 
   return (
     <Box>
-      <PageHeader
-        title="Archives Contrats"
-        subtitle={`${archives.length} fichier(s) · ${fmtSize(totalSize)}`}
-        action={{ label: 'Ajouter des fichiers', icon: <CloudUpload />, onClick: () => fileInputRef.current?.click() }}
-      />
+      {!embeddedMode && (
+        <PageHeader
+          title="Archives Contrats"
+          subtitle={`${archives.length} fichier(s) · ${fmtSize(totalSize)}`}
+          action={{ label: 'Ajouter des fichiers', icon: <CloudUpload />, onClick: () => fileInputRef.current?.click() }}
+        />
+      )}
 
-      {/* Sélecteur de fichiers (déclenché par le bouton « Ajouter des fichiers ») */}
+      {embeddedMode && (
+        <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 2 }}>
+          <Typography sx={{ fontSize: 13.5, color: '#64748B' }}>
+            {archives.length} fichier(s) · {fmtSize(totalSize)}
+          </Typography>
+          <Button
+            variant="contained"
+            startIcon={<CloudUpload />}
+            onClick={() => fileInputRef.current?.click()}
+            sx={{ borderRadius: '9px', fontSize: 13, px: 2, py: 0.9, bgcolor: '#2563EB', '&:hover': { bgcolor: '#1D4ED8' } }}
+          >
+            Ajouter des fichiers
+          </Button>
+        </Stack>
+      )}
+
+      {/* Sélecteur de fichiers (déclenché par le bouton) */}
       <input
         ref={fileInputRef}
         type="file"
@@ -408,6 +471,11 @@ export default function ContractArchivePage() {
                     </TableCell>
                     <TableCell>
                       <Stack direction="row" spacing={0.25}>
+                        <Tooltip title="Visualiser">
+                          <IconButton size="small" onClick={() => handlePreview(a)}>
+                            <Visibility sx={{ fontSize: 15, color: '#059669' }} />
+                          </IconButton>
+                        </Tooltip>
                         <Tooltip title="Télécharger">
                           <IconButton size="small" onClick={() => handleDownload(a)}>
                             <Download sx={{ fontSize: 15, color: '#2563EB' }} />
@@ -603,6 +671,116 @@ export default function ContractArchivePage() {
             {uploading ? 'Envoi en cours…' : `Importer ${matchRows.length > 0 ? `(${matchRows.length})` : ''}`}
           </Button>
         </DialogActions>
+      </Dialog>
+
+      {/* ══ Lecteur PDF / Image ══ */}
+      <Dialog
+        open={viewerOpen}
+        onClose={closeViewer}
+        maxWidth="xl"
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: '14px',
+            height: '92vh',
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
+          },
+        }}
+      >
+        {/* En-tête */}
+        <Box sx={{
+          display: 'flex', alignItems: 'center', gap: 1.5,
+          px: 2.5, py: 1.5,
+          bgcolor: '#0D2137', color: '#fff',
+          flexShrink: 0,
+        }}>
+          {viewerMime?.includes('pdf')
+            ? <PictureAsPdf sx={{ color: '#FCA5A5', fontSize: 20 }} />
+            : <Image sx={{ color: '#93C5FD', fontSize: 20 }} />}
+          <Typography sx={{ fontWeight: 700, fontSize: 14, flex: 1 }} noWrap>
+            {viewerName}
+          </Typography>
+
+          {/* Zoom image uniquement */}
+          {viewerMime?.startsWith('image/') && !viewerLoading && (
+            <Stack direction="row" spacing={0.5}>
+              <Tooltip title="Zoom -">
+                <IconButton size="small" sx={{ color: '#94A3B8' }}
+                  onClick={() => setImgZoom((z) => Math.max(0.25, z - 0.25))}>
+                  <ZoomOut sx={{ fontSize: 18 }} />
+                </IconButton>
+              </Tooltip>
+              <Typography sx={{ color: '#CBD5E1', fontSize: 12, alignSelf: 'center', minWidth: 36, textAlign: 'center' }}>
+                {Math.round(imgZoom * 100)}%
+              </Typography>
+              <Tooltip title="Zoom +">
+                <IconButton size="small" sx={{ color: '#94A3B8' }}
+                  onClick={() => setImgZoom((z) => Math.min(4, z + 0.25))}>
+                  <ZoomIn sx={{ fontSize: 18 }} />
+                </IconButton>
+              </Tooltip>
+            </Stack>
+          )}
+
+          <Tooltip title="Fermer">
+            <IconButton size="small" sx={{ color: '#94A3B8', ml: 1 }} onClick={closeViewer}>
+              <Close sx={{ fontSize: 18 }} />
+            </IconButton>
+          </Tooltip>
+        </Box>
+
+        {/* Corps */}
+        <Box sx={{ flex: 1, overflow: 'auto', bgcolor: '#1E293B', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          {viewerLoading ? (
+            <Stack alignItems="center" spacing={2}>
+              <CircularProgress sx={{ color: '#60A5FA' }} />
+              <Typography sx={{ color: '#94A3B8', fontSize: 13 }}>Chargement du fichier…</Typography>
+            </Stack>
+          ) : viewerMime?.includes('pdf') ? (
+            <iframe
+              src={viewerUrl}
+              title={viewerName}
+              style={{ width: '100%', height: '100%', border: 'none', display: 'block' }}
+            />
+          ) : viewerMime?.startsWith('image/') ? (
+            <Box sx={{ p: 2, overflow: 'auto', width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <img
+                src={viewerUrl}
+                alt={viewerName}
+                style={{
+                  maxWidth: '100%',
+                  transform: `scale(${imgZoom})`,
+                  transformOrigin: 'center center',
+                  transition: 'transform 0.2s',
+                  borderRadius: 8,
+                  boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
+                }}
+              />
+            </Box>
+          ) : (
+            <Stack alignItems="center" spacing={2}>
+              <InsertDriveFile sx={{ fontSize: 56, color: '#475569' }} />
+              <Typography sx={{ color: '#94A3B8', fontSize: 13 }}>
+                Ce type de fichier ne peut pas être prévisualisé directement.
+              </Typography>
+              <Button
+                variant="outlined"
+                startIcon={<Download />}
+                sx={{ color: '#60A5FA', borderColor: '#60A5FA' }}
+                onClick={() => {
+                  const a = document.createElement('a');
+                  a.href = viewerUrl;
+                  a.download = viewerName;
+                  a.click();
+                }}
+              >
+                Télécharger le fichier
+              </Button>
+            </Stack>
+          )}
+        </Box>
       </Dialog>
     </Box>
   );

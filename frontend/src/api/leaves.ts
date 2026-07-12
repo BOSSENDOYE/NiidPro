@@ -115,6 +115,37 @@ export const leavesApi = {
     client.post(`/leaves/${id}/justification`),
 };
 
+export interface CarryoverRow {
+  employee_id:      number;
+  employee_name:    string;
+  employee_number:  string;
+  department:       string;
+  solde_disponible: number;
+  plafond:          number;
+  jours_a_reporter: number;
+  already_applied:  boolean;
+  applied_at:       string | null;
+  jours_reportes:   number | null;
+}
+
+export interface CarryoverIndexResult {
+  year:    number;
+  plafond: number;
+  rows:    CarryoverRow[];
+  history: unknown[];
+}
+
+export const carryoverApi = {
+  index: (year?: number, plafond?: number) =>
+    client.get<CarryoverIndexResult>('/leaves-carryover', { params: { year, plafond } }).then((r) => r.data),
+
+  apply: (data: { year: number; plafond: number; employee_ids: number[] }) =>
+    client.post('/leaves-carryover/apply', data).then((r) => r.data),
+
+  history: (params?: Record<string, unknown>) =>
+    client.get('/leaves-carryover/history', { params }).then((r) => r.data),
+};
+
 // ── CRUD Types de congé ──────────────────────────────────────────────────────
 export const leaveTypesApi = {
   list: () =>

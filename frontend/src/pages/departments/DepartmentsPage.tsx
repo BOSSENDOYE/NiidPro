@@ -7,11 +7,12 @@ import {
 } from '@mui/material';
 import {
   Add, Edit, Delete, People, ExpandMore, ChevronRight,
-  Search, AccountTree, ViewList,
+  Search, AccountTree, ViewList, Hub,
 } from '@mui/icons-material';
 import { useForm } from 'react-hook-form';
 import { departmentsApi } from '../../api/departments';
 import PageHeader from '../../components/common/PageHeader';
+import OrganigrammePage from '../organigramme/OrganigrammePage';
 import type { Department } from '../../types';
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
@@ -193,8 +194,12 @@ function DeptRow({ node, level, expanded, toggle, onEdit, onDelete }: RowProps) 
 
 type FormData = { name: string; code: string; description: string; color: string; parent_id: string };
 
+const NAV_DEPT = '#0D2137';
+const ACT_DEPT = '#818CF8';
+
 export default function DepartmentsPage() {
   const qc = useQueryClient();
+  const [activeTab, setActiveTab] = useState(0);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<Department | null>(null);
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
@@ -295,8 +300,40 @@ export default function DepartmentsPage() {
       <PageHeader
         title="Directions & Services"
         subtitle={`${flatList.length} entités · ${roots.length} directions principales · ${totalActive} agents actifs`}
-        action={{ label: 'Nouvelle entité', icon: <Add />, onClick: openCreate }}
+        action={activeTab === 0 ? { label: 'Nouvelle entité', icon: <Add />, onClick: openCreate } : undefined}
       />
+
+      {/* ── Onglets ── */}
+      <Box sx={{ bgcolor: '#F1F5F9', px: 2, pt: 1.5, pb: 0, display: 'flex', gap: 1, borderBottom: `2px solid ${NAV_DEPT}`, mb: 2 }}>
+        {[
+          { label: 'Directions & Services', icon: <AccountTree sx={{ fontSize: 15 }} /> },
+          { label: 'Organigramme',          icon: <Hub sx={{ fontSize: 15 }} /> },
+        ].map((cfg, i) => {
+          const isActive = i === activeTab;
+          return (
+            <Box key={i} onClick={() => setActiveTab(i)} sx={{
+              px: 2, py: 1, cursor: 'pointer', borderRadius: '8px 8px 0 0',
+              fontWeight: 700, fontSize: 13, userSelect: 'none',
+              display: 'flex', alignItems: 'center', gap: '6px',
+              bgcolor: isActive ? ACT_DEPT : '#fff',
+              color:   isActive ? '#fff' : NAV_DEPT,
+              border:  `1.5px solid ${isActive ? ACT_DEPT : '#C7D2FE'}`,
+              borderBottom: 'none',
+              boxShadow: isActive ? '0 -2px 8px rgba(129,140,248,0.30)' : 'none',
+              transition: 'all 0.15s',
+              '&:hover': { bgcolor: isActive ? ACT_DEPT : '#EEF2FF' },
+            }}>
+              {cfg.icon}{cfg.label}
+            </Box>
+          );
+        })}
+      </Box>
+
+      {/* ── Contenu onglet Organigramme ── */}
+      {activeTab === 1 && <OrganigrammePage embeddedMode />}
+
+      {/* ── Contenu onglet Directions & Services ── */}
+      {activeTab === 0 && (<>
 
       {/* Toolbar */}
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2, flexWrap: 'wrap' }}>
@@ -480,6 +517,7 @@ export default function DepartmentsPage() {
           </Button>
         </DialogActions>
       </Dialog>
+      </>)}
     </Box>
   );
 }

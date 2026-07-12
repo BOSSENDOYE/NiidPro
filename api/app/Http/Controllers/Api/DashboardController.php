@@ -26,11 +26,24 @@ class DashboardController extends Controller
         $pendingJustifs = Justification::where('status', 'pending')->count();
 
         // Contrats expirant dans 30 jours
-        $expiringContracts = Contract::where('is_active', true)
+        $expiringQuery = Contract::where('is_active', true)
             ->whereNotNull('end_date')
             ->whereDate('end_date', '<=', $today->copy()->addDays(30))
             ->whereDate('end_date', '>=', $today)
-            ->count();
+            ->with('employee.department')
+            ->orderBy('end_date');
+
+        $expiringContracts = $expiringQuery->count();
+
+        $expiringList = $expiringQuery->get()->map(fn($c) => [
+            'contract_id'   => $c->id,
+            'employee_id'   => $c->employee_id,
+            'employee_name' => $c->employee->full_name,
+            'department'    => $c->employee->department?->name ?? '—',
+            'contract_type' => $c->type,
+            'end_date'      => $c->end_date->toDateString(),
+            'days_left'     => (int) $today->diffInDays($c->end_date),
+        ]);
 
         // Effectifs par direction
         $byDepartment = Department::withCount(['employees' => fn($q) => $q->where('status', 'active')])
@@ -57,7 +70,8 @@ class DashboardController extends Controller
             ],
             'pending_leaves'       => $pendingLeaves,
             'pending_justifications' => $pendingJustifs,
-            'expiring_contracts'   => $expiringContracts,
+            'expiring_contracts'      => $expiringContracts,
+            'expiring_contracts_list' => $expiringList,
             'total_employees'      => $activeEmployees,
             'by_department'        => $byDepartment,
             'recent_activity'      => $recentActivity,
