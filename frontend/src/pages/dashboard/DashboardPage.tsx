@@ -7,7 +7,7 @@ import {
 import {
   AssignmentLate, BeachAccess, Business, CheckCircle,
   EventAvailable, Groups, PersonAdd, Print, QueryStats, Schedule, TrendingUp,
-  WarningAmber, WorkHistory, Gavel,
+  WarningAmber, WorkHistory, Gavel, Work, Category,
 } from '@mui/icons-material';
 import type { ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -614,6 +614,174 @@ export default function DashboardPage() {
           </Card>
         </Grid>
       </Grid>
+
+      {/* ── Répartition par Fonction & Catégorie ─────────────────────── */}
+      {(isLoading || (data && (data.by_fonction?.length > 0 || data.by_categorie?.length > 0))) && (
+        <Grid container spacing={2}>
+          {/* Widget Fonctions */}
+          <Grid item xs={12} lg={7}>
+            <Card sx={{ borderRadius: '14px', height: '100%' }}>
+              <CardContent sx={{ p: 2.5 }}>
+                <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 2.25 }}>
+                  <Stack direction="row" spacing={1.25} alignItems="center">
+                    <Avatar sx={{ width: 34, height: 34, bgcolor: '#FFF7ED', color: '#EA580C' }}>
+                      <Work sx={{ fontSize: 18 }} />
+                    </Avatar>
+                    <Box>
+                      <Typography sx={{ fontWeight: 800, color: '#0F172A', fontSize: 15 }}>
+                        Effectifs par Fonction
+                      </Typography>
+                      <Typography sx={{ color: '#94A3B8', fontSize: 12 }}>
+                        Répartition des agents actifs par intitulé de poste
+                      </Typography>
+                    </Box>
+                  </Stack>
+                  {data && (
+                    <Chip
+                      label={`${data.by_fonction?.reduce((s, f) => s + f.count, 0) ?? 0} agents`}
+                      size="small"
+                      sx={{ bgcolor: '#FFF7ED', color: '#EA580C', fontWeight: 800 }}
+                    />
+                  )}
+                </Stack>
+
+                {isLoading ? (
+                  <Skeleton variant="rounded" height={280} />
+                ) : data?.by_fonction?.length ? (
+                  <Stack spacing={1.4}>
+                    {(() => {
+                      const top = data.by_fonction.slice(0, 10);
+                      const maxCount = Math.max(...top.map(f => f.count), 1);
+                      const COLORS = ['#002f59','#EA580C','#059669','#7C3AED','#0E7490','#DC2626','#D97706','#0284C7','#65A30D','#BE185D'];
+                      return top.map((item, i) => {
+                        const pct = Math.round((item.count / maxCount) * 100);
+                        const color = COLORS[i % COLORS.length];
+                        return (
+                          <Box key={item.fonction}>
+                            <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 0.6 }}>
+                              <Stack direction="row" spacing={1} alignItems="center" sx={{ minWidth: 0, flex: 1 }}>
+                                <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: color, flexShrink: 0 }} />
+                                <Typography noWrap sx={{ fontSize: 12.5, color: '#334155', fontWeight: 700 }}>
+                                  {item.fonction.charAt(0) + item.fonction.slice(1).toLowerCase()}
+                                </Typography>
+                              </Stack>
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, ml: 1 }}>
+                                <Typography sx={{ fontSize: 12, color: '#0F172A', fontWeight: 850, minWidth: 22, textAlign: 'right' }}>
+                                  {item.count}
+                                </Typography>
+                                <Chip
+                                  label={`${Math.round((item.count / (data.total_employees || 1)) * 100)}%`}
+                                  size="small"
+                                  sx={{ fontSize: 10, height: 18, fontWeight: 700, bgcolor: `${color}18`, color }}
+                                />
+                              </Box>
+                            </Stack>
+                            <LinearProgress
+                              variant="determinate" value={pct}
+                              sx={{ height: 7, borderRadius: 4, bgcolor: '#F1F5F9', '& .MuiLinearProgress-bar': { bgcolor: color } }}
+                            />
+                          </Box>
+                        );
+                      });
+                    })()}
+                    {data.by_fonction.length > 10 && (
+                      <Typography sx={{ fontSize: 11, color: '#94A3B8', textAlign: 'right', mt: 0.5 }}>
+                        + {data.by_fonction.length - 10} autre(s) fonction(s)
+                      </Typography>
+                    )}
+                  </Stack>
+                ) : (
+                  <Box sx={{ py: 4, textAlign: 'center' }}>
+                    <Typography sx={{ color: '#94A3B8', fontSize: 13 }}>
+                      Aucune donnée — importez le registre pour renseigner les fonctions
+                    </Typography>
+                  </Box>
+                )}
+              </CardContent>
+            </Card>
+          </Grid>
+
+          {/* Widget Catégories */}
+          <Grid item xs={12} lg={5}>
+            <Card sx={{ borderRadius: '14px', height: '100%' }}>
+              <CardContent sx={{ p: 2.5 }}>
+                <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 2.25 }}>
+                  <Stack direction="row" spacing={1.25} alignItems="center">
+                    <Avatar sx={{ width: 34, height: 34, bgcolor: '#F5F3FF', color: '#7C3AED' }}>
+                      <Category sx={{ fontSize: 18 }} />
+                    </Avatar>
+                    <Box>
+                      <Typography sx={{ fontWeight: 800, color: '#0F172A', fontSize: 15 }}>
+                        Effectifs par Catégorie
+                      </Typography>
+                      <Typography sx={{ color: '#94A3B8', fontSize: 12 }}>
+                        Structure hiérarchique des agents
+                      </Typography>
+                    </Box>
+                  </Stack>
+                  {data && (
+                    <Chip
+                      label={`${data.by_categorie?.length ?? 0} catég.`}
+                      size="small"
+                      sx={{ bgcolor: '#F5F3FF', color: '#7C3AED', fontWeight: 800 }}
+                    />
+                  )}
+                </Stack>
+
+                {isLoading ? (
+                  <Skeleton variant="rounded" height={280} />
+                ) : data?.by_categorie?.length ? (
+                  <Stack spacing={1.4}>
+                    {(() => {
+                      const items = data.by_categorie.slice(0, 12);
+                      const maxCount = Math.max(...items.map(c => c.count), 1);
+                      return items.map((item, i) => {
+                        const pct = Math.round((item.count / maxCount) * 100);
+                        const hue = (i * 37) % 360;
+                        const color = `hsl(${hue},60%,38%)`;
+                        return (
+                          <Box key={item.categorie}>
+                            <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 0.6 }}>
+                              <Stack direction="row" spacing={1} alignItems="center">
+                                <Box sx={{
+                                  width: 26, height: 26, borderRadius: '8px',
+                                  bgcolor: `hsl(${hue},60%,93%)`, color,
+                                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                  fontSize: 11, fontWeight: 900,
+                                }}>
+                                  {item.categorie}
+                                </Box>
+                              </Stack>
+                              <Box sx={{ flex: 1, mx: 1.5 }}>
+                                <LinearProgress
+                                  variant="determinate" value={pct}
+                                  sx={{ height: 7, borderRadius: 4, bgcolor: '#F1F5F9', '& .MuiLinearProgress-bar': { bgcolor: color } }}
+                                />
+                              </Box>
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, minWidth: 60, justifyContent: 'flex-end' }}>
+                                <Typography sx={{ fontSize: 13, color: '#0F172A', fontWeight: 850 }}>{item.count}</Typography>
+                                <Typography sx={{ fontSize: 10.5, color: '#94A3B8' }}>
+                                  ({Math.round((item.count / (data.total_employees || 1)) * 100)}%)
+                                </Typography>
+                              </Box>
+                            </Stack>
+                          </Box>
+                        );
+                      });
+                    })()}
+                  </Stack>
+                ) : (
+                  <Box sx={{ py: 4, textAlign: 'center' }}>
+                    <Typography sx={{ color: '#94A3B8', fontSize: 13 }}>
+                      Aucune donnée — importez le registre pour renseigner les catégories
+                    </Typography>
+                  </Box>
+                )}
+              </CardContent>
+            </Card>
+          </Grid>
+        </Grid>
+      )}
 
       {/* ── Panel Alertes Contrats ─────────────────────────────────────── */}
       <ContractAlertsPanel contracts={data?.expiring_contracts_list ?? []} isLoading={isLoading} />

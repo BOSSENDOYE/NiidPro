@@ -30,6 +30,7 @@ use App\Http\Controllers\Api\CarriereController;
 use App\Http\Controllers\Api\PayrollTemplateController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\LeaveCarryoverController;
+use App\Http\Controllers\Api\EnrollmentController;
 use Illuminate\Support\Facades\Route;
 
 // Health check
@@ -42,6 +43,9 @@ Route::get('/settings', [SettingsController::class, 'index']);
 Route::prefix('auth')->group(function () {
     Route::post('/login', [AuthController::class, 'login']);
 });
+
+// Enrôlement agent (public — sans authentification)
+Route::post('/enroll/submit', [EnrollmentController::class, 'submit']);
 
 // Protected routes
 Route::middleware('auth:sanctum')->group(function () {
@@ -92,11 +96,18 @@ Route::middleware('auth:sanctum')->group(function () {
     // Dashboard
     Route::get('/dashboard', [DashboardController::class, 'index']);
 
+    // Enrôlement — vérification (protégé)
+    Route::get('/enrollments',              [EnrollmentController::class, 'index']);
+    Route::get('/enrollments/{enrollment}', [EnrollmentController::class, 'show']);
+    Route::post('/enrollments/{enrollment}/validate', [EnrollmentController::class, 'validate']);
+    Route::post('/enrollments/{enrollment}/reject',   [EnrollmentController::class, 'reject']);
+
     // Departments
     Route::apiResource('departments', DepartmentController::class);
 
     // Employees
     Route::post('/employees/import-json',              [EmployeeController::class, 'importJson']);
+    Route::post('/employees/import-registre',          [EmployeeController::class, 'importRegistre']);
     Route::get('/employees/counts',                    [EmployeeController::class, 'counts']);
     Route::get('/employees/export',                    [EmployeeController::class, 'export']);
     Route::post('/employees/import',                   [EmployeeController::class, 'import']);

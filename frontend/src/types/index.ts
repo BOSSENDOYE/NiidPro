@@ -75,6 +75,31 @@ export interface Employee {
   // Carrière
   categorie_emploi?: string;
   echelon?: string;
+  fonction?: string;
+  qualification?: string;
+}
+
+export interface EnrollmentRequest {
+  id: number;
+  matricule: string;
+  first_name: string;
+  last_name: string;
+  date_naissance: string;
+  lieu_naissance: string;
+  date_embauche: string;
+  fonction: string;
+  telephone: string;
+  email: string;
+  categorie_emploi?: string;
+  qualification?: string;
+  status: 'pending' | 'validated' | 'rejected';
+  rejection_reason?: string;
+  matched_employee_id?: number;
+  reviewed_by?: number;
+  reviewed_at?: string;
+  created_at: string;
+  reviewer?: { id: number; name: string };
+  matched_employee?: Employee;
 }
 
 export interface EmployeeFamilyMember {
@@ -173,6 +198,8 @@ export interface DashboardStats {
   expiring_contracts_list: ExpiringContract[];
   total_employees: number;
   by_department: { id: number; name: string; color: string; count: number }[];
+  by_fonction:   { fonction: string; count: number }[];
+  by_categorie:  { categorie: string; count: number }[];
   recent_activity: { type: string; message: string; date: string }[];
 }
 

@@ -7,6 +7,9 @@ import AppLayout from './components/layout/AppLayout';
 // Auth
 import LoginPage from './pages/auth/LoginPage';
 
+// Enrôlement (public)
+import EnrollmentPage from './pages/enrollment/EnrollmentPage';
+
 // Dashboard
 import DashboardPage from './pages/dashboard/DashboardPage';
 
@@ -105,6 +108,7 @@ export default function App() {
         <BrowserRouter>
           <Routes>
             <Route path="/login" element={<LoginPage />} />
+            <Route path="/enroll" element={<EnrollmentPage />} />
 
             {/* ══ Portail Agent ══ */}
             <Route path="/portail" element={<PrivateRoute><PortalLayout /></PrivateRoute>}>

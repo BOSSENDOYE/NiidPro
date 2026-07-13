@@ -1,4 +1,4 @@
-﻿import { useState } from 'react';
+﻿import { useState, useCallback, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Box, Typography, Button, Tabs, Tab, Chip, Dialog, DialogTitle,
@@ -6,19 +6,93 @@ import {
   CardContent, IconButton, Tooltip, Table, TableBody, TableCell,
   TableContainer, TableHead, TableRow, Select, FormControl,
   InputLabel, CircularProgress, Divider, Stack, Alert, TablePagination,
-  Avatar, Skeleton, InputAdornment,
+  Avatar, Skeleton, InputAdornment, LinearProgress,
 } from '@mui/material';
 import {
   Add, Check, Close, Work, People, CalendarMonth,
   Edit, Publish, Lock, PersonAdd,
   Assignment, Schedule, CheckCircle, Search, Clear,
+  CloudUpload, FileUpload, Refresh,
 } from '@mui/icons-material';
+import * as XLSX from 'xlsx';
 import { recruitmentApi } from '../../api/recruitment';
 import { employeesApi } from '../../api/employees';
+import client from '../../api/client';
 import PlanRecrutementPage from '../planRecrutement/PlanRecrutementPage';
 import type {
   RecruitmentRequest, JobPosting, JobApplication, Interview,
 } from '../../types';
+
+// ── Helpers import registre ──────────────────────────────────────────────────
+const REG_COL_MAP: Record<string, string> = {
+  'matr': 'employee_number', 'matr.': 'employee_number', 'matricule': 'employee_number',
+  'prénom(s)': 'first_name', 'prenom(s)': 'first_name', 'prénom': 'first_name', 'prenom': 'first_name', 'prénoms': 'first_name', 'prenoms': 'first_name',
+  'nom': 'last_name',
+  'date naiss.': 'birth_date', 'date naiss': 'birth_date', 'date naissance': 'birth_date',
+  'lieu naiss.': 'birth_place', 'lieu naiss': 'birth_place', 'lieu naissance': 'birth_place',
+  'date emb.': 'hire_date', 'date emb': 'hire_date', 'date embauche': 'hire_date',
+  'ancienneté (ans)': 'anciennete_recrutement', 'anciennete (ans)': 'anciennete_recrutement',
+  'ancienneté': 'anciennete_recrutement', 'anciennete': 'anciennete_recrutement',
+  'fonction': 'fonction',
+  'catégorie': 'categorie_emploi', 'categorie': 'categorie_emploi',
+  'qualification': 'qualification',
+  'n°': '_skip', 'no': '_skip', 'obs': '_skip',
+};
+
+function parseRegDate(val: unknown): string | null {
+  if (!val) return null;
+  if (typeof val === 'number') {
+    const d = XLSX.SSF.parse_date_code(val);
+    if (d) return `${d.y}-${String(d.m).padStart(2,'0')}-${String(d.d).padStart(2,'0')}`;
+  }
+  const s = String(val).trim();
+  const m = s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})$/);
+  if (m) return `${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  return null;
+}
+
+function parseRegFile(file: File): Promise<Record<string, unknown>[]> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const wb  = XLSX.read(e.target?.result, { type: 'array', cellDates: false });
+        const ws  = wb.Sheets[wb.SheetNames[0]];
+        const raw = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { header: 1, defval: '' });
+        if (raw.length < 2) { resolve([]); return; }
+
+        const headerRow = (raw[0] as string[]).map(h => String(h ?? '').toLowerCase().trim().replace(/\s+/g,' '));
+        const mappedHeaders = headerRow.map(h => REG_COL_MAP[h] ?? null);
+
+        const rows: Record<string, unknown>[] = [];
+        for (let i = 1; i < raw.length; i++) {
+          const cells = raw[i] as unknown[];
+          const row: Record<string, unknown> = {};
+          let hasData = false;
+          mappedHeaders.forEach((field, j) => {
+            if (!field || field === '_skip') return;
+            const v = cells[j];
+            if (v === '' || v === null || v === undefined) { row[field] = null; return; }
+            if (field === 'birth_date' || field === 'hire_date') row[field] = parseRegDate(v);
+            else row[field] = String(v).trim();
+            if (row[field]) hasData = true;
+          });
+          if (hasData) rows.push(row);
+        }
+        resolve(rows);
+      } catch (err) { reject(err); }
+    };
+    reader.onerror = reject;
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+function fmtDate(d: string | null | undefined) {
+  if (!d) return '—';
+  try { return new Date(d).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' }); }
+  catch { return d; }
+}
 
 // �"?�"? helpers �"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?
 
@@ -87,6 +161,53 @@ export default function RecruitmentsPage() {
   const [ivPage,   setIvPage]   = useState(0);
   const [regPage,  setRegPage]  = useState(0);
   const [regSearch, setRegSearch] = useState('');
+
+  // ── Enrôlement / Vérification ────────────────────────────────────────────
+  const [enrollFilter, setEnrollFilter] = useState<'pending'|'validated'|'rejected'|''>('pending');
+  const [enrollDetail, setEnrollDetail] = useState<{ enrollment: EnrollmentRequest; matched_employee: import('../../types').Employee | null } | null>(null);
+  const [enrollDetailOpen, setEnrollDetailOpen] = useState(false);
+  const [enrollRejectOpen, setEnrollRejectOpen] = useState(false);
+  const [rejectReasonText, setRejectReasonText] = useState('');
+  const [enrollActionLoading, setEnrollActionLoading] = useState(false);
+  const ENROLL_URL = `${window.location.origin}/enroll`;
+
+  // ── Import registre ──────────────────────────────────────────────────────
+  const [importOpen,    setImportOpen]    = useState(false);
+  const [importStep,    setImportStep]    = useState<0|1|2>(0);
+  const [importRows,    setImportRows]    = useState<Record<string, unknown>[]>([]);
+  const [importFile,    setImportFile]    = useState('');
+  const [importLoading, setImportLoading] = useState(false);
+  const [importResult,  setImportResult]  = useState<{ updated: number; created: number; skipped: string[] } | null>(null);
+  const [dragOver,      setDragOver]      = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const handleRegFile = useCallback(async (file: File) => {
+    try {
+      const rows = await parseRegFile(file);
+      setImportRows(rows);
+      setImportFile(file.name);
+      setImportStep(1);
+    } catch { setImportRows([]); }
+  }, []);
+
+  const confirmImport = async () => {
+    setImportLoading(true);
+    try {
+      const res = await client.post('/employees/import-registre', { rows: importRows });
+      setImportResult(res.data);
+      setImportStep(2);
+      qc.invalidateQueries({ queryKey: ['employees-registry'] });
+    } catch { /* handled */ }
+    finally { setImportLoading(false); }
+  };
+
+  const resetImport = () => {
+    setImportOpen(false);
+    setImportStep(0);
+    setImportRows([]);
+    setImportFile('');
+    setImportResult(null);
+  };
 
   // �"? Dialog states �"?
   const [requestDialog, setRequestDialog]       = useState(false);
@@ -335,124 +456,94 @@ export default function RecruitmentsPage() {
           {/* ── TAB 0 : REGISTRE DE L'EMPLOYEUR ── */}
           {tab === 0 && (() => {
             const allEmps = (employeesReg ?? []).slice().sort(
-              (a, b) => new Date(a.hire_date).getTime() - new Date(b.hire_date).getTime(),
+              (a, b) => new Date(a.hire_date ?? '').getTime() - new Date(b.hire_date ?? '').getTime(),
             );
             const s = regSearch.toLowerCase();
             const filtered = s
               ? allEmps.filter(e =>
                   `${e.first_name} ${e.last_name}`.toLowerCase().includes(s) ||
                   (e.employee_number ?? '').toLowerCase().includes(s) ||
-                  (e.department?.name ?? '').toLowerCase().includes(s) ||
-                  (e.position?.title ?? '').toLowerCase().includes(s)
+                  (e.fonction ?? '').toLowerCase().includes(s) ||
+                  (e.categorie_emploi ?? '').toLowerCase().includes(s)
                 )
               : allEmps;
             const paged = filtered.slice(regPage * REC_RPP, (regPage + 1) * REC_RPP);
 
-            const statusMap: Record<string, { label: string; color: string; bg: string }> = {
-              active:     { label: 'Actif',      color: '#059669', bg: '#ECFDF5' },
-              inactive:   { label: 'Inactif',    color: '#64748B', bg: '#F1F5F9' },
-              suspended:  { label: 'Suspendu',   color: '#D97706', bg: '#FFFBEB' },
-              on_leave:   { label: 'En congé',   color: '#2563EB', bg: '#EFF6FF' },
-              terminated: { label: 'Parti',      color: '#DC2626', bg: '#FEF2F2' },
-            };
-
             return (
               <Box>
-                {/* Barre de recherche */}
-                <Stack direction="row" alignItems="center" spacing={1.5} sx={{ mb: 2 }}>
+                {/* Barre outils */}
+                <Stack direction="row" alignItems="center" spacing={1.5} sx={{ mb: 2 }} flexWrap="wrap">
                   <TextField
                     size="small"
-                    placeholder="Rechercher par nom, matricule, poste, direction…"
+                    placeholder="Rechercher par nom, matricule, fonction…"
                     value={regSearch}
                     onChange={e => { setRegSearch(e.target.value); setRegPage(0); }}
                     InputProps={{
                       startAdornment: <InputAdornment position="start"><Search sx={{ fontSize: 16, color: '#94A3B8' }} /></InputAdornment>,
+                      endAdornment: regSearch ? (
+                        <InputAdornment position="end">
+                          <IconButton size="small" onClick={() => { setRegSearch(''); setRegPage(0); }}><Clear fontSize="small" /></IconButton>
+                        </InputAdornment>
+                      ) : null,
                     }}
-                    sx={{ width: 360, bgcolor: '#fff' }}
+                    sx={{ width: 320 }}
                   />
-                  {regSearch && (
-                    <IconButton size="small" onClick={() => { setRegSearch(''); setRegPage(0); }}>
-                      <Clear fontSize="small" />
-                    </IconButton>
-                  )}
-                  <Typography sx={{ fontSize: 12, color: '#64748B' }}>
-                    {filtered.length} agent(s) — triés par date de recrutement
+                  <Typography sx={{ fontSize: 12, color: '#64748B', flex: 1 }}>
+                    {filtered.length} agent(s) — triés par date d'embauche
                   </Typography>
+                  <Button
+                    variant="contained" startIcon={<FileUpload />}
+                    onClick={() => { setImportOpen(true); setImportStep(0); }}
+                    sx={{ borderRadius: '10px', textTransform: 'none', fontWeight: 700, bgcolor: '#002f59', '&:hover': { bgcolor: '#001f3f' } }}
+                  >
+                    Importer le registre
+                  </Button>
                 </Stack>
 
-                <TableContainer>
-                  <Table size="small">
+                <TableContainer sx={{ border: '1px solid #E2E8F0', borderRadius: 1 }}>
+                  <Table size="small" sx={{ minWidth: 900 }}>
                     <TableHead>
-                      <TableRow sx={{ '& th': { fontWeight: 700, fontSize: 12, color: '#64748B', borderBottom: '2px solid #E2E8F0', bgcolor: '#F8FAFC' } }}>
-                        <TableCell sx={{ width: 40 }}>N°</TableCell>
-                        <TableCell>Matricule</TableCell>
-                        <TableCell>Agent</TableCell>
-                        <TableCell>Poste</TableCell>
-                        <TableCell>Direction / Service</TableCell>
-                        <TableCell>Date de recrutement</TableCell>
-                        <TableCell>Ancienneté</TableCell>
-                        <TableCell>Statut</TableCell>
+                      <TableRow sx={{ bgcolor: '#1E3A5F' }}>
+                        {['N°','Matr.','Prénom(s)','Nom','Date Naiss.','Lieu Naiss.','Date Emb.','Ancienneté (ans)','Fonction','Catégorie','Qualification'].map(h => (
+                          <TableCell key={h} sx={{ color: '#fff', fontWeight: 700, fontSize: 11, py: 1.25, whiteSpace: 'nowrap', borderBottom: 'none' }}>{h}</TableCell>
+                        ))}
                       </TableRow>
                     </TableHead>
                     <TableBody>
                       {loadingReg
                         ? Array.from({ length: 8 }).map((_, i) => (
                             <TableRow key={i}>
-                              {Array.from({ length: 8 }).map((_, j) => (
-                                <TableCell key={j}><Skeleton height={18} /></TableCell>
+                              {Array.from({ length: 11 }).map((_, j) => (
+                                <TableCell key={j}><Skeleton height={16} /></TableCell>
                               ))}
                             </TableRow>
                           ))
                         : filtered.length === 0
                           ? (
                             <TableRow>
-                              <TableCell colSpan={8} align="center" sx={{ py: 5, color: '#94A3B8', fontSize: 13 }}>
+                              <TableCell colSpan={11} align="center" sx={{ py: 5, color: '#94A3B8', fontSize: 13 }}>
                                 Aucun agent trouvé
                               </TableCell>
                             </TableRow>
                           )
                           : paged.map((emp, idx) => {
-                              const st = statusMap[emp.status] ?? { label: emp.status, color: '#475569', bg: '#F1F5F9' };
-                              const initials = `${emp.first_name[0] ?? ''}${emp.last_name[0] ?? ''}`.toUpperCase();
+                              const rowNum = regPage * REC_RPP + idx + 1;
+                              const isEven = rowNum % 2 === 0;
                               return (
-                                <TableRow key={emp.id} hover sx={{ '&:nth-of-type(even)': { bgcolor: '#F8FAFC' } }}>
-                                  <TableCell sx={{ fontSize: 12, color: '#94A3B8' }}>
-                                    {regPage * REC_RPP + idx + 1}
+                                <TableRow key={emp.id} sx={{ bgcolor: isEven ? '#FFFDE7' : '#fff', '&:hover': { bgcolor: '#FFF9C4' } }}>
+                                  <TableCell sx={{ fontSize: 11, color: '#94A3B8', width: 36 }}>{rowNum}</TableCell>
+                                  <TableCell sx={{ fontSize: 12, fontWeight: 700, color: '#002f59', whiteSpace: 'nowrap' }}>{emp.employee_number ?? '—'}</TableCell>
+                                  <TableCell sx={{ fontSize: 12 }}>{emp.first_name}</TableCell>
+                                  <TableCell sx={{ fontSize: 12, fontWeight: 600, textTransform: 'uppercase' }}>{emp.last_name}</TableCell>
+                                  <TableCell sx={{ fontSize: 12, whiteSpace: 'nowrap' }}>{fmtDate(emp.birth_date)}</TableCell>
+                                  <TableCell sx={{ fontSize: 12 }}>{emp.birth_place ?? '—'}</TableCell>
+                                  <TableCell sx={{ fontSize: 12, whiteSpace: 'nowrap', fontWeight: 600 }}>{fmtDate(emp.hire_date)}</TableCell>
+                                  <TableCell sx={{ fontSize: 12, textAlign: 'center' }}>
+                                    {emp.anciennete_recrutement ?? '—'}
                                   </TableCell>
-                                  <TableCell sx={{ fontSize: 12, fontWeight: 700, color: '#1E3A5F' }}>
-                                    {emp.employee_number}
-                                  </TableCell>
-                                  <TableCell>
-                                    <Stack direction="row" alignItems="center" spacing={1}>
-                                      <Avatar src={emp.photo_url ?? undefined} sx={{ width: 28, height: 28, fontSize: 11, fontWeight: 700, bgcolor: '#1E3A5F' }}>
-                                        {initials}
-                                      </Avatar>
-                                      <Typography sx={{ fontSize: 13, fontWeight: 600 }}>
-                                        {emp.first_name} {emp.last_name}
-                                      </Typography>
-                                    </Stack>
-                                  </TableCell>
-                                  <TableCell sx={{ fontSize: 12 }}>{emp.position?.title ?? '—'}</TableCell>
-                                  <TableCell sx={{ fontSize: 12 }}>{emp.department?.name ?? '—'}</TableCell>
-                                  <TableCell sx={{ fontSize: 12, fontWeight: 600 }}>
-                                    {emp.hire_date
-                                      ? new Date(emp.hire_date).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' })
-                                      : '—'}
-                                  </TableCell>
-                                  <TableCell sx={{ fontSize: 12 }}>
-                                    {emp.anciennete_recrutement ?? (emp.hire_date
-                                      ? (() => {
-                                          const ms = Date.now() - new Date(emp.hire_date).getTime();
-                                          const yrs = Math.floor(ms / (1000 * 60 * 60 * 24 * 365.25));
-                                          const mos = Math.floor((ms % (1000 * 60 * 60 * 24 * 365.25)) / (1000 * 60 * 60 * 24 * 30.44));
-                                          return yrs > 0 ? `${yrs} an${yrs > 1 ? 's' : ''}${mos > 0 ? ` ${mos} mois` : ''}` : `${mos} mois`;
-                                        })()
-                                      : '—')}
-                                  </TableCell>
-                                  <TableCell>
-                                    <Chip label={st.label} size="small"
-                                      sx={{ fontSize: 11, fontWeight: 700, bgcolor: st.bg, color: st.color, border: `1px solid ${st.color}30` }} />
-                                  </TableCell>
+                                  <TableCell sx={{ fontSize: 12 }}>{emp.fonction ?? emp.position?.title ?? '—'}</TableCell>
+                                  <TableCell sx={{ fontSize: 12, textAlign: 'center' }}>{emp.categorie_emploi ?? '—'}</TableCell>
+                                  <TableCell sx={{ fontSize: 12 }}>{emp.qualification ?? '—'}</TableCell>
                                 </TableRow>
                               );
                             })}
@@ -463,11 +554,158 @@ export default function RecruitmentsPage() {
                   component="div" count={filtered.length} page={regPage} rowsPerPage={REC_RPP}
                   onPageChange={(_, p) => setRegPage(p)} rowsPerPageOptions={[REC_RPP]}
                   labelDisplayedRows={({ from, to, count }) => `${from}–${to} sur ${count}`}
-                  sx={{ borderTop: '1px solid #E2E8F0', '& .MuiTablePagination-toolbar': { fontSize: 12 }, '& .MuiTablePagination-displayedRows': { fontSize: 12 } }}
+                  sx={{ borderTop: '1px solid #E2E8F0', '& .MuiTablePagination-toolbar': { fontSize: 12 } }}
                 />
               </Box>
             );
           })()}
+
+          {/* ── DIALOG IMPORT REGISTRE ── */}
+          <Dialog open={importOpen} onClose={resetImport} maxWidth="lg" fullWidth PaperProps={{ sx: { borderRadius: 3, maxHeight: '90vh' } }}>
+            <DialogTitle sx={{ fontWeight: 800, pb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
+              <FileUpload sx={{ color: '#002f59' }} />
+              Importer le Registre de l'Employeur
+            </DialogTitle>
+            <Divider />
+
+            {/* Stepper */}
+            <Box sx={{ display: 'flex', px: 3, pt: 2, pb: 1, gap: 1 }}>
+              {['1. Chargement fichier', '2. Vérification', '3. Résultat'].map((label, i) => (
+                <Box key={i} sx={{ flex: 1, textAlign: 'center' }}>
+                  <Box sx={{
+                    py: 0.75, borderRadius: 2, fontSize: 12, fontWeight: 700,
+                    bgcolor: importStep === i ? '#002f59' : importStep > i ? '#059669' : '#F1F5F9',
+                    color: importStep >= i ? '#fff' : '#94A3B8',
+                  }}>{label}</Box>
+                </Box>
+              ))}
+            </Box>
+
+            <DialogContent sx={{ pt: 1 }}>
+
+              {/* STEP 0 : upload */}
+              {importStep === 0 && (
+                <Box>
+                  <Typography sx={{ fontSize: 13, color: '#64748B', mb: 2 }}>
+                    Chargez votre fichier Excel (.xlsx / .xls) avec les colonnes : <strong>Matr. · Prénom(s) · Nom · Date Naiss. · Lieu Naiss. · Date Emb. · Ancienneté (ans) · Fonction · Catégorie · Qualification</strong>
+                  </Typography>
+                  <Box
+                    onDragOver={e => { e.preventDefault(); setDragOver(true); }}
+                    onDragLeave={() => setDragOver(false)}
+                    onDrop={e => { e.preventDefault(); setDragOver(false); const f = e.dataTransfer.files[0]; if (f) handleRegFile(f); }}
+                    onClick={() => fileRef.current?.click()}
+                    sx={{
+                      border: `2px dashed ${dragOver ? '#002f59' : '#CBD5E1'}`,
+                      borderRadius: 2, p: 5, textAlign: 'center', cursor: 'pointer',
+                      bgcolor: dragOver ? '#EFF6FF' : '#F8FAFC',
+                      transition: 'all 0.2s',
+                      '&:hover': { borderColor: '#002f59', bgcolor: '#EFF6FF' },
+                    }}
+                  >
+                    <CloudUpload sx={{ fontSize: 48, color: dragOver ? '#002f59' : '#94A3B8', mb: 1 }} />
+                    <Typography sx={{ fontWeight: 700, color: '#0F172A' }}>Glissez-déposez votre fichier Excel ici</Typography>
+                    <Typography sx={{ fontSize: 12, color: '#94A3B8', mt: 0.5 }}>ou cliquez pour sélectionner — .xlsx, .xls</Typography>
+                  </Box>
+                  <input ref={fileRef} type="file" accept=".xlsx,.xls" hidden onChange={e => { const f = e.target.files?.[0]; if (f) handleRegFile(f); }} />
+                </Box>
+              )}
+
+              {/* STEP 1 : prévisualisation */}
+              {importStep === 1 && (
+                <Box>
+                  <Stack direction="row" alignItems="center" spacing={2} sx={{ mb: 1.5 }}>
+                    <Chip label={`${importRows.length} ligne(s) détectée(s)`} color="primary" size="small" sx={{ fontWeight: 700 }} />
+                    <Typography sx={{ fontSize: 12, color: '#64748B' }}>Fichier : <strong>{importFile}</strong></Typography>
+                    <Typography sx={{ fontSize: 12, color: '#64748B', flex: 1 }}>
+                      Les agents existants (même matricule ou même nom) seront <strong>mis à jour</strong> sur les champs vides. Les nouveaux seront <strong>créés</strong>.
+                    </Typography>
+                  </Stack>
+                  <TableContainer sx={{ maxHeight: 420, border: '1px solid #E2E8F0', borderRadius: 1 }}>
+                    <Table size="small" stickyHeader>
+                      <TableHead>
+                        <TableRow>
+                          {['Matr.','Prénom(s)','Nom','Date Naiss.','Lieu Naiss.','Date Emb.','Ancienneté','Fonction','Catégorie','Qualification'].map(h => (
+                            <TableCell key={h} sx={{ fontWeight: 700, fontSize: 11, bgcolor: '#F8FAFC', color: '#475569', whiteSpace: 'nowrap' }}>{h}</TableCell>
+                          ))}
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {importRows.map((row, i) => (
+                          <TableRow key={i} sx={{ '&:nth-of-type(even)': { bgcolor: '#FFFDE7' } }}>
+                            <TableCell sx={{ fontSize: 11, fontWeight: 700, color: '#002f59' }}>{String(row.employee_number ?? '—')}</TableCell>
+                            <TableCell sx={{ fontSize: 11 }}>{String(row.first_name ?? '—')}</TableCell>
+                            <TableCell sx={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase' }}>{String(row.last_name ?? '—')}</TableCell>
+                            <TableCell sx={{ fontSize: 11, whiteSpace: 'nowrap' }}>{fmtDate(row.birth_date as string)}</TableCell>
+                            <TableCell sx={{ fontSize: 11 }}>{String(row.birth_place ?? '—')}</TableCell>
+                            <TableCell sx={{ fontSize: 11, whiteSpace: 'nowrap' }}>{fmtDate(row.hire_date as string)}</TableCell>
+                            <TableCell sx={{ fontSize: 11, textAlign: 'center' }}>{String(row.anciennete_recrutement ?? '—')}</TableCell>
+                            <TableCell sx={{ fontSize: 11 }}>{String(row.fonction ?? '—')}</TableCell>
+                            <TableCell sx={{ fontSize: 11, textAlign: 'center' }}>{String(row.categorie_emploi ?? '—')}</TableCell>
+                            <TableCell sx={{ fontSize: 11 }}>{String(row.qualification ?? '—')}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                  {importLoading && <LinearProgress sx={{ mt: 1, borderRadius: 1 }} />}
+                </Box>
+              )}
+
+              {/* STEP 2 : résultat */}
+              {importStep === 2 && importResult && (
+                <Box sx={{ py: 2 }}>
+                  <Stack direction="row" spacing={3} justifyContent="center" sx={{ mb: 3 }}>
+                    <Box sx={{ textAlign: 'center', p: 2.5, borderRadius: 2, bgcolor: '#EFF6FF', border: '1px solid #BFDBFE', minWidth: 140 }}>
+                      <Typography sx={{ fontSize: 32, fontWeight: 800, color: '#2563EB' }}>{importResult.updated}</Typography>
+                      <Typography sx={{ fontSize: 13, color: '#475569', fontWeight: 600 }}>Agent(s) mis à jour</Typography>
+                    </Box>
+                    <Box sx={{ textAlign: 'center', p: 2.5, borderRadius: 2, bgcolor: '#ECFDF5', border: '1px solid #A7F3D0', minWidth: 140 }}>
+                      <Typography sx={{ fontSize: 32, fontWeight: 800, color: '#059669' }}>{importResult.created}</Typography>
+                      <Typography sx={{ fontSize: 13, color: '#475569', fontWeight: 600 }}>Agent(s) créé(s)</Typography>
+                    </Box>
+                    {importResult.skipped.length > 0 && (
+                      <Box sx={{ textAlign: 'center', p: 2.5, borderRadius: 2, bgcolor: '#FEF2F2', border: '1px solid #FECACA', minWidth: 140 }}>
+                        <Typography sx={{ fontSize: 32, fontWeight: 800, color: '#DC2626' }}>{importResult.skipped.length}</Typography>
+                        <Typography sx={{ fontSize: 13, color: '#475569', fontWeight: 600 }}>Ignoré(s)</Typography>
+                      </Box>
+                    )}
+                  </Stack>
+                  <Alert severity="success" sx={{ borderRadius: 2, mb: 2 }}>{importResult.message}</Alert>
+                  {importResult.skipped.length > 0 && (
+                    <Alert severity="warning" sx={{ borderRadius: 2 }}>
+                      <Typography sx={{ fontWeight: 700, mb: 0.5 }}>Lignes ignorées :</Typography>
+                      {importResult.skipped.map((s, i) => <Typography key={i} sx={{ fontSize: 12 }}>• {s}</Typography>)}
+                    </Alert>
+                  )}
+                </Box>
+              )}
+
+            </DialogContent>
+            <DialogActions sx={{ px: 3, pb: 2, gap: 1 }}>
+              {importStep === 0 && (
+                <Button variant="outlined" onClick={resetImport} sx={{ borderRadius: '9px', textTransform: 'none' }}>Annuler</Button>
+              )}
+              {importStep === 1 && (
+                <>
+                  <Button variant="outlined" onClick={() => setImportStep(0)} startIcon={<Refresh />} sx={{ borderRadius: '9px', textTransform: 'none' }}>
+                    Changer de fichier
+                  </Button>
+                  <Box sx={{ flex: 1 }} />
+                  <Button variant="outlined" onClick={resetImport} sx={{ borderRadius: '9px', textTransform: 'none' }}>Annuler</Button>
+                  <Button variant="contained" onClick={confirmImport} disabled={importLoading || importRows.length === 0}
+                    sx={{ borderRadius: '9px', textTransform: 'none', fontWeight: 700, bgcolor: '#002f59' }}>
+                    Confirmer l'import ({importRows.length} lignes)
+                  </Button>
+                </>
+              )}
+              {importStep === 2 && (
+                <Button variant="contained" onClick={resetImport} startIcon={<CheckCircle />}
+                  sx={{ borderRadius: '9px', textTransform: 'none', fontWeight: 700, bgcolor: '#059669' }}>
+                  Terminé — voir le registre
+                </Button>
+              )}
+            </DialogActions>
+          </Dialog>
 
           {/* ── TAB 1 : DASHBOARD ── */}
           {tab === 1 && stats && (
@@ -797,6 +1035,7 @@ export default function RecruitmentsPage() {
                 sx={{ borderTop: '1px solid #E2E8F0', '& .MuiTablePagination-toolbar': { fontSize: 12 }, '& .MuiTablePagination-displayedRows': { fontSize: 12 } }} />
             </TableContainer>
           )}
+
         </Box>
       </Card>
 
@@ -1130,7 +1369,7 @@ export default function RecruitmentsPage() {
         </DialogActions>
       </Dialog>
 
-      {/* �"?�"? Dialog : Statut candidature �"?�"? */}
+
       <Dialog open={statusDialog.open} onClose={() => setStatusDialog({ open: false, application: null })} maxWidth="xs" fullWidth
         PaperProps={{ sx: { borderRadius: 3 } }}>
         <DialogTitle sx={{ fontWeight: 800, pb: 1 }}>

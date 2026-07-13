@@ -1,22 +1,25 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
-  Box, Card, Avatar, Typography, IconButton, Tooltip, TextField,
-  Skeleton, Stack, Tabs, Tab, Button,
+  Box, Card, CardContent, Avatar, Typography, IconButton, Tooltip, TextField,
+  Skeleton, Stack, Tabs, Tab, Button, CircularProgress,
   Chip, Select, FormControl, Grid, Divider, Checkbox, Menu, ListItemIcon, ListItemText,
   MenuItem, Dialog, DialogTitle, DialogContent, DialogActions,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
+  Alert,
 } from '@mui/material';
 import {
   Visibility, Edit, Delete, Email, Badge as BadgeIcon,
   Print, PersonAdd, Groups, CheckCircle, Block,
   Gavel, Assignment, Assessment, ViewModule, ViewList,
   Phone, Event, Refresh, AccessTime, EmojiEvents, Search, AssignmentTurnedIn,
-  FileUpload,
+  FileUpload, HowToReg, QrCode2, VerifiedUser, DoNotDisturb,
 } from '@mui/icons-material';
+import { QRCodeSVG } from 'qrcode.react';
 import { useNavigate } from 'react-router-dom';
 import { employeesApi } from '../../api/employees';
 import { tasksApi } from '../../api/tasks';
+import client from '../../api/client';
 import { formatDate } from '../../utils/format';
 import EmployeeCreateModal from '../../components/employees/EmployeeCreateModal';
 import ContractTab from '../../components/employees/ContractTab';
@@ -26,15 +29,16 @@ import DistinctionTab from '../../components/employees/DistinctionTab';
 import SanctionTab from '../../components/employees/SanctionTab';
 import EmployeeBadgeCard from '../../components/employees/EmployeeBadgeCard';
 import ComposeEmailDialog from '../../components/employees/ComposeEmailDialog';
-import type { Employee } from '../../types';
+import type { Employee, EnrollmentRequest } from '../../types';
 
 const TAB_CONFIG = [
-  { label: 'Agents',        icon: <Groups fontSize="small" />,      color: '#F97316' },
-  { label: 'Disponibilité', icon: <AccessTime fontSize="small" />,  color: '#06B6D4' },
-  { label: 'Distinction',   icon: <EmojiEvents fontSize="small" />, color: '#A855F7' },
-  { label: 'Sanction',      icon: <Gavel fontSize="small" />,       color: '#EF4444' },
-  { label: 'Contrat',       icon: <Assignment fontSize="small" />,  color: '#3B82F6' },
-  { label: 'Évaluation',    icon: <Assessment fontSize="small" />,  color: '#F59E0B' },
+  { label: 'Agents',              icon: <Groups fontSize="small" />,      color: '#F97316' },
+  { label: 'Disponibilité',       icon: <AccessTime fontSize="small" />,  color: '#06B6D4' },
+  { label: 'Distinction',         icon: <EmojiEvents fontSize="small" />, color: '#A855F7' },
+  { label: 'Sanction',            icon: <Gavel fontSize="small" />,       color: '#EF4444' },
+  { label: 'Contrat',             icon: <Assignment fontSize="small" />,  color: '#3B82F6' },
+  { label: 'Évaluation',          icon: <Assessment fontSize="small" />,  color: '#F59E0B' },
+  { label: 'Vérification agents', icon: <HowToReg fontSize="small" />,   color: '#002f59' },
 ];
 
 export default function EmployeesPage() {
@@ -64,6 +68,15 @@ export default function EmployeesPage() {
   const [taskEmp, setTaskEmp]   = useState<Employee | null>(null);
   const [taskForm, setTaskForm] = useState({ title: '', description: '', priority: 'medium', due_date: '' });
 
+  // ── Vérification / Enrôlement ────────────────────────────────────────────
+  const ENROLL_URL = `${window.location.origin}/enroll`;
+  const [enrollFilter, setEnrollFilter]       = useState<'pending'|'validated'|'rejected'|''>('pending');
+  const [enrollDetail, setEnrollDetail]       = useState<{ enrollment: EnrollmentRequest; matched_employee: Employee | null } | null>(null);
+  const [enrollDetailOpen, setEnrollDetailOpen] = useState(false);
+  const [enrollRejectOpen, setEnrollRejectOpen] = useState(false);
+  const [rejectReasonText, setRejectReasonText] = useState('');
+  const [enrollActionLoading, setEnrollActionLoading] = useState(false);
+
   const qcPage = useQueryClient();
   const taskMut = useMutation({
     mutationFn: (data: Record<string, unknown>) => tasksApi.create(data),
@@ -87,6 +100,12 @@ export default function EmployeesPage() {
         search: search || undefined,
         status: statusFilter !== 'all' ? statusFilter : undefined,
       }).then((r) => r.data),
+  });
+
+  const { data: enrollmentsData, isLoading: loadingEnrollments, refetch: refetchEnrollments } = useQuery({
+    queryKey: ['enrollments', enrollFilter],
+    queryFn: () => client.get('/enrollments', { params: enrollFilter ? { status: enrollFilter } : {} }).then(r => r.data),
+    enabled: activeTab === 6,
   });
 
   const handleSelect = (id: number) =>
@@ -925,6 +944,109 @@ export default function EmployeesPage() {
         ) : activeTab === 5 ? (
           /* ── ONGLET ÉVALUATION ── */
           <EvaluationTab />
+        ) : activeTab === 6 ? (
+          /* ── ONGLET VÉRIFICATION AGENTS ── */
+          <Grid container spacing={2}>
+            {/* QR Code */}
+            <Grid item xs={12} md={4}>
+              <Card elevation={0} sx={{ borderRadius: 2, border: '1px solid #E2E8F0', height: '100%' }}>
+                <CardContent sx={{ p: 3, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, width: '100%' }}>
+                    <QrCode2 sx={{ color: '#002f59' }} />
+                    <Typography sx={{ fontWeight: 700, color: 'text.primary' }}>QR Code d'enrôlement</Typography>
+                  </Box>
+                  <Box sx={{ p: 2, borderRadius: 2, border: '2px solid #E2E8F0', bgcolor: '#fff', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1.5 }}>
+                    <QRCodeSVG value={ENROLL_URL} size={180} fgColor="#002f59" level="M" />
+                    <Typography sx={{ fontSize: 11, color: 'text.secondary', textAlign: 'center', wordBreak: 'break-all' }}>{ENROLL_URL}</Typography>
+                  </Box>
+                  <Button fullWidth variant="outlined" startIcon={<Print />}
+                    onClick={() => window.print()}
+                    sx={{ borderRadius: 2, textTransform: 'none', borderColor: '#002f59', color: '#002f59' }}>
+                    Imprimer le QR code
+                  </Button>
+                  <Typography sx={{ fontSize: 12, color: 'text.secondary', textAlign: 'center' }}>
+                    Les agents scannent ce QR code pour accéder au formulaire d'enrôlement.
+                  </Typography>
+                </CardContent>
+              </Card>
+            </Grid>
+
+            {/* Liste des demandes */}
+            <Grid item xs={12} md={8}>
+              <Card elevation={0} sx={{ borderRadius: 2, border: '1px solid #E2E8F0', height: '100%' }}>
+                <CardContent sx={{ p: 2.5 }}>
+                  <Stack direction="row" alignItems="center" spacing={1.5} sx={{ mb: 2 }} flexWrap="wrap">
+                    <Typography sx={{ fontWeight: 700, color: 'text.primary', flex: 1 }}>Demandes d'enrôlement</Typography>
+                    {(['pending','validated','rejected',''] as const).map((s) => (
+                      <Chip key={s || 'all'}
+                        label={s === 'pending' ? 'En attente' : s === 'validated' ? 'Validées' : s === 'rejected' ? 'Rejetées' : 'Toutes'}
+                        variant={enrollFilter === s ? 'filled' : 'outlined'}
+                        color={s === 'pending' ? 'warning' : s === 'validated' ? 'success' : s === 'rejected' ? 'error' : 'default'}
+                        size="small" onClick={() => setEnrollFilter(s)}
+                        sx={{ fontWeight: 600, cursor: 'pointer' }}
+                      />
+                    ))}
+                    <Tooltip title="Actualiser">
+                      <IconButton size="small" onClick={() => refetchEnrollments()}><Refresh fontSize="small" /></IconButton>
+                    </Tooltip>
+                  </Stack>
+                  {loadingEnrollments ? (
+                    <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}><CircularProgress /></Box>
+                  ) : (
+                    <TableContainer sx={{ maxHeight: 420 }}>
+                      <Table size="small" stickyHeader>
+                        <TableHead>
+                          <TableRow>
+                            {['Matricule','Nom complet','Fonction','Email','Date soumission','Statut',''].map(h => (
+                              <TableCell key={h} sx={{ fontWeight: 700, fontSize: 11, bgcolor: '#F8FAFC', color: '#475569', whiteSpace: 'nowrap' }}>{h}</TableCell>
+                            ))}
+                          </TableRow>
+                        </TableHead>
+                        <TableBody>
+                          {(enrollmentsData?.data ?? []).length === 0 ? (
+                            <TableRow>
+                              <TableCell colSpan={7} align="center" sx={{ py: 5, color: '#94A3B8', fontSize: 13 }}>
+                                Aucune demande d'enrôlement
+                              </TableCell>
+                            </TableRow>
+                          ) : (enrollmentsData?.data ?? []).map((enr: EnrollmentRequest) => (
+                            <TableRow key={enr.id} hover>
+                              <TableCell sx={{ fontSize: 12, fontWeight: 700, color: '#002f59' }}>{enr.matricule}</TableCell>
+                              <TableCell sx={{ fontSize: 12 }}>{enr.first_name} <strong>{enr.last_name}</strong></TableCell>
+                              <TableCell sx={{ fontSize: 12 }}>{enr.fonction}</TableCell>
+                              <TableCell sx={{ fontSize: 12 }}>{enr.email}</TableCell>
+                              <TableCell sx={{ fontSize: 11, whiteSpace: 'nowrap', color: '#64748B' }}>
+                                {new Date(enr.created_at).toLocaleDateString('fr-FR')}
+                              </TableCell>
+                              <TableCell>
+                                <Chip
+                                  label={enr.status === 'pending' ? 'En attente' : enr.status === 'validated' ? 'Validée' : 'Rejetée'}
+                                  color={enr.status === 'pending' ? 'warning' : enr.status === 'validated' ? 'success' : 'error'}
+                                  size="small" sx={{ fontWeight: 700, fontSize: 10 }}
+                                />
+                              </TableCell>
+                              <TableCell>
+                                <Tooltip title="Voir détail">
+                                  <IconButton size="small" sx={{ color: '#002f59' }}
+                                    onClick={async () => {
+                                      const res = await client.get(`/enrollments/${enr.id}`);
+                                      setEnrollDetail(res.data);
+                                      setEnrollDetailOpen(true);
+                                    }}>
+                                    <Search fontSize="small" />
+                                  </IconButton>
+                                </Tooltip>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </TableContainer>
+                  )}
+                </CardContent>
+              </Card>
+            </Grid>
+          </Grid>
         ) : (
           /* ── PLACEHOLDER AUTRES ONGLETS ── */
           <Box sx={{ py: 14, textAlign: 'center' }}>
@@ -948,6 +1070,148 @@ export default function EmployeesPage() {
           </Box>
         )}
       </Card>
+
+      {/* ── Dialog : Détail enrôlement ── */}
+      <Dialog open={enrollDetailOpen} onClose={() => { setEnrollDetailOpen(false); setEnrollDetail(null); }}
+        maxWidth="md" fullWidth PaperProps={{ sx: { borderRadius: 3 } }}>
+        <DialogTitle sx={{ fontWeight: 800, pb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
+          <HowToReg sx={{ color: '#002f59' }} />
+          Demande d'enrôlement
+          {enrollDetail && (
+            <Chip
+              label={enrollDetail.enrollment.status === 'pending' ? 'En attente' : enrollDetail.enrollment.status === 'validated' ? 'Validée' : 'Rejetée'}
+              color={enrollDetail.enrollment.status === 'pending' ? 'warning' : enrollDetail.enrollment.status === 'validated' ? 'success' : 'error'}
+              size="small" sx={{ fontWeight: 700, ml: 1 }}
+            />
+          )}
+        </DialogTitle>
+        <Divider />
+        {enrollDetail && (
+          <DialogContent sx={{ pt: 2 }}>
+            <Grid container spacing={3}>
+              <Grid item xs={12} md={enrollDetail.matched_employee ? 6 : 12}>
+                <Typography sx={{ fontWeight: 700, fontSize: 13, color: '#002f59', mb: 1.5 }}>Informations soumises</Typography>
+                <Box sx={{ bgcolor: '#F8FAFC', borderRadius: 2, p: 2 }}>
+                  {([
+                    ['Matricule', enrollDetail.enrollment.matricule],
+                    ['Prénom(s)', enrollDetail.enrollment.first_name],
+                    ['Nom', enrollDetail.enrollment.last_name],
+                    ['Date de naissance', enrollDetail.enrollment.date_naissance ? new Date(enrollDetail.enrollment.date_naissance).toLocaleDateString('fr-FR') : '—'],
+                    ['Lieu de naissance', enrollDetail.enrollment.lieu_naissance],
+                    ["Date d'embauche", enrollDetail.enrollment.date_embauche ? new Date(enrollDetail.enrollment.date_embauche).toLocaleDateString('fr-FR') : '—'],
+                    ['Fonction', enrollDetail.enrollment.fonction],
+                    ['Téléphone', enrollDetail.enrollment.telephone],
+                    ['Email', enrollDetail.enrollment.email],
+                    ['Catégorie', enrollDetail.enrollment.categorie_emploi || '—'],
+                    ['Qualification', enrollDetail.enrollment.qualification || '—'],
+                  ] as [string, string][]).map(([label, val]) => (
+                    <Box key={label} sx={{ display: 'flex', py: 0.75, borderBottom: '1px solid #E2E8F0', '&:last-child': { borderBottom: 'none' } }}>
+                      <Typography sx={{ width: 160, fontSize: 12, color: '#64748B', fontWeight: 600, flexShrink: 0 }}>{label}</Typography>
+                      <Typography sx={{ fontSize: 12, color: '#0F172A', fontWeight: 500 }}>{val || '—'}</Typography>
+                    </Box>
+                  ))}
+                </Box>
+              </Grid>
+              {enrollDetail.matched_employee && (
+                <Grid item xs={12} md={6}>
+                  <Typography sx={{ fontWeight: 700, fontSize: 13, color: '#059669', mb: 1.5 }}>Agent existant trouvé</Typography>
+                  <Box sx={{ bgcolor: '#ECFDF5', borderRadius: 2, p: 2, border: '1px solid #A7F3D0' }}>
+                    {([
+                      ['Matricule', enrollDetail.matched_employee.employee_number],
+                      ['Prénom(s)', enrollDetail.matched_employee.first_name],
+                      ['Nom', enrollDetail.matched_employee.last_name],
+                      ['Date de naissance', enrollDetail.matched_employee.birth_date ? new Date(enrollDetail.matched_employee.birth_date).toLocaleDateString('fr-FR') : '—'],
+                      ['Lieu de naissance', enrollDetail.matched_employee.birth_place || '—'],
+                      ["Date d'embauche", enrollDetail.matched_employee.hire_date ? new Date(enrollDetail.matched_employee.hire_date).toLocaleDateString('fr-FR') : '—'],
+                      ['Fonction', enrollDetail.matched_employee.fonction || '—'],
+                      ['Téléphone', enrollDetail.matched_employee.phone_personal || '—'],
+                      ['Email', enrollDetail.matched_employee.personal_email || '—'],
+                    ] as [string, string][]).map(([label, val]) => (
+                      <Box key={label} sx={{ display: 'flex', py: 0.75, borderBottom: '1px solid #A7F3D0', '&:last-child': { borderBottom: 'none' } }}>
+                        <Typography sx={{ width: 160, fontSize: 12, color: '#047857', fontWeight: 600, flexShrink: 0 }}>{label}</Typography>
+                        <Typography sx={{ fontSize: 12, color: '#0F172A', fontWeight: 500 }}>{val || '—'}</Typography>
+                      </Box>
+                    ))}
+                    <Alert severity="info" sx={{ mt: 1.5, borderRadius: 1, py: 0.5, fontSize: 12 }}>
+                      Cet agent sera <strong>mis à jour</strong> sur les champs vides uniquement.
+                    </Alert>
+                  </Box>
+                </Grid>
+              )}
+              {enrollDetail.enrollment.rejection_reason && (
+                <Grid item xs={12}>
+                  <Alert severity="error" sx={{ borderRadius: 2 }}>
+                    <strong>Motif de rejet :</strong> {enrollDetail.enrollment.rejection_reason}
+                  </Alert>
+                </Grid>
+              )}
+            </Grid>
+          </DialogContent>
+        )}
+        <DialogActions sx={{ px: 3, pb: 2, gap: 1 }}>
+          <Button variant="outlined" onClick={() => { setEnrollDetailOpen(false); setEnrollDetail(null); }}
+            sx={{ borderRadius: 2, textTransform: 'none' }}>Fermer</Button>
+          {enrollDetail?.enrollment.status === 'pending' && (
+            <>
+              <Button variant="outlined" color="error" startIcon={<DoNotDisturb />}
+                onClick={() => setEnrollRejectOpen(true)}
+                sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 700 }}>Rejeter</Button>
+              <Button variant="contained" startIcon={<VerifiedUser />} disabled={enrollActionLoading}
+                onClick={async () => {
+                  if (!enrollDetail) return;
+                  setEnrollActionLoading(true);
+                  try {
+                    await client.post(`/enrollments/${enrollDetail.enrollment.id}/validate`);
+                    setEnrollDetailOpen(false);
+                    setEnrollDetail(null);
+                    refetchEnrollments();
+                  } finally { setEnrollActionLoading(false); }
+                }}
+                sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 700, bgcolor: '#059669', '&:hover': { bgcolor: '#047857' } }}>
+                {enrollActionLoading ? <CircularProgress size={18} sx={{ color: '#fff' }} /> : 'Valider'}
+              </Button>
+            </>
+          )}
+        </DialogActions>
+      </Dialog>
+
+      {/* ── Dialog : Motif de rejet ── */}
+      <Dialog open={enrollRejectOpen} onClose={() => setEnrollRejectOpen(false)}
+        maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: 3 } }}>
+        <DialogTitle sx={{ fontWeight: 800, pb: 1 }}>Motif de rejet</DialogTitle>
+        <Divider />
+        <DialogContent sx={{ pt: 2 }}>
+          <Typography sx={{ fontSize: 13, color: '#64748B', mb: 2 }}>
+            Ce motif sera envoyé par email à l'agent pour qu'il puisse corriger et soumettre à nouveau.
+          </Typography>
+          <TextField fullWidth multiline rows={4} label="Motif *"
+            value={rejectReasonText} onChange={e => setRejectReasonText(e.target.value)}
+            placeholder="Ex : Le matricule saisi ne correspond pas à nos dossiers. Veuillez vérifier et soumettre à nouveau."
+            size="small"
+          />
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2, gap: 1 }}>
+          <Button variant="outlined" onClick={() => setEnrollRejectOpen(false)}
+            sx={{ borderRadius: 2, textTransform: 'none' }}>Annuler</Button>
+          <Button variant="contained" color="error"
+            disabled={enrollActionLoading || rejectReasonText.trim().length < 10}
+            onClick={async () => {
+              if (!enrollDetail) return;
+              setEnrollActionLoading(true);
+              try {
+                await client.post(`/enrollments/${enrollDetail.enrollment.id}/reject`, { reason: rejectReasonText });
+                setEnrollRejectOpen(false);
+                setEnrollDetailOpen(false);
+                setEnrollDetail(null);
+                setRejectReasonText('');
+                refetchEnrollments();
+              } finally { setEnrollActionLoading(false); }
+            }}
+            sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 700 }}>
+            {enrollActionLoading ? <CircularProgress size={18} sx={{ color: '#fff' }} /> : 'Envoyer le rejet'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

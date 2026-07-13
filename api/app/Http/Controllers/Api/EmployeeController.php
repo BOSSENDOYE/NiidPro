@@ -353,6 +353,97 @@ class EmployeeController extends Controller
         ]);
     }
 
+    // ── Import Registre de l'employeur (match matricule → update ou créer) ─────
+    public function importRegistre(Request $request)
+    {
+        $request->validate([
+            'rows'   => ['required', 'array', 'min:1', 'max:1000'],
+            'rows.*' => ['array'],
+        ]);
+
+        $created = 0;
+        $updated = 0;
+        $skipped = [];
+
+        foreach ($request->rows as $i => $row) {
+            $line      = $i + 2;
+            $matricule = trim($row['employee_number'] ?? '');
+            $prenom    = trim($row['first_name']      ?? '');
+            $nom       = trim($row['last_name']       ?? '');
+
+            if (!$prenom && !$nom && !$matricule) continue;
+
+            try {
+                // Chercher par matricule d'abord, puis par prénom+nom
+                $employee = $matricule
+                    ? Employee::where('employee_number', $matricule)->first()
+                    : null;
+
+                if (!$employee && $prenom && $nom) {
+                    $employee = Employee::where('first_name', $prenom)
+                        ->where('last_name', $nom)
+                        ->first();
+                }
+
+                $anciennete = null;
+                if (!empty($row['anciennete_recrutement'])) {
+                    $val = str_replace(',', '.', (string) $row['anciennete_recrutement']);
+                    if (is_numeric($val)) $anciennete = (float) $val;
+                }
+
+                $fields = array_filter([
+                    'birth_date'             => $row['birth_date']       ?? null,
+                    'birth_place'            => $row['birth_place']      ?? null,
+                    'hire_date'              => $row['hire_date']        ?? null,
+                    'anciennete_recrutement' => $anciennete,
+                    'fonction'               => $row['fonction']         ?? null,
+                    'categorie_emploi'       => $row['categorie_emploi'] ?? null,
+                    'qualification'          => $row['qualification']    ?? null,
+                ], fn($v) => $v !== null && $v !== '');
+
+                if ($employee) {
+                    // Mettre à jour uniquement les champs vides/nuls
+                    $updates = [];
+                    foreach ($fields as $key => $value) {
+                        if (empty($employee->$key)) {
+                            $updates[$key] = $value;
+                        }
+                    }
+                    // Toujours mettre à jour matricule si absent
+                    if ($matricule && empty($employee->employee_number)) {
+                        $updates['employee_number'] = $matricule;
+                    }
+                    if (!empty($updates)) $employee->update($updates);
+                    $updated++;
+                } else {
+                    if (!$prenom || !$nom) {
+                        $skipped[] = "Ligne $line : prénom et nom obligatoires.";
+                        continue;
+                    }
+                    Employee::create(array_merge([
+                        'employee_number' => $matricule ?: $this->generateEmployeeNumber(),
+                        'first_name'      => $prenom,
+                        'last_name'       => $nom,
+                        'status'          => 'active',
+                        'annual_leave_days' => 24,
+                        'hire_date'       => now()->format('Y-m-d'),
+                        'base_salary'     => 0,
+                    ], $fields));
+                    $created++;
+                }
+            } catch (\Exception $e) {
+                $skipped[] = "Ligne $line : " . $e->getMessage();
+            }
+        }
+
+        return response()->json([
+            'updated' => $updated,
+            'created' => $created,
+            'skipped' => $skipped,
+            'message' => "$updated agent(s) mis à jour, $created créé(s).",
+        ]);
+    }
+
     // ── Paie : données de paie de l'agent ────────────────────────────────────
     public function payeData(Employee $employee)
     {

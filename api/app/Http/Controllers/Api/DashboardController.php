@@ -56,6 +56,28 @@ class DashboardController extends Controller
                 'count' => $d->employees_count,
             ]);
 
+        // Répartition par fonction (normalisée en majuscules)
+        $byFonction = Employee::where('status', 'active')
+            ->whereNotNull('fonction')
+            ->where('fonction', '!=', '')
+            ->selectRaw('UPPER(TRIM(fonction)) as fonction, COUNT(*) as count')
+            ->groupBy(\Illuminate\Support\Facades\DB::raw('UPPER(TRIM(fonction))'))
+            ->orderByDesc('count')
+            ->limit(15)
+            ->get()
+            ->map(fn($e) => ['fonction' => $e->fonction, 'count' => (int) $e->count]);
+
+        // Répartition par catégorie
+        $byCategorie = Employee::where('status', 'active')
+            ->whereNotNull('categorie_emploi')
+            ->where('categorie_emploi', '!=', '')
+            ->selectRaw('UPPER(TRIM(categorie_emploi)) as categorie, COUNT(*) as count')
+            ->groupBy(\Illuminate\Support\Facades\DB::raw('UPPER(TRIM(categorie_emploi))'))
+            ->orderByDesc('count')
+            ->limit(15)
+            ->get()
+            ->map(fn($e) => ['categorie' => $e->categorie, 'count' => (int) $e->count]);
+
         // Activité récente (dernières embauches, congés, etc.)
         $recentActivity = $this->getRecentActivity();
 
@@ -74,6 +96,8 @@ class DashboardController extends Controller
             'expiring_contracts_list' => $expiringList,
             'total_employees'      => $activeEmployees,
             'by_department'        => $byDepartment,
+            'by_fonction'          => $byFonction,
+            'by_categorie'         => $byCategorie,
             'recent_activity'      => $recentActivity,
         ]);
     }
