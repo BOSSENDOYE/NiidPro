@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Dialog, Box, Typography, Button, TextField, Grid, MenuItem,
@@ -21,6 +21,7 @@ import { employeesApi } from '../../api/employees';
 import { departmentsApi } from '../../api/departments';
 import { getPayrollTemplates, type PayrollTemplate } from '../../api/payrollTemplates';
 import { recruitmentApi } from '../../api/recruitment';
+import { organisationUnitApi, type OrgUnit } from '../../api/organisationUnits';
 import type { Employee, RecruitmentIndice } from '../../types';
 
 /* ─── Types ─── */
@@ -45,10 +46,11 @@ const schema = z.object({
   city:               z.string().optional(),
   country:            z.string().optional(),
   birth_place:        z.string().optional(),
-  payroll_template_id: z.number().nullable().optional(),
-  indice_id:           z.number().nullable().optional(),
-  part_trimf:          z.number().nullable().optional(),
-  part_ir:             z.number().nullable().optional(),
+  payroll_template_id:  z.number().nullable().optional(),
+  indice_id:            z.number().nullable().optional(),
+  part_trimf:           z.number().nullable().optional(),
+  part_ir:              z.number().nullable().optional(),
+  organisation_unit_id: z.number().nullable().optional(),
 });
 type FormData = z.infer<typeof schema>;
 
@@ -74,19 +76,19 @@ function updateRow(setter: React.Dispatch<React.SetStateAction<TableRow[]>>, id:
 
 /* ─── Shared input style ─── */
 const inputSx = {
-  bgcolor: '#fff',
   '& .MuiOutlinedInput-root': {
-    borderRadius: '10px', fontSize: 13,
-    '& fieldset': { borderColor: '#E2E8F0' },
-    '&:hover fieldset': { borderColor: '#93C5FD' },
-    '&.Mui-focused fieldset': { borderColor: '#2563EB', borderWidth: '2px' },
-    '&.Mui-disabled': { bgcolor: '#F8FAFC' },
+    borderRadius: '10px', fontSize: 13, bgcolor: '#fff',
+    '& fieldset': { borderColor: '#DDE3EE' },
+    '&:hover fieldset': { borderColor: '#6B8DD6' },
+    '&.Mui-focused fieldset': { borderColor: '#2563EB', borderWidth: '1.5px' },
+    '&.Mui-disabled': { bgcolor: '#F6F8FC' },
+    '&.Mui-disabled fieldset': { borderColor: '#E8ECF4' },
   },
 };
 const labelSx = {
-  fontSize: 10.5, fontWeight: 700, color: '#64748B',
+  fontSize: 10, fontWeight: 800, color: '#7C8BAB',
   textTransform: 'uppercase' as const,
-  letterSpacing: '0.07em', display: 'block', mb: 0.5,
+  letterSpacing: '0.08em', display: 'block', mb: 0.5,
 };
 
 const SF = (props: React.ComponentProps<typeof TextField>) => (
@@ -98,19 +100,22 @@ const SectionBox = ({ title, color = '#2563EB', icon, children }: {
   title: string; color?: string; icon?: React.ReactNode; children: React.ReactNode
 }) => (
   <Box sx={{
-    border: '1px solid #E8EDF2',
-    borderLeft: `3.5px solid ${color}`,
-    borderRadius: '0 12px 12px 12px',
-    p: 2, mb: 2, bgcolor: '#FAFBFC',
-    boxShadow: '0 1px 4px rgba(15,23,42,0.04)',
+    border: '1px solid #E8EDF6', borderRadius: '14px', overflow: 'hidden', mb: 2,
+    boxShadow: '0 1px 6px rgba(15,23,42,0.05)',
   }}>
-    <Stack direction="row" alignItems="center" spacing={0.75} mb={1.5}>
-      {icon && <Box sx={{ color, display: 'flex', '& svg': { fontSize: 15 } }}>{icon}</Box>}
-      <Typography sx={{ fontSize: 10.5, fontWeight: 800, color, textTransform: 'uppercase', letterSpacing: '0.09em' }}>
-        {title}
-      </Typography>
-    </Stack>
-    {children}
+    <Box sx={{
+      background: `linear-gradient(135deg, ${alpha(color, 0.1)} 0%, ${alpha(color, 0.03)} 100%)`,
+      borderBottom: `1px solid ${alpha(color, 0.14)}`,
+      px: 2, py: 1.25,
+    }}>
+      <Stack direction="row" alignItems="center" spacing={0.75}>
+        {icon && <Box sx={{ color, display: 'flex', '& svg': { fontSize: 15 } }}>{icon}</Box>}
+        <Typography sx={{ fontSize: 10.5, fontWeight: 800, color, textTransform: 'uppercase', letterSpacing: '0.09em' }}>
+          {title}
+        </Typography>
+      </Stack>
+    </Box>
+    <Box sx={{ p: 2, bgcolor: '#FAFBFF' }}>{children}</Box>
   </Box>
 );
 
@@ -266,10 +271,11 @@ function empToForm(e: Employee): FormData {
     city:               e.city           ?? '',
     country:            e.country        ?? '',
     birth_place:        e.birth_place    ?? '',
-    payroll_template_id: e.payroll_template_id ?? null,
-    indice_id:           e.indice_id ?? null,
-    part_trimf:          e.part_trimf   ? Number(e.part_trimf)   : null,
-    part_ir:             e.part_ir      ? Number(e.part_ir)      : null,
+    payroll_template_id:  e.payroll_template_id ?? null,
+    indice_id:            e.indice_id ?? null,
+    part_trimf:           e.part_trimf   ? Number(e.part_trimf)   : null,
+    part_ir:              e.part_ir      ? Number(e.part_ir)      : null,
+    organisation_unit_id: e.organisation_unit_id ?? null,
   };
 }
 
@@ -312,6 +318,36 @@ export default function EmployeeCreateModal({ open, onClose, mode = 'create', em
     queryFn: getPayrollTemplates,
   });
 
+  /* ── Organisation units (filière) ── */
+  const { data: orgUnits = [] } = useQuery<OrgUnit[]>({
+    queryKey: ['organisation-units'],
+    queryFn: () => organisationUnitApi.list().then(r => r.data),
+  });
+
+  // Org units that are top-level anchors (gouvernance/direction/appui/cellule with no parent or parent is gouvernance)
+  const govIds = new Set(orgUnits.filter(u => u.type === 'gouvernance').map(u => u.id));
+  const parentUnits = orgUnits.filter(u => u.parent_id === null || govIds.has(u.parent_id));
+  // Children of the selected parent
+  const [orgParentId, setOrgParentId] = useState<number | null>(null);
+  const childUnits = orgUnits.filter(u => u.parent_id === orgParentId);
+
+  // On edit mode: restore orgParentId from the existing organisation_unit_id
+  useEffect(() => {
+    if (!employee || !orgUnits.length) return;
+    const unitId = employee.organisation_unit_id;
+    if (!unitId) return;
+    const unit = orgUnits.find(u => u.id === unitId);
+    if (!unit) return;
+    // If this unit has a parent in our parentUnits list, set that parent
+    if (unit.parent_id && parentUnits.some(p => p.id === unit.parent_id)) {
+      setOrgParentId(unit.parent_id);
+    } else {
+      // It is itself a parent unit
+      setOrgParentId(unit.id);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [employee?.id, orgUnits.length]);
+
   /* ── Indices (Grade) ── */
   const [selectedIndice, setSelectedIndice] = useState<RecruitmentIndice | null>(
     employee?.indice ?? null
@@ -339,7 +375,8 @@ export default function EmployeeCreateModal({ open, onClose, mode = 'create', em
         first_name: '', last_name: '', professional_email: '', phone: '',
         hire_date: '', birth_date: '', nationality: '', gender: '',
         employee_number: '', city: '', country: '', birth_place: '',
-        payroll_template_id: null, part_trimf: null, part_ir: null };
+        payroll_template_id: null, part_trimf: null, part_ir: null,
+        organisation_unit_id: null };
 
   const { register, handleSubmit, control, watch, reset, setValue, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema),
@@ -403,6 +440,7 @@ export default function EmployeeCreateModal({ open, onClose, mode = 'create', em
     reset(); setTab(0); setPhotoUrl(null); setPhotoFile(null); setAge(null);
     setFamilyRows([]); setDiplomas([]); setQuals([]);
     setCategories([]); setPostings([]); setDocuments([]);
+    setOrgParentId(null);
     onClose();
   };
 
@@ -418,10 +456,10 @@ export default function EmployeeCreateModal({ open, onClose, mode = 'create', em
     <Dialog open={open} onClose={handleClose} maxWidth={false}
       PaperProps={{
         sx: {
-          width: { xs: '100%', md: 960 }, maxWidth: '98vw', maxHeight: '97vh',
-          borderRadius: '22px', overflow: 'hidden',
+          width: { xs: '100%', md: 1100 }, maxWidth: '98vw', maxHeight: '97vh',
+          borderRadius: '20px', overflow: 'hidden',
           display: 'flex', flexDirection: 'column',
-          boxShadow: '0 40px 100px rgba(15,23,42,0.35), 0 0 0 1px rgba(255,255,255,0.05)',
+          boxShadow: '0 30px 90px rgba(0,0,0,0.45), 0 0 0 1px rgba(255,255,255,0.06)',
         },
       }}
     >
@@ -429,65 +467,67 @@ export default function EmployeeCreateModal({ open, onClose, mode = 'create', em
 
         {/* ══ HEADER ══ */}
         <Box sx={{
-          background: 'linear-gradient(135deg,#0F172A 0%,#1E293B 55%,#0B1120 100%)',
-          px: 3, py: 2, flexShrink: 0, position: 'relative', overflow: 'hidden',
-          '&::before': {
-            content: '""', position: 'absolute', inset: 0, pointerEvents: 'none',
-            background: `radial-gradient(ellipse at 10% 60%,${mCfg.color}22 0%,transparent 55%), radial-gradient(ellipse at 90% 20%,rgba(37,99,235,.1) 0%,transparent 45%)`,
-          },
+          background: 'linear-gradient(135deg,#07101E 0%,#0E2240 55%,#081726 100%)',
+          flexShrink: 0, position: 'relative', overflow: 'hidden',
         }}>
-            <Stack direction="row" alignItems="center" justifyContent="space-between">
-              <Stack direction="row" spacing={2} alignItems="center">
-                {/* Mode icon */}
-                <Box sx={{
-                  width: 46, height: 46, borderRadius: '13px',
-                  background: `linear-gradient(135deg,${mCfg.color},${mCfg.color}CC)`,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  boxShadow: `0 6px 18px ${mCfg.color}50`, flexShrink: 0,
-                }}>
-                  <Box sx={{ color: '#fff' }}>{mCfg.icon}</Box>
-                </Box>
+          {/* Top accent gradient bar */}
+          <Box sx={{ height: 3, background: `linear-gradient(90deg, ${mCfg.color} 0%, #7C3AED 100%)` }} />
+          {/* Dots pattern */}
+          <Box sx={{ position: 'absolute', top: 3, bottom: 0, left: 0, right: 0, pointerEvents: 'none', opacity: 0.04, backgroundImage: 'radial-gradient(circle, #ffffff 1px, transparent 1px)', backgroundSize: '18px 18px' }} />
+          {/* Glow overlay */}
+          <Box sx={{ position: 'absolute', inset: 0, pointerEvents: 'none', background: `radial-gradient(ellipse at 12% 70%, ${mCfg.color}18 0%, transparent 50%), radial-gradient(ellipse at 88% 15%, rgba(124,58,237,.06) 0%, transparent 50%)` }} />
 
-                <Box>
-                  <Stack direction="row" spacing={1} alignItems="center">
-                    <Typography sx={{ color: '#F1F5F9', fontWeight: 800, fontSize: 15, letterSpacing: '-0.3px' }}>
-                      GRH · Gestion Agent
-                    </Typography>
-                    <Chip label={mCfg.label} size="small"
-                      sx={{ height: 20, fontSize: 9.5, fontWeight: 700, bgcolor: mCfg.bg, color: mCfg.color, border: `1px solid ${mCfg.color}40`, letterSpacing: '0.05em' }} />
-                  </Stack>
-                  {mode !== 'create' && employee ? (
-                    <Typography sx={{ color: '#475569', fontSize: 11, mt: 0.25 }}>
-                      {employee.full_name} · {employee.employee_number}
-                    </Typography>
-                  ) : (
-                    <Typography sx={{ color: '#475569', fontSize: 11, mt: 0.25 }}>Dossier de création · Nouvel agent</Typography>
-                  )}
-                </Box>
-              </Stack>
-
-              <Stack direction="row" spacing={1} alignItems="center">
-                {!isView && (
-                  <Button size="small" type="submit" form="agent-form"
-                    startIcon={mutation.isPending ? <CircularProgress size={13} color="inherit" /> : <Save sx={{ fontSize: '14px !important' }} />}
-                    disabled={mutation.isPending}
-                    sx={{ bgcolor: mCfg.color, color: '#fff', fontWeight: 700, fontSize: 12, borderRadius: '10px', px: 2.5, boxShadow: `0 3px 10px ${mCfg.color}50`, '&:hover': { filter: 'brightness(0.92)' } }}>
-                    {mutation.isPending ? 'Enregistrement…' : (mode === 'edit' ? 'Mettre à jour' : 'Enregistrer')}
-                  </Button>
-                )}
-                {!isView && (
-                  <Button size="small" startIcon={<Autorenew sx={{ fontSize: '13px !important' }} />}
-                    sx={{ color: '#94A3B8', border: '1px solid rgba(148,163,184,.2)', borderRadius: '10px', fontSize: 11.5, px: 2, '&:hover': { bgcolor: 'rgba(255,255,255,.06)' } }}>
-                    Renouvellement
-                  </Button>
-                )}
-                <IconButton size="small" onClick={handleClose}
-                  sx={{ color: '#64748B', bgcolor: 'rgba(255,255,255,.06)', borderRadius: '9px', width: 32, height: 32, '&:hover': { color: '#F87171', bgcolor: 'rgba(248,113,113,.12)' } }}>
-                  <Close fontSize="small" />
-                </IconButton>
-              </Stack>
+          <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ px: 3, py: 2, position: 'relative' }}>
+            <Stack direction="row" spacing={2} alignItems="center">
+              <Box sx={{
+                width: 50, height: 50, borderRadius: '15px',
+                background: `linear-gradient(135deg, ${mCfg.color}, ${mCfg.color}BB)`,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                boxShadow: `0 8px 24px ${mCfg.color}55, inset 0 1px 0 rgba(255,255,255,0.25)`, flexShrink: 0,
+              }}>
+                <Box sx={{ color: '#fff' }}>{mCfg.icon}</Box>
+              </Box>
+              <Box>
+                <Stack direction="row" spacing={0.75} alignItems="center" mb={0.4}>
+                  <Chip label="ANASER · GRH" size="small" sx={{ height: 17, fontSize: 8.5, fontWeight: 800, bgcolor: 'rgba(255,255,255,0.07)', color: '#64748B', letterSpacing: '0.1em', borderRadius: '5px' }} />
+                  <Chip label={mCfg.label.toUpperCase()} size="small" sx={{ height: 17, fontSize: 8.5, fontWeight: 700, bgcolor: alpha(mCfg.color, 0.2), color: mCfg.color, letterSpacing: '0.05em', borderRadius: '5px' }} />
+                </Stack>
+                <Typography sx={{ color: '#F1F5F9', fontWeight: 800, fontSize: 16, letterSpacing: '-0.3px', lineHeight: 1 }}>
+                  Dossier Agent
+                </Typography>
+                <Typography sx={{ color: '#475569', fontSize: 11.5, mt: 0.3 }}>
+                  {mode !== 'create' && employee ? `${employee.full_name} · ${employee.employee_number}` : 'Création d\'un nouvel agent'}
+                </Typography>
+              </Box>
             </Stack>
-          </Box>
+
+            <Stack direction="row" spacing={1} alignItems="center">
+              {!isView && (
+                <Button size="small" type="submit" form="agent-form"
+                  startIcon={mutation.isPending ? <CircularProgress size={13} color="inherit" /> : <Save sx={{ fontSize: '14px !important' }} />}
+                  disabled={mutation.isPending}
+                  sx={{
+                    bgcolor: mCfg.color, color: '#fff', fontWeight: 700, fontSize: 12.5, borderRadius: '11px', px: 2.5, py: 0.9,
+                    boxShadow: `0 4px 14px ${mCfg.color}55`,
+                    '&:hover': { filter: 'brightness(0.88)', transform: 'translateY(-1px)' },
+                    transition: 'all .15s',
+                  }}>
+                  {mutation.isPending ? 'Enregistrement…' : (mode === 'edit' ? 'Mettre à jour' : 'Enregistrer')}
+                </Button>
+              )}
+              {!isView && (
+                <Button size="small" startIcon={<Autorenew sx={{ fontSize: '13px !important' }} />}
+                  sx={{ color: '#64748B', border: '1px solid rgba(255,255,255,.1)', borderRadius: '10px', fontSize: 11.5, px: 1.75, '&:hover': { bgcolor: 'rgba(255,255,255,.06)', color: '#94A3B8' } }}>
+                  Renouvellement
+                </Button>
+              )}
+              <IconButton size="small" onClick={handleClose}
+                sx={{ color: '#475569', bgcolor: 'rgba(255,255,255,.06)', borderRadius: '10px', width: 34, height: 34, border: '1px solid rgba(255,255,255,0.07)', '&:hover': { color: '#F87171', bgcolor: 'rgba(248,113,113,.12)' } }}>
+                <Close fontSize="small" />
+              </IconButton>
+            </Stack>
+          </Stack>
+        </Box>
 
           {/* ══ FORM ══ */}
           <Box component={isView ? 'div' : 'form'} id="agent-form"
@@ -495,15 +535,76 @@ export default function EmployeeCreateModal({ open, onClose, mode = 'create', em
             sx={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
 
             {mutError && (
-              <Alert severity="error" sx={{ mx: 2.5, mt: 1.5, borderRadius: '10px', fontSize: 12 }}>
+              <Alert severity="error" sx={{ mx: 2, mt: 1.25, borderRadius: '10px', fontSize: 12, py: 0.5 }}>
                 {mutError.response?.data?.message ?? 'Erreur — vérifiez les champs obligatoires.'}
               </Alert>
             )}
 
-            {/* ── EN-TÊTE FICHE ── */}
-            <Box sx={{ px: 2.5, py: 2, bgcolor: '#F8FAFC', borderBottom: '1.5px solid #E2E8F0', flexShrink: 0 }}>
-              <Grid container spacing={1.5} alignItems="flex-start">
-                <Grid item xs={12} md={10}>
+            {/* ── IDENTITY CARD ── */}
+            <Box sx={{ display: 'flex', flexShrink: 0, bgcolor: '#fff', borderBottom: '1.5px solid #E4EAF5' }}>
+
+              {/* LEFT: Photo + mini preview (dark panel) */}
+              <Box sx={{
+                width: 172, flexShrink: 0,
+                background: 'linear-gradient(170deg, #09192F 0%, #132B4A 55%, #0B1F3A 100%)',
+                display: 'flex', flexDirection: 'column', alignItems: 'center',
+                justifyContent: 'center', py: 2.5, px: 2.25, gap: 1.75,
+                borderRight: '1px solid rgba(255,255,255,0.05)',
+              }}>
+                <Box onClick={() => !isView && fileRef.current?.click()} sx={{
+                  width: 108, height: 132, borderRadius: '16px',
+                  position: 'relative', overflow: 'hidden',
+                  cursor: isView ? 'default' : 'pointer',
+                  border: `2.5px solid ${alpha(mCfg.color, 0.5)}`,
+                  boxShadow: `0 0 0 1px rgba(255,255,255,0.07), 0 12px 32px rgba(0,0,0,0.55)`,
+                  bgcolor: '#1B3255', transition: 'all .25s',
+                  ...(!isView ? { '&:hover': { borderColor: mCfg.color, transform: 'scale(1.025)' }, '&:hover .cam-ov': { opacity: 1 } } : {}),
+                }}>
+                  {photoUrl
+                    ? <Box component="img" src={photoUrl} sx={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    : (
+                      <Stack alignItems="center" justifyContent="center" height="100%" spacing={1.25}>
+                        <Avatar sx={{ width: 50, height: 50, fontSize: 20, fontWeight: 800, background: `linear-gradient(135deg, ${mCfg.color}55, #7C3AED55)`, color: '#fff' }}>
+                          {initials}
+                        </Avatar>
+                        {!isView && <Typography sx={{ fontSize: 8, color: 'rgba(255,255,255,0.25)', fontWeight: 700, letterSpacing: '0.12em' }}>PHOTO</Typography>}
+                      </Stack>
+                    )
+                  }
+                  <Box className="cam-ov" sx={{ position: 'absolute', inset: 0, bgcolor: 'rgba(0,0,0,.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: 0, transition: '.2s', flexDirection: 'column', gap: 0.5 }}>
+                    <CameraAlt sx={{ color: '#fff', fontSize: 22 }} />
+                    <Typography sx={{ color: 'rgba(255,255,255,0.7)', fontSize: 7.5, fontWeight: 700, letterSpacing: '0.1em' }}>CHANGER</Typography>
+                  </Box>
+                </Box>
+                <input ref={fileRef} type="file" accept="image/*" hidden onChange={handlePhoto} />
+
+                <Box textAlign="center">
+                  <Typography sx={{ color: '#E2E8F0', fontWeight: 800, fontSize: 12.5, lineHeight: 1.35, mb: 0.9 }}>
+                    {watched.first_name || '—'}{' '}{watched.last_name || '—'}
+                  </Typography>
+                  <Chip
+                    label={watched.status === 'active' ? '● ACTIF' : watched.status === 'inactive' ? '● INACTIF' : '● SUSPENDU'}
+                    size="small"
+                    sx={{
+                      height: 20, fontSize: 9, fontWeight: 800, letterSpacing: '0.03em',
+                      bgcolor: watched.status === 'active' ? 'rgba(52,211,153,0.12)' : 'rgba(248,113,113,0.12)',
+                      color: watched.status === 'active' ? '#34D399' : '#F87171',
+                      border: `1px solid ${watched.status === 'active' ? 'rgba(52,211,153,0.25)' : 'rgba(248,113,113,0.25)'}`,
+                    }}
+                  />
+                  {deptName !== '—' && (
+                    <Typography sx={{ color: '#4A6080', fontSize: 9, mt: 0.9, fontWeight: 600, letterSpacing: '0.04em', lineHeight: 1.3 }}>
+                      {deptName}
+                    </Typography>
+                  )}
+                </Box>
+              </Box>
+
+              {/* RIGHT: Fields */}
+              <Box sx={{ flex: 1, p: 2.25, minWidth: 0, bgcolor: '#FAFBFF' }}>
+                <Box sx={{ display: 'none' }}>{/* placeholder for old Grid container */}</Box>
+                <Grid container spacing={1.5} alignItems="flex-start">
+                <Grid item xs={12} md={12}>
                   {/* Ligne 1 */}
                   <Grid container spacing={1.25} mb={1.25}>
                     <Grid item xs={4} sm={2}>
@@ -585,76 +686,108 @@ export default function EmployeeCreateModal({ open, onClose, mode = 'create', em
                         </FormControl>
                       )} />
                     </Grid>
-                    <Grid item xs={6} sm={3}><Typography variant="caption" sx={labelSx}>Service</Typography><SF placeholder="Service" disabled={isView} /></Grid>
-                    <Grid item xs={6} sm={3}><Typography variant="caption" sx={labelSx}>Division</Typography><SF placeholder="Division" disabled={isView} /></Grid>
-                    <Grid item xs={6} sm={3}><Typography variant="caption" sx={labelSx}>Bureau</Typography><SF placeholder="Bureau" disabled={isView} /></Grid>
+                    {/* Cascading org unit: Direction → Division */}
+                    <Grid item xs={6} sm={3}>
+                      <Typography variant="caption" sx={labelSx}>Direction / Entité</Typography>
+                      <FormControl size="small" fullWidth sx={inputSx}>
+                        <Select
+                          value={orgParentId ?? ''}
+                          displayEmpty
+                          disabled={isView}
+                          onChange={e => {
+                            const pid = e.target.value === '' ? null : Number(e.target.value);
+                            setOrgParentId(pid);
+                            // If this parent has children → don't set organisation_unit_id yet
+                            const hasChildren = orgUnits.some(u => u.parent_id === pid);
+                            if (!hasChildren) {
+                              setValue('organisation_unit_id', pid);
+                            } else {
+                              setValue('organisation_unit_id', null);
+                            }
+                            // Auto-sync department_id
+                            if (pid) {
+                              const unit = orgUnits.find(u => u.id === pid);
+                              if (unit?.type === 'direction') {
+                                const matchedDept = (departments ?? []).find((d: { id: number; name: string }) =>
+                                  d.name.toLowerCase().includes(unit.libelle.substring(0, 15).toLowerCase()) ||
+                                  unit.libelle.toLowerCase().includes(d.name.substring(0, 15).toLowerCase())
+                                );
+                                if (matchedDept) setValue('department_id', matchedDept.id);
+                              }
+                            }
+                          }}
+                        >
+                          <MenuItem value=""><em style={{ color: '#94A3B8', fontStyle: 'normal', fontSize: 13 }}>Sélectionner</em></MenuItem>
+                          {parentUnits.map(u => (
+                            <MenuItem key={u.id} value={u.id} sx={{ fontSize: 13 }}>
+                              <Stack direction="row" spacing={1} alignItems="center">
+                                <Chip label={u.code} size="small" sx={{ height: 16, fontSize: 9, fontWeight: 700, bgcolor: '#EFF6FF', color: '#2563EB', flexShrink: 0 }} />
+                                <span>{u.libelle}</span>
+                              </Stack>
+                            </MenuItem>
+                          ))}
+                        </Select>
+                      </FormControl>
+                    </Grid>
+                    <Grid item xs={6} sm={3}>
+                      <Typography variant="caption" sx={labelSx}>Division / Service</Typography>
+                      <FormControl size="small" fullWidth sx={inputSx}>
+                        <Select
+                          value={childUnits.length > 0 ? (watch('organisation_unit_id') ?? '') : ''}
+                          displayEmpty
+                          disabled={isView || childUnits.length === 0}
+                          onChange={e => {
+                            const cid = e.target.value === '' ? null : Number(e.target.value);
+                            setValue('organisation_unit_id', cid ?? orgParentId);
+                          }}
+                        >
+                          <MenuItem value=""><em style={{ color: '#94A3B8', fontStyle: 'normal', fontSize: 13 }}>{childUnits.length === 0 ? '—' : 'Sélectionner'}</em></MenuItem>
+                          {childUnits.map(u => (
+                            <MenuItem key={u.id} value={u.id} sx={{ fontSize: 13 }}>
+                              <Stack direction="row" spacing={1} alignItems="center">
+                                <Chip label={u.code} size="small" sx={{ height: 16, fontSize: 9, fontWeight: 700, bgcolor: '#F0FDF4', color: '#059669', flexShrink: 0 }} />
+                                <span>{u.libelle}</span>
+                              </Stack>
+                            </MenuItem>
+                          ))}
+                        </Select>
+                      </FormControl>
+                    </Grid>
                   </Grid>
                 </Grid>
-
-                {/* Photo */}
-                <Grid item xs={12} md={2}>
-                  <Stack alignItems="center" spacing={1.25}>
-                    <Box onClick={() => !isView && fileRef.current?.click()} sx={{
-                      width: 85, height: 105, borderRadius: '14px',
-                      border: isView ? '2px solid #E2E8F0' : '2px dashed #CBD5E1',
-                      display: 'flex', flexDirection: 'column',
-                      alignItems: 'center', justifyContent: 'center',
-                      cursor: isView ? 'default' : 'pointer',
-                      overflow: 'hidden', bgcolor: '#F8FAFC', transition: 'all .2s',
-                      position: 'relative',
-                      boxShadow: '0 2px 8px rgba(15,23,42,0.08)',
-                      ...(!isView ? { '&:hover': { borderColor: '#2563EB', bgcolor: alpha('#2563EB', .04) }, '&:hover .cam': { opacity: 1 } } : {}),
-                    }}>
-                      {photoUrl
-                        ? <Box component="img" src={photoUrl} sx={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                        : (
-                          <Stack alignItems="center" spacing={0.75}>
-                            <CameraAlt sx={{ fontSize: 24, color: '#CBD5E1' }} />
-                            <Typography sx={{ fontSize: 9, color: '#CBD5E1', fontWeight: 700, letterSpacing: '0.1em' }}>PHOTO</Typography>
-                          </Stack>
-                        )
-                      }
-                      {photoUrl && !isView && (
-                        <Box className="cam" sx={{ position: 'absolute', inset: 0, bgcolor: 'rgba(0,0,0,.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: 0, transition: '.2s' }}>
-                          <CameraAlt sx={{ color: '#fff' }} />
-                        </Box>
-                      )}
-                    </Box>
-                    <input ref={fileRef} type="file" accept="image/*" hidden onChange={handlePhoto} />
-
-                    <Avatar sx={{ width: 36, height: 36, fontSize: 14, fontWeight: 800, background: `linear-gradient(135deg,${mCfg.color},#7C3AED)` }}>
-                      {initials}
-                    </Avatar>
-
-                    <Box textAlign="center">
-                      <Typography sx={{ fontSize: 9, color: '#94A3B8', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
-                        {deptName}
-                      </Typography>
-                    </Box>
-
-                    <FormControlLabel control={<Checkbox size="small" checked={watched.status === 'active'} disabled sx={{ '&.Mui-checked': { color: '#059669' }, p: 0.5 }} />}
-                      label={<Typography sx={{ fontSize: 10.5, fontWeight: 700, color: watched.status === 'active' ? '#059669' : '#DC2626' }}>
-                        {watched.status === 'active' ? 'ACTIF' : 'INACTIF'}
-                      </Typography>}
-                      sx={{ m: 0 }} />
-                  </Stack>
-                </Grid>
               </Grid>
+              </Box>
             </Box>
 
             {/* ── TABS BAR ── */}
-            <Box sx={{ borderBottom: '1.5px solid #E2E8F0', bgcolor: '#fff', flexShrink: 0 }}>
+            <Box sx={{ bgcolor: '#fff', borderBottom: '1px solid #E4EAF5', flexShrink: 0, px: 1 }}>
               <Tabs value={tab} onChange={(_, v) => setTab(v)} variant="scrollable" scrollButtons="auto"
                 sx={{
-                  minHeight: 44,
-                  '& .MuiTabs-indicator': { height: 3, borderRadius: 2, bgcolor: TABS[tab]?.color },
-                  '& .MuiTab-root': { minHeight: 44, fontSize: 11.5, fontWeight: 500, color: '#64748B', textTransform: 'none', px: 1.75, '&:hover': { color: '#0F172A', bgcolor: '#F8FAFC' } },
-                  '& .Mui-selected': { color: `${TABS[tab]?.color} !important`, fontWeight: '700 !important' },
+                  minHeight: 46,
+                  '& .MuiTabs-indicator': { display: 'none' },
+                  '& .MuiTab-root': {
+                    minHeight: 46, fontSize: 11.5, fontWeight: 600, color: '#64748B',
+                    textTransform: 'none', px: 2, mx: 0.25, borderRadius: '10px',
+                    transition: 'all .18s',
+                    '&:hover': { color: '#0F172A', bgcolor: '#F0F4FF' },
+                  },
+                  '& .Mui-selected': {
+                    color: `${TABS[tab]?.color} !important`, fontWeight: '700 !important',
+                    bgcolor: `${alpha(TABS[tab]?.color ?? '#2563EB', 0.08)} !important`,
+                  },
                 }}>
                 {TABS.map((t, i) => (
                   <Tab key={i} label={
-                    <Stack direction="row" alignItems="center" spacing={0.5}>
-                      <Box sx={{ color: tab === i ? t.color : '#94A3B8', display: 'flex', '& svg': { fontSize: 14 } }}>{t.icon}</Box>
+                    <Stack direction="row" alignItems="center" spacing={0.75}>
+                      <Box sx={{
+                        width: 26, height: 26, borderRadius: '8px',
+                        bgcolor: tab === i ? alpha(t.color, 0.15) : '#F1F5F9',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        transition: 'all .18s',
+                        '& svg': { fontSize: 13.5, color: tab === i ? t.color : '#94A3B8', transition: 'color .18s' },
+                      }}>
+                        {t.icon}
+                      </Box>
                       <span>{t.label}</span>
                     </Stack>
                   } />
@@ -663,7 +796,7 @@ export default function EmployeeCreateModal({ open, onClose, mode = 'create', em
             </Box>
 
             {/* ── TAB CONTENT ── */}
-            <Box sx={{ flex: 1, overflow: 'auto', px: 2.5, py: 2, bgcolor: '#F8FAFC' }}>
+            <Box sx={{ flex: 1, overflow: 'auto', px: 2.5, py: 2.25, bgcolor: '#F2F5FB' }}>
 
               {/* ─── TAB 0 : FILIATIONS ─── */}
               {tab === 0 && (
@@ -1171,33 +1304,36 @@ export default function EmployeeCreateModal({ open, onClose, mode = 'create', em
             </Box>
 
             {/* ── FOOTER : nav dots + boutons ── */}
-            <Box sx={{ px: 2.5, py: 1.25, borderTop: '1.5px solid #F1F5F9', bgcolor: '#fff', flexShrink: 0 }}>
+            <Box sx={{ px: 2.5, py: 1.5, borderTop: '1px solid #E4EAF5', bgcolor: '#fff', flexShrink: 0 }}>
               <Stack direction="row" alignItems="center" justifyContent="space-between">
                 {/* Dots de navigation */}
-                <Stack direction="row" spacing={0.75}>
+                <Stack direction="row" spacing={0.75} alignItems="center">
                   {TABS.map((t, i) => (
                     <Tooltip key={i} title={t.label} arrow placement="top">
                       <Box onClick={() => setTab(i)} sx={{
-                        width: tab === i ? 28 : 8, height: 8, borderRadius: '4px', cursor: 'pointer',
-                        bgcolor: tab === i ? t.color : i < tab ? alpha(t.color, 0.35) : '#E2E8F0',
+                        width: tab === i ? 28 : 8, height: 8, borderRadius: '99px', cursor: 'pointer',
+                        bgcolor: tab === i ? t.color : i < tab ? alpha(t.color, 0.3) : '#DDE3EE',
                         transition: 'all 0.25s ease',
-                        '&:hover': { bgcolor: t.color, transform: 'scaleY(1.2)' },
+                        '&:hover': { bgcolor: t.color, transform: 'scaleY(1.15)' },
                       }} />
                     </Tooltip>
                   ))}
+                  <Typography sx={{ fontSize: 11, color: '#94A3B8', ml: 0.75, fontWeight: 600 }}>
+                    {tab + 1}/{TABS.length}
+                  </Typography>
                 </Stack>
 
                 {/* Boutons navigation tab */}
                 <Stack direction="row" spacing={0.75}>
                   {tab > 0 && (
                     <Button size="small" variant="outlined" onClick={() => setTab(t => t - 1)}
-                      sx={{ borderRadius: '8px', fontSize: 11.5, fontWeight: 600, px: 1.75, borderColor: '#E2E8F0', color: '#475569', '&:hover': { borderColor: '#94A3B8' } }}>
+                      sx={{ borderRadius: '9px', fontSize: 12, fontWeight: 600, px: 2, borderColor: '#DDE3EE', color: '#475569', '&:hover': { borderColor: '#94A3B8', bgcolor: '#F8FAFC' } }}>
                       ← Précédent
                     </Button>
                   )}
                   {tab < TABS.length - 1 && (
                     <Button size="small" variant="outlined" onClick={() => setTab(t => t + 1)}
-                      sx={{ borderRadius: '8px', fontSize: 11.5, fontWeight: 600, px: 1.75, borderColor: '#E2E8F0', color: '#475569', '&:hover': { borderColor: '#94A3B8' } }}>
+                      sx={{ borderRadius: '9px', fontSize: 12, fontWeight: 600, px: 2, borderColor: '#DDE3EE', color: '#475569', '&:hover': { borderColor: '#94A3B8', bgcolor: '#F8FAFC' } }}>
                       Suivant →
                     </Button>
                   )}
@@ -1205,7 +1341,7 @@ export default function EmployeeCreateModal({ open, onClose, mode = 'create', em
                     <Button size="small" type="submit" form="agent-form"
                       startIcon={mutation.isPending ? <CircularProgress size={12} color="inherit" /> : <Save sx={{ fontSize: '13px !important' }} />}
                       disabled={mutation.isPending}
-                      sx={{ bgcolor: mCfg.color, color: '#fff', fontWeight: 700, fontSize: 11.5, borderRadius: '8px', px: 2, boxShadow: `0 3px 10px ${mCfg.color}40`, '&:hover': { filter: 'brightness(0.92)' } }}>
+                      sx={{ bgcolor: mCfg.color, color: '#fff', fontWeight: 700, fontSize: 12, borderRadius: '9px', px: 2.5, boxShadow: `0 3px 12px ${mCfg.color}45`, '&:hover': { filter: 'brightness(0.9)', transform: 'translateY(-1px)' }, transition: 'all .15s' }}>
                       {mutation.isPending ? 'Enregistrement…' : (mode === 'edit' ? 'Mettre à jour' : 'Enregistrer')}
                     </Button>
                   )}

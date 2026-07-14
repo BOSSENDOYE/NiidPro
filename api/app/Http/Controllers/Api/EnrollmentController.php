@@ -10,6 +10,7 @@ use App\Models\EnrollmentRequest;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Storage;
 
 class EnrollmentController extends Controller
 {
@@ -28,6 +29,7 @@ class EnrollmentController extends Controller
             'email'           => 'required|email|max:150',
             'categorie_emploi'=> 'nullable|string|max:50',
             'qualification'   => 'nullable|string|max:100',
+            'photo'           => 'nullable|image|mimes:jpeg,png,jpg,webp|max:3072',
         ]);
 
         // Block duplicate pending requests for same email
@@ -40,6 +42,11 @@ class EnrollmentController extends Controller
                 'message' => 'Une demande en attente existe déjà pour cet email. Veuillez patienter ou contacter les RH.',
             ], 422);
         }
+
+        if ($request->hasFile('photo')) {
+            $data['photo_path'] = $request->file('photo')->store('enrollments/photos', 'public');
+        }
+        unset($data['photo']);
 
         $enrollment = EnrollmentRequest::create($data);
 

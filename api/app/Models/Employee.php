@@ -13,7 +13,7 @@ class Employee extends Model
     protected $appends = ['photo_url', 'full_name'];
 
     protected $fillable = [
-        'employee_number', 'user_id', 'department_id', 'position_id', 'manager_id',
+        'employee_number', 'user_id', 'department_id', 'organisation_unit_id', 'position_id', 'manager_id',
         'first_name', 'last_name', 'photo', 'birth_date', 'birth_place',
         'gender', 'nationality', 'national_id', 'social_security_number',
         'personal_email', 'professional_email', 'phone_personal', 'phone_professional',
@@ -99,6 +99,11 @@ class Employee extends Model
     public function department()
     {
         return $this->belongsTo(Department::class);
+    }
+
+    public function organisationUnit()
+    {
+        return $this->belongsTo(\App\Models\OrganisationUnit::class, 'organisation_unit_id');
     }
 
     public function familyMembers()

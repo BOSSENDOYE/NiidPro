@@ -31,6 +31,9 @@ use App\Http\Controllers\Api\PayrollTemplateController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\LeaveCarryoverController;
 use App\Http\Controllers\Api\EnrollmentController;
+use App\Http\Controllers\Api\EvalCampagneController;
+use App\Http\Controllers\Api\EvalFicheController;
+use App\Http\Controllers\Api\OrganisationUnitController;
 use Illuminate\Support\Facades\Route;
 
 // Health check
@@ -456,5 +459,50 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('/{id}/avancer',             [EvaluationController::class, 'avancer']);
         Route::put('/{id}/valider-rrh',         [EvaluationController::class, 'validerRrh']);
         Route::put('/{id}/decision-dg',         [EvaluationController::class, 'decisionDg']);
+    });
+
+    // ── Module Évaluation Annuelle ANASER (CDC-ANASER-EVAL-2026-01) ───────────
+    Route::prefix('eval')->group(function () {
+
+        // Campagnes
+        Route::prefix('campagnes')->group(function () {
+            Route::get('/',                       [EvalCampagneController::class, 'index']);
+            Route::post('/',                      [EvalCampagneController::class, 'store']);
+            Route::get('/{campagne}',             [EvalCampagneController::class, 'show']);
+            Route::put('/{campagne}',             [EvalCampagneController::class, 'update']);
+            Route::put('/{campagne}/lancer',      [EvalCampagneController::class, 'lancer']);
+            Route::get('/{campagne}/synthese',    [EvalCampagneController::class, 'synthese']);
+            Route::delete('/{campagne}',          [EvalCampagneController::class, 'destroy']);
+        });
+
+        // Critères (référentiel)
+        Route::get('/criteres',                   [EvalFicheController::class, 'criteres']);
+
+        // Fiches
+        Route::prefix('fiches')->group(function () {
+            Route::get('/',                                [EvalFicheController::class, 'index']);
+            Route::post('/',                               [EvalFicheController::class, 'store']);
+            Route::get('/{fiche}',                         [EvalFicheController::class, 'show']);
+            Route::put('/{fiche}/planifier',               [EvalFicheController::class, 'planifier']);
+            Route::put('/{fiche}/noter',                   [EvalFicheController::class, 'noter']);
+            Route::put('/{fiche}/besoins',                 [EvalFicheController::class, 'sauvegarderBesoins']);
+            Route::put('/{fiche}/objectifs',               [EvalFicheController::class, 'sauvegarderObjectifs']);
+            Route::put('/{fiche}/signer-evaluateur',       [EvalFicheController::class, 'signerEvaluateur']);
+            Route::put('/{fiche}/signer-agent',            [EvalFicheController::class, 'signerAgent']);
+            Route::put('/{fiche}/transmettre-daf',         [EvalFicheController::class, 'transmettreDAF']);
+            Route::put('/{fiche}/annoter-dg',              [EvalFicheController::class, 'annoterDG']);
+            Route::put('/{fiche}/notifier',                [EvalFicheController::class, 'notifier']);
+            Route::put('/{fiche}/archiver',                [EvalFicheController::class, 'archiver']);
+            Route::delete('/{fiche}',                      [EvalFicheController::class, 'destroy']);
+        });
+    });
+
+    // Organigramme
+    Route::prefix('organisation-units')->group(function () {
+        Route::get('/',                    [OrganisationUnitController::class, 'index']);
+        Route::post('/',                   [OrganisationUnitController::class, 'store']);
+        Route::post('/seed',               [OrganisationUnitController::class, 'seed']);
+        Route::put('/{organisationUnit}',  [OrganisationUnitController::class, 'update']);
+        Route::delete('/{organisationUnit}', [OrganisationUnitController::class, 'destroy']);
     });
 });

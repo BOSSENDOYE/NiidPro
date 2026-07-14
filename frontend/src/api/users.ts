@@ -8,6 +8,11 @@ export interface ManagedUser {
   roles: string[];
   role: string | null;
   photo_url: string | null;
+  employee_id: number | null;
+  employee_name: string | null;
+  employee_number: string | null;
+  department_id: number | null;
+  department_name: string | null;
   last_login_at: string | null;
   created_at: string;
 }
@@ -18,6 +23,8 @@ export interface UserPayload {
   password?: string;
   role?: string | null;
   is_active?: boolean;
+  employee_id?: number | null;
+  department_id?: number | null;
 }
 
 export const usersApi = {

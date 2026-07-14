@@ -21,6 +21,8 @@ class User extends Authenticatable
         'password',
         'avatar',
         'is_active',
+        'employee_id',
+        'department_id',
         'two_factor_secret',
         'two_factor_enabled',
         'last_login_at',
@@ -46,5 +48,20 @@ class User extends Authenticatable
     public function employee()
     {
         return $this->hasOne(Employee::class);
+    }
+
+    public function linkedEmployee()
+    {
+        return $this->belongsTo(Employee::class, 'employee_id');
+    }
+
+    public function department()
+    {
+        return $this->belongsTo(Department::class);
+    }
+
+    public function hasFullAccess(): bool
+    {
+        return $this->hasAnyRole(['super_admin', 'admin_rh']);
     }
 }

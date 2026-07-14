@@ -955,12 +955,37 @@ export default function EmployeesPage() {
                     <QrCode2 sx={{ color: '#002f59' }} />
                     <Typography sx={{ fontWeight: 700, color: 'text.primary' }}>QR Code d'enrôlement</Typography>
                   </Box>
-                  <Box sx={{ p: 2, borderRadius: 2, border: '2px solid #E2E8F0', bgcolor: '#fff', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1.5 }}>
+                  <Box id="qr-print-zone" sx={{ p: 2, borderRadius: 2, border: '2px solid #E2E8F0', bgcolor: '#fff', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1.5 }}>
                     <QRCodeSVG value={ENROLL_URL} size={180} fgColor="#002f59" level="M" />
                     <Typography sx={{ fontSize: 11, color: 'text.secondary', textAlign: 'center', wordBreak: 'break-all' }}>{ENROLL_URL}</Typography>
                   </Box>
                   <Button fullWidth variant="outlined" startIcon={<Print />}
-                    onClick={() => window.print()}
+                    onClick={() => {
+                      const zone = document.getElementById('qr-print-zone');
+                      if (!zone) return;
+                      const svgEl = zone.querySelector('svg');
+                      const svgHtml = svgEl ? svgEl.outerHTML : '';
+                      const win = window.open('', '_blank', 'width=400,height=500');
+                      if (!win) return;
+                      win.document.write(`<!DOCTYPE html><html><head><title>QR Code Enrôlement</title>
+                        <style>
+                          body { margin: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; font-family: Arial, sans-serif; background: #fff; }
+                          .title { color: #002f59; font-weight: 800; font-size: 18px; margin-bottom: 12px; letter-spacing: 0.5px; }
+                          .qr-box { padding: 20px; border: 2px solid #E2E8F0; border-radius: 12px; display: flex; flex-direction: column; align-items: center; gap: 12px; }
+                          .url { font-size: 10px; color: #64748B; text-align: center; word-break: break-all; max-width: 220px; }
+                          .subtitle { color: #475569; font-size: 12px; margin-top: 8px; text-align: center; max-width: 240px; }
+                          @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+                        </style></head><body>
+                        <div class="title">Formulaire d'enrôlement</div>
+                        <div class="qr-box">
+                          ${svgHtml}
+                          <div class="url">${ENROLL_URL}</div>
+                        </div>
+                        <div class="subtitle">Scannez ce QR code pour accéder au formulaire d'enrôlement agent</div>
+                        <script>window.onload = function(){ window.print(); window.onafterprint = function(){ window.close(); }; }<\/script>
+                      </body></html>`);
+                      win.document.close();
+                    }}
                     sx={{ borderRadius: 2, textTransform: 'none', borderColor: '#002f59', color: '#002f59' }}>
                     Imprimer le QR code
                   </Button>
@@ -997,7 +1022,7 @@ export default function EmployeesPage() {
                       <Table size="small" stickyHeader>
                         <TableHead>
                           <TableRow>
-                            {['Matricule','Nom complet','Fonction','Email','Date soumission','Statut',''].map(h => (
+                            {['Photo','Matricule','Nom complet','Fonction','Email','Date soumission','Statut',''].map(h => (
                               <TableCell key={h} sx={{ fontWeight: 700, fontSize: 11, bgcolor: '#F8FAFC', color: '#475569', whiteSpace: 'nowrap' }}>{h}</TableCell>
                             ))}
                           </TableRow>
@@ -1005,12 +1030,20 @@ export default function EmployeesPage() {
                         <TableBody>
                           {(enrollmentsData?.data ?? []).length === 0 ? (
                             <TableRow>
-                              <TableCell colSpan={7} align="center" sx={{ py: 5, color: '#94A3B8', fontSize: 13 }}>
+                              <TableCell colSpan={8} align="center" sx={{ py: 5, color: '#94A3B8', fontSize: 13 }}>
                                 Aucune demande d'enrôlement
                               </TableCell>
                             </TableRow>
                           ) : (enrollmentsData?.data ?? []).map((enr: EnrollmentRequest) => (
                             <TableRow key={enr.id} hover>
+                              <TableCell sx={{ py: 0.5 }}>
+                                <Avatar
+                                  src={enr.photo_path ? `${(import.meta.env.VITE_API_URL ?? 'http://localhost:8000/api').replace('/api', '')}/storage/${enr.photo_path}` : undefined}
+                                  sx={{ width: 36, height: 36, fontSize: 13, fontWeight: 700, bgcolor: '#E2E8F0', color: '#475569' }}
+                                >
+                                  {`${enr.first_name?.[0] ?? ''}${enr.last_name?.[0] ?? ''}`.toUpperCase()}
+                                </Avatar>
+                              </TableCell>
                               <TableCell sx={{ fontSize: 12, fontWeight: 700, color: '#002f59' }}>{enr.matricule}</TableCell>
                               <TableCell sx={{ fontSize: 12 }}>{enr.first_name} <strong>{enr.last_name}</strong></TableCell>
                               <TableCell sx={{ fontSize: 12 }}>{enr.fonction}</TableCell>
@@ -1088,6 +1121,43 @@ export default function EmployeesPage() {
         <Divider />
         {enrollDetail && (
           <DialogContent sx={{ pt: 2 }}>
+            {/* Carte profil photo */}
+            <Box sx={{
+              display: 'flex', alignItems: 'center', gap: 2.5, mb: 3,
+              p: 2.5, borderRadius: 2,
+              background: 'linear-gradient(135deg, #002f59 0%, #004080 100%)',
+            }}>
+              <Avatar
+                src={enrollDetail.enrollment.photo_path
+                  ? `${(import.meta.env.VITE_API_URL ?? 'http://localhost:8000/api').replace('/api', '')}/storage/${enrollDetail.enrollment.photo_path}`
+                  : undefined}
+                sx={{
+                  width: 96, height: 96, flexShrink: 0,
+                  border: '3px solid rgba(255,255,255,0.4)',
+                  fontSize: 32, fontWeight: 800,
+                  bgcolor: 'rgba(255,255,255,0.15)', color: '#fff',
+                }}
+              >
+                {`${enrollDetail.enrollment.first_name?.[0] ?? ''}${enrollDetail.enrollment.last_name?.[0] ?? ''}`.toUpperCase()}
+              </Avatar>
+              <Box sx={{ minWidth: 0 }}>
+                <Typography sx={{ color: '#fff', fontWeight: 800, fontSize: 18, lineHeight: 1.2 }}>
+                  {enrollDetail.enrollment.first_name} {enrollDetail.enrollment.last_name}
+                </Typography>
+                <Typography sx={{ color: 'rgba(255,255,255,0.7)', fontSize: 13, mt: 0.5 }}>
+                  {enrollDetail.enrollment.fonction}
+                </Typography>
+                <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
+                  <Chip label={`Matricule : ${enrollDetail.enrollment.matricule}`}
+                    size="small" sx={{ bgcolor: 'rgba(255,255,255,0.15)', color: '#fff', fontWeight: 700, fontSize: 11 }} />
+                  {!enrollDetail.enrollment.photo_path && (
+                    <Chip label="Pas de photo" size="small"
+                      sx={{ bgcolor: 'rgba(255,120,0,0.3)', color: '#ffd0a0', fontSize: 11 }} />
+                  )}
+                </Stack>
+              </Box>
+            </Box>
+
             <Grid container spacing={3}>
               <Grid item xs={12} md={enrollDetail.matched_employee ? 6 : 12}>
                 <Typography sx={{ fontWeight: 700, fontSize: 13, color: '#002f59', mb: 1.5 }}>Informations soumises</Typography>

@@ -77,6 +77,9 @@ export interface Employee {
   echelon?: string;
   fonction?: string;
   qualification?: string;
+  // Filière organisationnelle
+  organisation_unit_id?: number | null;
+  organisation_unit?: import('../api/organisationUnits').OrgUnit;
 }
 
 export interface EnrollmentRequest {
@@ -92,6 +95,7 @@ export interface EnrollmentRequest {
   email: string;
   categorie_emploi?: string;
   qualification?: string;
+  photo_path?: string;
   status: 'pending' | 'validated' | 'rejected';
   rejection_reason?: string;
   matched_employee_id?: number;
@@ -1166,4 +1170,187 @@ export interface PaginatedResponse<T> {
 export interface ApiError {
   message: string;
   errors?: Record<string, string[]>;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// MODULE ÉVALUATION ANNUELLE — CDC-ANASER-EVAL-2026-01
+// ═══════════════════════════════════════════════════════════════════════════════
+
+export type EvalStatutCampagne = 'preparation' | 'active' | 'synthese' | 'cloturee';
+
+export type EvalStatutFiche =
+  | 'a_planifier'
+  | 'planifiee'
+  | 'en_cours'
+  | 'signee_evaluateur'
+  | 'signee_agent'
+  | 'transmise_daf'
+  | 'annotee_dg'
+  | 'notifiee'
+  | 'archivee';
+
+export type EvalAppreciation =
+  | 'excellent'
+  | 'tres_satisfaisant'
+  | 'satisfaisant'
+  | 'a_ameliorer'
+  | 'insuffisant';
+
+export type EvalCategorieCritere = 'base' | 'complementaire' | 'fonctionnaire';
+export type EvalStatutAgent = 'contractuel' | 'fonctionnaire' | 'decisionnaire';
+export type EvalPrioriteFormation = 'haute' | 'moyenne' | 'faible';
+
+export interface EvalCampagne {
+  id: number;
+  exercice: number;
+  titre: string;
+  statut: EvalStatutCampagne;
+  date_lancement: string | null;
+  date_limite_planification: string | null;
+  date_limite_entretiens: string | null;
+  date_limite_transmission: string | null;
+  date_limite_synthese: string | null;
+  date_cloture: string | null;
+  periode_debut: string | null;
+  periode_fin: string | null;
+  note_service: string | null;
+  cree_par: number | null;
+  lance_par: number | null;
+  lance_at: string | null;
+  createur?: { id: number; name: string };
+  lanceur?: { id: number; name: string };
+  stats?: EvalCampagneStats;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface EvalCampagneStats {
+  total: number;
+  a_planifier: number;
+  planifiees: number;
+  en_cours: number;
+  signees: number;
+  transmises: number;
+  notifiees: number;
+  archivees: number;
+}
+
+export interface EvalCritere {
+  id: number;
+  code: string;
+  libelle: string;
+  categorie: EvalCategorieCritere;
+  ordre: number;
+  actif: boolean;
+}
+
+export interface EvalNotation {
+  id?: number;
+  fiche_id: number;
+  critere_id: number;
+  note: 1 | 2 | 3 | 4 | 5 | null;
+  observation: string | null;
+  critere?: EvalCritere;
+}
+
+export interface EvalBesoinFormation {
+  id?: number;
+  fiche_id?: number;
+  intitule: string;
+  priorite: EvalPrioriteFormation;
+  ordre?: number;
+}
+
+export interface EvalObjectif {
+  id?: number;
+  fiche_id?: number;
+  objectif: string;
+  indicateur: string | null;
+  echeance: string | null;
+  ordre?: number;
+}
+
+export interface EvalDecisionRh {
+  id?: number;
+  fiche_id?: number;
+  formation: boolean;
+  coaching: boolean;
+  mobilite: boolean;
+  felicitations: boolean;
+  suivi_particulier: boolean;
+  gratification: boolean;
+  montant_gratification: string | null;
+  autre: string | null;
+  commentaire: string | null;
+  decideur_id?: number | null;
+  decide_at?: string | null;
+}
+
+export interface EvalFiche {
+  id: number;
+  campagne_id: number;
+  employee_id: number;
+  evaluateur_id: number | null;
+  statut: EvalStatutFiche;
+  statut_agent: EvalStatutAgent;
+  snapshot_direction: string | null;
+  snapshot_service: string | null;
+  snapshot_fonction: string | null;
+  snapshot_matricule: string | null;
+  snapshot_superieur: string | null;
+  snapshot_anciennete_mois: number | null;
+  date_entretien: string | null;
+  lieu_entretien: string | null;
+  entretien_tenu: boolean;
+  entretien_tenu_at: string | null;
+  moyenne: number | null;
+  appreciation: EvalAppreciation | null;
+  realisations: string | null;
+  difficultes: string | null;
+  competences_demontrees: string | null;
+  observations_evaluateur: string | null;
+  observations_agent: string | null;
+  refus_signature_agent: boolean;
+  motif_refus_signature: string | null;
+  signe_evaluateur_at: string | null;
+  signe_agent_at: string | null;
+  transmise_daf_at: string | null;
+  notifiee_at: string | null;
+  archivee_at: string | null;
+  avis_chef_service: string | null;
+  avis_dg: string | null;
+  employee?: Employee;
+  evaluateur?: { id: number; name: string };
+  campagne?: EvalCampagne;
+  notations?: EvalNotation[];
+  besoins_formation?: EvalBesoinFormation[];
+  objectifs?: EvalObjectif[];
+  decision_rh?: EvalDecisionRh | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface EvalSyntheseAgent {
+  id: number;
+  matricule: string | null;
+  nom_complet: string;
+  fonction: string | null;
+  moyenne: number | null;
+  appreciation: EvalAppreciation | null;
+  decisions: EvalDecisionRh | null;
+  besoins: string[];
+}
+
+export interface EvalSyntheseDirection {
+  direction: string;
+  nb_agents: number;
+  moyenne_direction: number;
+  agents: EvalSyntheseAgent[];
+}
+
+export interface EvalSynthese {
+  campagne: { id: number; exercice: number; titre: string };
+  synthese: EvalSyntheseDirection[];
+  total_fiches: number;
+  moyenne_globale: number;
 }

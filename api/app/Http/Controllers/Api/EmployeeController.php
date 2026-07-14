@@ -24,7 +24,14 @@ class EmployeeController extends Controller
 
     public function index(Request $request)
     {
+        $authUser = $request->user();
+
         $query = Employee::with(['department', 'position', 'manager', 'activeContract', 'indice.hierarchy'])
+            // Scope département : les non-admins ne voient que leur département
+            ->when(
+                $authUser && !$authUser->hasAnyRole(['super_admin', 'admin_rh']) && $authUser->department_id,
+                fn($q) => $q->where('department_id', $authUser->department_id)
+            )
             ->when($request->search, fn($q, $s) => $q->where(fn($q) =>
                 $q->where('first_name', 'like', "%{$s}%")
                   ->orWhere('last_name', 'like', "%{$s}%")
@@ -46,6 +53,7 @@ class EmployeeController extends Controller
             'first_name'           => ['required', 'string', 'max:100'],
             'last_name'            => ['required', 'string', 'max:100'],
             'department_id'        => ['nullable', 'exists:departments,id'],
+            'organisation_unit_id' => ['nullable', 'exists:organisation_units,id'],
             'position_id'          => ['nullable', 'exists:positions,id'],
             'professional_email'   => ['nullable', 'email', 'unique:employees'],
             'personal_email'       => ['nullable', 'email'],
@@ -76,13 +84,13 @@ class EmployeeController extends Controller
             $this->syncFamilyMembers($employee, $family);
         }
 
-        return response()->json($employee->load(['department', 'position', 'familyMembers']), 201);
+        return response()->json($employee->load(['department', 'position', 'organisationUnit', 'familyMembers']), 201);
     }
 
     public function show(Employee $employee)
     {
         return response()->json(
-            $employee->load(['department', 'position', 'manager', 'contracts', 'user', 'familyMembers', 'indice.hierarchy', 'indice.augmentations'])
+            $employee->load(['department', 'position', 'organisationUnit', 'manager', 'contracts', 'user', 'familyMembers', 'indice.hierarchy', 'indice.augmentations'])
         );
     }
 
@@ -91,9 +99,10 @@ class EmployeeController extends Controller
         $data = $request->validate([
             'first_name'         => ['sometimes', 'string', 'max:100'],
             'last_name'          => ['sometimes', 'string', 'max:100'],
-            'department_id'      => ['nullable', 'exists:departments,id'],
-            'position_id'        => ['nullable', 'exists:positions,id'],
-            'professional_email' => ['nullable', 'email', 'unique:employees,professional_email,' . $employee->id],
+            'department_id'        => ['nullable', 'exists:departments,id'],
+            'organisation_unit_id' => ['nullable', 'exists:organisation_units,id'],
+            'position_id'          => ['nullable', 'exists:positions,id'],
+            'professional_email'   => ['nullable', 'email', 'unique:employees,professional_email,' . $employee->id],
             'personal_email'     => ['nullable', 'email'],
             'phone_personal'     => ['nullable', 'string'],
             'phone_professional' => ['nullable', 'string'],
@@ -130,7 +139,7 @@ class EmployeeController extends Controller
             $this->syncFamilyMembers($employee, $family);
         }
 
-        return response()->json($employee->fresh()->load(['department', 'position', 'familyMembers', 'indice.hierarchy']));
+        return response()->json($employee->fresh()->load(['department', 'position', 'organisationUnit', 'familyMembers', 'indice.hierarchy']));
     }
 
     /** Règles de validation des membres de la famille (onglet Conjoints/Enfants) */

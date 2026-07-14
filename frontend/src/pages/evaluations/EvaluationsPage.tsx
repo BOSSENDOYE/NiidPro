@@ -1,1659 +1,2037 @@
-import { useState, useEffect } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Box, Typography, Tabs, Tab, Grid, Card, CardContent, Chip, Button,
-  Table, TableHead, TableRow, TableCell, TableBody, IconButton,
+  Table, TableHead, TableRow, TableCell, TableBody, TableContainer, TablePagination, IconButton,
   Dialog, DialogTitle, DialogContent, DialogActions, TextField,
-  MenuItem, Select, FormControl, InputLabel, LinearProgress,
-  Stepper, Step, StepLabel,
-  Alert, Divider, Paper, Stack, Tooltip,
+  LinearProgress, Alert, Divider, Paper, Stack, Tooltip,
+  MenuItem, Select, FormControl, InputLabel,
+  Stepper, Step, StepLabel, StepConnector,
+  CircularProgress, Avatar, FormControlLabel, Checkbox,
 } from '@mui/material';
 import {
-  Add, ArrowBack, CheckCircle, AccessTime, Person,
-  Grade, Assignment, HowToVote, Archive, Send, Edit, Print,
+  Add, CheckCircle, Assignment, Send, Archive,
+  Edit, Visibility, BarChart, Settings,
+  FiberManualRecord, EventNote, Grade, Person,
+  ThumbUp, Warning, Block, Star, Delete, DeleteForever, Print,
 } from '@mui/icons-material';
-import { evaluationApi } from '../../api/evaluations';
-import { useCompany } from '../../hooks/useCompany';
+import { evalCampagneApi, evalFicheApi } from '../../api/evaluations';
+import { employeesApi } from '../../api/employees';
 import type {
-  EvaluationCritere, EvaluationPeriodeEssai, GroupeCritere,
-  AppreciationEvaluation, DecisionEvaluation, StatutEvaluation,
+  EvalCampagne, EvalFiche, EvalStatutFiche, EvalAppreciation,
+  EvalNotation, EvalBesoinFormation, EvalObjectif, EvalDecisionRh, EvalCritere,
+  Employee,
 } from '../../types';
 
-// ── Constantes & helpers ─────────────────────────────────────────────────────
+// ── Impression fiche ──────────────────────────────────────────────────────────
 
-const STATUT_STEPS: StatutEvaluation[] = [
-  'brouillon', 'auto_evaluation', 'entretien', 'signe', 'valide_rrh', 'decision_dg', 'archive',
-];
-
-const STATUT_LABELS: Record<string, string> = {
-  brouillon: 'Brouillon',
-  auto_evaluation: 'Auto-évaluation',
-  entretien: 'Entretien',
-  signe: 'Signé',
-  valide_rrh: 'Validé RRH',
-  decision_dg: 'Décision DG',
-  archive: 'Archivé',
-};
-
-const STATUT_COLORS: Record<string, 'default' | 'info' | 'primary' | 'warning' | 'success' | 'error'> = {
-  brouillon: 'default',
-  auto_evaluation: 'info',
-  entretien: 'primary',
-  signe: 'warning',
-  valide_rrh: 'warning',
-  decision_dg: 'success',
-  archive: 'default',
-};
-
-const APPRECIATION_COLORS: Record<AppreciationEvaluation, 'error' | 'warning' | 'primary' | 'success'> = {
-  insuffisant: 'error',
-  passable: 'warning',
-  satisfaisant: 'primary',
-  excellent: 'success',
-};
-
-const APPRECIATION_LABELS: Record<AppreciationEvaluation, string> = {
-  insuffisant: 'Insuffisant',
-  passable: 'Passable',
-  satisfaisant: 'Satisfaisant',
-  excellent: 'Excellent',
-};
-
-const DECISION_COLORS: Record<DecisionEvaluation, 'success' | 'warning' | 'error'> = {
-  confirmation: 'success',
-  renouvellement: 'warning',
-  non_confirmation: 'error',
-};
-
-const DECISION_LABELS: Record<DecisionEvaluation, string> = {
-  confirmation: 'Confirmation',
-  renouvellement: 'Renouvellement',
-  non_confirmation: 'Non-confirmation',
-};
-
-const GROUPE_LABELS: Record<GroupeCritere, string> = {
-  competences_techniques:  'A — Compétences Techniques et Professionnelles (40%)',
-  comportement_relations:  'B — Comportement et Relations Professionnelles (30%)',
-  aptitudes_personnelles:  'C — Aptitudes Personnelles (30%)',
-};
-
-const GROUPE_POIDS_GLOBAL: Record<GroupeCritere, number> = {
-  competences_techniques: 0.40,
-  comportement_relations: 0.30,
-  aptitudes_personnelles: 0.30,
-};
-
-function fmtDate(d: string | null) {
-  if (!d) return '—';
-  return new Date(d).toLocaleDateString('fr-FR');
-}
-
-function calcAppréciation(note: number): AppreciationEvaluation {
-  if (note < 1.5) return 'insuffisant';
-  if (note < 2.5) return 'passable';
-  if (note < 3.25) return 'satisfaisant';
-  return 'excellent';
-}
-
-function calcDecision(note: number): DecisionEvaluation {
-  if (note < 2.0) return 'non_confirmation';
-  if (note < 2.5) return 'renouvellement';
-  return 'confirmation';
-}
-
-// ── Composants réutilisables ──────────────────────────────────────────────────
-
-function KpiCard({ label, value, color }: { label: string; value: number; color: string }) {
-  return (
-    <Card sx={{ borderTop: `4px solid ${color}`, height: '100%' }}>
-      <CardContent sx={{ textAlign: 'center' }}>
-        <Typography variant="h3" fontWeight={700} color={color}>{value}</Typography>
-        <Typography variant="body2" color="text.secondary" mt={0.5}>{label}</Typography>
-      </CardContent>
-    </Card>
-  );
-}
-
-function AppreciationChip({ appreciation }: { appreciation: AppreciationEvaluation | null }) {
-  if (!appreciation) return <Chip label="—" size="small" />;
-  return (
-    <Chip
-      label={APPRECIATION_LABELS[appreciation]}
-      color={APPRECIATION_COLORS[appreciation]}
-      size="small"
-    />
-  );
-}
-
-function DecisionChip({ decision }: { decision: DecisionEvaluation | null }) {
-  if (!decision) return null;
-  return (
-    <Chip
-      label={DECISION_LABELS[decision]}
-      color={DECISION_COLORS[decision]}
-      size="small"
-      variant="outlined"
-    />
-  );
-}
-
-function StatutBadge({ statut }: { statut: StatutEvaluation }) {
-  return (
-    <Chip label={STATUT_LABELS[statut]} color={STATUT_COLORS[statut]} size="small" />
-  );
-}
-
-function NoteBar({ note }: { note: number | null }) {
-  if (!note) return <Typography variant="body2" color="text.disabled">—/4</Typography>;
-  const pct = (note / 4) * 100;
-  const color = note < 2 ? 'error' : note < 2.5 ? 'warning' : note < 3.25 ? 'primary' : 'success';
-  return (
-    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-      <Box sx={{ flex: 1 }}>
-        <LinearProgress variant="determinate" value={pct} color={color} sx={{ height: 8, borderRadius: 4 }} />
-      </Box>
-      <Typography variant="body2" fontWeight={600} sx={{ minWidth: 32 }}>{note}/4</Typography>
-    </Box>
-  );
-}
-
-// ── Onglet 1 : Tableau de bord ────────────────────────────────────────────────
-
-function DashboardTab() {
-  const { data } = useQuery({
-    queryKey: ['evaluations-dashboard'],
-    queryFn: () => evaluationApi.dashboard().then(r => r.data),
-  });
-
-  if (!data) return <LinearProgress />;
-
-  return (
-    <Box>
-      <Grid container spacing={2} mb={3}>
-        <Grid item xs={6} sm={4} md={2}>
-          <KpiCard label="Total dossiers" value={data.total} color="#6366F1" />
-        </Grid>
-        <Grid item xs={6} sm={4} md={2}>
-          <KpiCard label="En cours" value={data.en_cours} color="#0EA5E9" />
-        </Grid>
-        <Grid item xs={6} sm={4} md={2}>
-          <KpiCard label="Confirmés" value={data.confirmes} color="#10B981" />
-        </Grid>
-        <Grid item xs={6} sm={4} md={2}>
-          <KpiCard label="Renouvelés" value={data.renouveles} color="#F59E0B" />
-        </Grid>
-        <Grid item xs={6} sm={4} md={2}>
-          <KpiCard label="Non confirmés" value={data.non_confirmes} color="#EF4444" />
-        </Grid>
-        <Grid item xs={6} sm={4} md={2}>
-          <KpiCard label="En attente" value={data.en_attente} color="#8B5CF6" />
-        </Grid>
-      </Grid>
-
-      <Grid container spacing={3}>
-        {/* Prochains entretiens */}
-        <Grid item xs={12} md={6}>
-          <Card>
-            <CardContent>
-              <Typography variant="subtitle1" fontWeight={700} mb={2} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <AccessTime fontSize="small" color="primary" />
-                Prochains entretiens (30j)
-              </Typography>
-              {data.prochains_entretiens.length === 0 ? (
-                <Typography color="text.secondary" variant="body2">Aucun entretien prévu dans les 30 prochains jours.</Typography>
-              ) : (
-                <Table size="small">
-                  <TableHead>
-                    <TableRow>
-                      <TableCell>Agent</TableCell>
-                      <TableCell>Type</TableCell>
-                      <TableCell>Date entretien</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {data.prochains_entretiens.map(ev => (
-                      <TableRow key={ev.id}>
-                        <TableCell>
-                          <Typography variant="body2" fontWeight={500}>
-                            {ev.employee?.first_name} {ev.employee?.last_name}
-                          </Typography>
-                        </TableCell>
-                        <TableCell><Chip label={ev.type.replace('_', ' ')} size="small" /></TableCell>
-                        <TableCell><Typography variant="body2">{fmtDate(ev.date_entretien)}</Typography></TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              )}
-            </CardContent>
-          </Card>
-        </Grid>
-
-        {/* Périodes échéant bientôt */}
-        <Grid item xs={12} md={6}>
-          <Card>
-            <CardContent>
-              <Typography variant="subtitle1" fontWeight={700} mb={2} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <Assignment fontSize="small" color="warning" />
-                Périodes d'essai arrivant à échéance
-              </Typography>
-              {data.a_echoir.length === 0 ? (
-                <Typography color="text.secondary" variant="body2">Aucune période d'essai n'expire dans les 14 prochains jours.</Typography>
-              ) : (
-                <Table size="small">
-                  <TableHead>
-                    <TableRow>
-                      <TableCell>Agent</TableCell>
-                      <TableCell>Cat.</TableCell>
-                      <TableCell>Fin période</TableCell>
-                      <TableCell>Statut</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {data.a_echoir.map(ev => (
-                      <TableRow key={ev.id}>
-                        <TableCell>
-                          <Typography variant="body2" fontWeight={500}>
-                            {ev.employee?.first_name} {ev.employee?.last_name}
-                          </Typography>
-                        </TableCell>
-                        <TableCell><Chip label={ev.categorie} size="small" /></TableCell>
-                        <TableCell><Typography variant="body2" color="error">{fmtDate(ev.date_fin_periode)}</Typography></TableCell>
-                        <TableCell><StatutBadge statut={ev.statut} /></TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              )}
-            </CardContent>
-          </Card>
-        </Grid>
-
-        {/* Répartition appréciations */}
-        <Grid item xs={12} md={6}>
-          <Card>
-            <CardContent>
-              <Typography variant="subtitle1" fontWeight={700} mb={2} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <Grade fontSize="small" color="secondary" />
-                Répartition des appréciations
-              </Typography>
-              {data.repartition.length === 0 ? (
-                <Typography color="text.secondary" variant="body2">Aucune note saisie.</Typography>
-              ) : (
-                <Stack spacing={1.5}>
-                  {data.repartition.map(r => (
-                    <Box key={r.appreciation} sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                      <AppreciationChip appreciation={r.appreciation as AppreciationEvaluation} />
-                      <Box flex={1}>
-                        <LinearProgress
-                          variant="determinate"
-                          value={Math.min(100, (r.count / data.total) * 100)}
-                          color={APPRECIATION_COLORS[r.appreciation as AppreciationEvaluation]}
-                          sx={{ height: 8, borderRadius: 4 }}
-                        />
-                      </Box>
-                      <Typography variant="body2" fontWeight={600} sx={{ minWidth: 20 }}>{r.count}</Typography>
-                    </Box>
-                  ))}
-                </Stack>
-              )}
-            </CardContent>
-          </Card>
-        </Grid>
-
-        {/* Dossiers récents */}
-        <Grid item xs={12} md={6}>
-          <Card>
-            <CardContent>
-              <Typography variant="subtitle1" fontWeight={700} mb={2} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <Person fontSize="small" />
-                Dossiers récents
-              </Typography>
-              <Table size="small">
-                <TableBody>
-                  {data.recents.map(ev => (
-                    <TableRow key={ev.id}>
-                      <TableCell>
-                        <Typography variant="body2" fontWeight={500}>
-                          {ev.employee?.first_name} {ev.employee?.last_name}
-                        </Typography>
-                      </TableCell>
-                      <TableCell><Chip label={ev.type.replace('_', ' ')} size="small" variant="outlined" /></TableCell>
-                      <TableCell><StatutBadge statut={ev.statut} /></TableCell>
-                      <TableCell>
-                        {ev.note_globale ? <AppreciationChip appreciation={ev.appreciation} /> : null}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        </Grid>
-      </Grid>
-    </Box>
-  );
-}
-
-// ── Détail évaluation ─────────────────────────────────────────────────────────
-
-type LocalNote = { critere_id: number; note: number; commentaire_hierarchique: string };
-
-const NAVY = '#1e3a5f';
-
-const SECTIONS_DEF: { groupe: GroupeCritere; lettre: string; titre: string; poids: number }[] = [
-  { groupe: 'competences_techniques', lettre: 'A', titre: 'COMPÉTENCES TECHNIQUES ET PROFESSIONNELLES', poids: 0.40 },
-  { groupe: 'comportement_relations', lettre: 'B', titre: 'COMPORTEMENT ET RELATIONS PROFESSIONNELLES',  poids: 0.30 },
-  { groupe: 'aptitudes_personnelles', lettre: 'C', titre: 'APTITUDES PERSONNELLES',                      poids: 0.30 },
-];
-
-function NoteSelect({
-  value, onChange, disabled,
-}: { value: number | null; onChange: (v: number) => void; disabled?: boolean }) {
-  const NOTE_META: Record<number, { label: string; color: string }> = {
-    1: { label: '1 — Insuffisant',  color: '#DC2626' },
-    2: { label: '2 — Passable',     color: '#D97706' },
-    3: { label: '3 — Satisfaisant', color: '#2563EB' },
-    4: { label: '4 — Excellent',    color: '#059669' },
+function printFiche(
+  fiche: EvalFiche,
+  criteres: EvalCritere[],
+  notations: Record<number, { note: number; observation: string }>,
+) {
+  const apprecLabel = (m: number | null) => {
+    if (m === null) return '—';
+    if (m >= 4.5) return 'Excellent';
+    if (m >= 3.5) return 'Très satisfaisant';
+    if (m >= 2.5) return 'Satisfaisant';
+    if (m >= 1.5) return 'À améliorer';
+    return 'Insuffisant';
   };
-  const meta = value ? NOTE_META[value] : null;
-  return (
-    <Select
-      size="small"
-      value={value ?? ''}
-      onChange={e => onChange(Number(e.target.value))}
-      disabled={disabled}
-      displayEmpty
-      sx={{
-        minWidth: 46, fontSize: 13, fontWeight: 700,
-        color: meta?.color ?? '#94A3B8',
-        '& .MuiOutlinedInput-notchedOutline': {
-          borderColor: meta ? meta.color : '#E2E8F0',
-          borderWidth: value ? 2 : 1,
-        },
-        '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: meta?.color ?? '#94A3B8' },
-        '& .MuiSelect-select': { py: 0.6, px: 1 },
-      }}
-    >
-      <MenuItem value="" disabled sx={{ fontSize: 12, color: '#94A3B8' }}>—</MenuItem>
-      {[1, 2, 3, 4].map(n => (
-        <MenuItem key={n} value={n} sx={{ fontSize: 12, fontWeight: 700, color: NOTE_META[n].color }}>
-          {NOTE_META[n].label}
-        </MenuItem>
-      ))}
-    </Select>
-  );
-}
+  const fmt = (d?: string | null) => d ? new Date(d).toLocaleDateString('fr-FR') : '—';
+  const field = (label: string, val?: string | null) =>
+    `<div class="field"><span class="label">${label}</span><span class="val">${val || '—'}</span></div>`;
+  const noteCircle = (n: number, active: boolean) =>
+    `<span class="circle${active ? ' active' : ''}">${n}</span>`;
 
-function EvaluationDetail({
-  evaluation: initEval,
-  criteres,
-  onBack,
-}: {
-  evaluation: EvaluationPeriodeEssai;
-  criteres: EvaluationCritere[];
-  onBack: () => void;
-}) {
-  const qc = useQueryClient();
-  const [ficheOpen, setFicheOpen] = useState(false);
-
-  const { data: ev, isLoading } = useQuery({
-    queryKey: ['evaluation-detail', initEval.id],
-    queryFn: () => evaluationApi.show(initEval.id).then(r => r.data),
-    initialData: initEval,
-  });
-
-  const [localNotes, setLocalNotes] = useState<Record<number, LocalNote>>(() => {
-    const init: Record<number, LocalNote> = {};
-    (initEval.notations ?? []).forEach(n => {
-      init[n.critere_id] = { critere_id: n.critere_id, note: n.note ?? 1, commentaire_hierarchique: n.commentaire_hierarchique ?? '' };
-    });
-    return init;
-  });
-  const [commentaireGeneral, setCommentaireGeneral] = useState(initEval.commentaire_general ?? '');
-  const [planAmelioration, setPlanAmelioration]     = useState(initEval.plan_amelioration ?? '');
-  const [dgDialog, setDgDialog]   = useState(false);
-  const [dgDecision, setDgDecision] = useState('confirmation');
-  const [dgRemarques, setDgRemarques] = useState('');
-
-  const invalidate = () => {
-    qc.invalidateQueries({ queryKey: ['evaluations'] });
-    qc.invalidateQueries({ queryKey: ['eval-essai'] });
-    qc.invalidateQueries({ queryKey: ['evaluation-detail', initEval.id] });
-    qc.invalidateQueries({ queryKey: ['evaluations-dashboard'] });
-    qc.invalidateQueries({ queryKey: ['eval-essai-dashboard'] });
+  const categorieLabel: Record<string, string> = {
+    base: '7 Critères de base',
+    complementaire: '5 Critères complémentaires',
+    fonctionnaire: '6 Critères spécifiques fonctionnaires',
   };
 
-  const mutSaveNotes  = useMutation({ mutationFn: () => evaluationApi.saveNotes(initEval.id, { notations: Object.values(localNotes), commentaire_general: commentaireGeneral, plan_amelioration: planAmelioration }), onSuccess: invalidate });
-  const mutAvancer    = useMutation({ mutationFn: () => evaluationApi.avancer(initEval.id),    onSuccess: invalidate });
-  const mutValiderRrh = useMutation({ mutationFn: () => evaluationApi.validerRrh(initEval.id), onSuccess: invalidate });
-  const mutDecisionDg = useMutation({ mutationFn: () => evaluationApi.decisionDg(initEval.id, { decision_finale: dgDecision, remarques_dg: dgRemarques }), onSuccess: () => { setDgDialog(false); invalidate(); } });
+  const grille = ['base', 'complementaire', 'fonctionnaire'].map(cat => {
+    const cats = criteres.filter(c => c.categorie === cat);
+    if (!cats.length) return '';
+    const rows = cats.map(c => {
+      const n = notations[c.id];
+      const note = n?.note ?? 0;
+      const obs = n?.observation ?? '';
+      return `<tr>
+        <td class="crit-code">${c.code}</td>
+        <td class="crit-label">${c.libelle}</td>
+        <td class="crit-notes">
+          ${[1,2,3,4,5].map(v => noteCircle(v, note === v)).join('')}
+        </td>
+        <td class="crit-obs">${obs}</td>
+      </tr>`;
+    }).join('');
+    return `<div class="section-block">
+      <div class="sub-title">${categorieLabel[cat]}</div>
+      <table class="grid-table">
+        <thead><tr><th style="width:8%">Code</th><th>Critère</th><th style="width:18%">Note /5</th><th style="width:22%">Observation</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>`;
+  }).join('');
 
-  if (isLoading || !ev) return <LinearProgress />;
+  const besoinsRows = (fiche.besoins_formation ?? []).map((b, i) =>
+    `<tr><td>${i + 1}</td><td>${b.intitule}</td><td><span class="badge badge-${b.priorite}">${b.priorite.charAt(0).toUpperCase() + b.priorite.slice(1)}</span></td></tr>`
+  ).join('') || '<tr><td colspan="3" style="text-align:center;color:#888">Aucun besoin renseigné</td></tr>';
 
-  const setNote = (critereId: number, note: number) =>
-    setLocalNotes(prev => ({ ...prev, [critereId]: { critere_id: critereId, note, commentaire_hierarchique: prev[critereId]?.commentaire_hierarchique ?? '' } }));
-  const setComment = (critereId: number, txt: string) =>
-    setLocalNotes(prev => ({ ...prev, [critereId]: { ...prev[critereId], critere_id: critereId, note: prev[critereId]?.note ?? 1, commentaire_hierarchique: txt } }));
+  const objectifsRows = (fiche.objectifs ?? []).map((o, i) =>
+    `<tr><td>${i + 1}</td><td>${o.objectif}</td><td>${o.indicateur || '—'}</td><td>${fmt(o.echeance)}</td></tr>`
+  ).join('') || '<tr><td colspan="4" style="text-align:center;color:#888">Aucun objectif renseigné</td></tr>';
 
-  const liveTotal    = criteres.reduce((sum, c) => sum + (localNotes[c.id]?.note ?? 0) * c.poids, 0);
-  const hasAllNotes  = criteres.every(c => localNotes[c.id]?.note);
-  const liveApprec   = calcAppréciation(liveTotal);
-  const liveDecision = calcDecision(liveTotal);
-  const stepIndex    = STATUT_STEPS.indexOf(ev.statut);
-  const isEditable   = ['brouillon', 'entretien'].includes(ev.statut);
+  const dec = fiche.decision_rh;
+  const decChecks = dec ? [
+    ['Formation', dec.formation],
+    ['Coaching', dec.coaching],
+    ['Mobilité', dec.mobilite],
+    ['Félicitations', dec.felicitations],
+    ['Suivi particulier', dec.suivi_particulier],
+    ['Gratification', dec.gratification],
+  ].map(([l, v]) => `<div class="dec-item"><span class="chk">${v ? '☑' : '☐'}</span> ${l}</div>`).join('') : '';
 
-  const avancerLabel: Record<string, string> = {
-    brouillon:       'Envoyer la fiche à l\'agent',
-    auto_evaluation: "Lancer l'entretien",
-    entretien:       'Signer (hiérarchique)',
-    decision_dg:     'Archiver le dossier',
-  };
+  const sigBlock = (label: string, name: string, date?: string | null) => `
+    <div class="sig-box">
+      <div class="sig-title">${label}</div>
+      <div class="sig-name">${name}</div>
+      <div class="sig-line"></div>
+      <div class="sig-date">${date ? `Signé le ${fmt(date)}` : 'Signature &amp; Date'}</div>
+    </div>`;
 
-  // shared cell styles
-  const th = { bgcolor: NAVY, color: '#fff', fontWeight: 700, fontSize: 11, border: `1px solid #2d5080`, px: 1.25, py: 0.9, textAlign: 'center' as const };
-  const td = { border: '1px solid #d1d9e6', px: 1.25, py: 0.9, fontSize: 12 };
+  const html = `<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Fiche d'évaluation — ${fiche.employee?.first_name} ${fiche.employee?.last_name}</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 11pt; color: #1a1a2e; background: #fff; }
 
-  const APPRECIATION_COLOR_HEX: Record<string, string> = {
-    insuffisant: '#DC2626', passable: '#D97706', satisfaisant: '#2563EB', excellent: '#059669',
-  };
-  const DECISION_COLOR_HEX: Record<string, string> = {
-    confirmation: '#059669', renouvellement: '#F59E0B', non_confirmation: '#DC2626',
-  };
+  /* === HEADER === */
+  .header { background: #002f59; color: #fff; padding: 18px 28px 14px; display: flex; align-items: center; gap: 20px; }
+  .header-logo { width: 56px; height: 56px; background: rgba(255,255,255,0.15); border: 2px solid rgba(255,255,255,0.4); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 22px; font-weight: 800; }
+  .header-text h1 { font-size: 14pt; font-weight: 800; letter-spacing: 0.5px; }
+  .header-text h2 { font-size: 10pt; color: rgba(255,255,255,0.7); font-weight: 400; margin-top: 3px; }
+  .header-meta { margin-left: auto; text-align: right; }
+  .header-meta .exercice { font-size: 20pt; font-weight: 900; color: #ff7631; }
+  .header-meta .statut { font-size: 9pt; color: rgba(255,255,255,0.7); margin-top: 2px; }
+  .orange-bar { height: 4px; background: linear-gradient(90deg, #ff7631, #ff9a62); }
 
-  return (
-    <Box sx={{ fontFamily: 'Arial, sans-serif' }}>
+  /* === FICHE META === */
+  .fiche-meta { display: flex; justify-content: space-between; align-items: center; padding: 10px 28px; background: #f0f4f8; border-bottom: 1px solid #d1dce8; }
+  .fiche-meta .agent-name { font-size: 14pt; font-weight: 800; color: #002f59; }
+  .fiche-meta .agent-sub { font-size: 10pt; color: #555; margin-top: 2px; }
+  .moyenne-badge { background: #002f59; color: #fff; border-radius: 8px; padding: 8px 18px; text-align: center; }
+  .moyenne-badge .moy-val { font-size: 20pt; font-weight: 900; color: #ff7631; }
+  .moyenne-badge .moy-apprec { font-size: 9pt; color: rgba(255,255,255,0.85); }
 
-      {/* ═══ BARRE D'ACTIONS ═══ */}
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2,
-        p: 1.5, bgcolor: '#fff', borderRadius: '12px', border: '1px solid #E2E8F0',
-        boxShadow: '0 1px 4px rgba(15,23,42,0.07)' }}>
-        <IconButton onClick={onBack} size="small" sx={{ color: NAVY }}>
-          <ArrowBack />
-        </IconButton>
-        <Divider orientation="vertical" flexItem />
-        <Box sx={{ flex: 1, overflow: 'hidden' }}>
-          <Stepper activeStep={stepIndex} alternativeLabel
-            sx={{ '& .MuiStepLabel-label': { fontSize: 10.5 }, '& .MuiSvgIcon-root': { fontSize: 18 } }}>
-            {STATUT_STEPS.map((s, i) => (
-              <Step key={s} completed={i < stepIndex}>
-                <StepLabel>{STATUT_LABELS[s]}</StepLabel>
-              </Step>
-            ))}
-          </Stepper>
-        </Box>
-        <Divider orientation="vertical" flexItem />
-        <Stack direction="row" spacing={1}>
-          <Button size="small" variant="outlined" startIcon={<Print />}
-            onClick={() => setFicheOpen(true)}
-            sx={{ fontSize: 11.5, borderColor: NAVY, color: NAVY, '&:hover': { bgcolor: '#EEF2FF' } }}>
-            Imprimer
-          </Button>
-          {isEditable && (
-            <Button size="small" variant="contained" startIcon={<Edit />}
-              onClick={() => mutSaveNotes.mutate()}
-              disabled={!hasAllNotes || mutSaveNotes.isPending}
-              sx={{ fontSize: 11.5, bgcolor: NAVY, '&:hover': { bgcolor: '#162d4a' } }}>
-              {mutSaveNotes.isPending ? 'Enregistrement…' : 'Enregistrer les notes'}
-            </Button>
-          )}
-          {avancerLabel[ev.statut] && (
-            <Button size="small" variant="contained" startIcon={<Send />}
-              onClick={() => mutAvancer.mutate()} disabled={mutAvancer.isPending}
-              sx={{ fontSize: 11.5, bgcolor: '#2563EB', '&:hover': { bgcolor: '#1D4ED8' } }}>
-              {avancerLabel[ev.statut]}
-            </Button>
-          )}
-          {ev.statut === 'signe' && (
-            <Button size="small" variant="contained" startIcon={<CheckCircle />}
-              onClick={() => mutValiderRrh.mutate()} disabled={mutValiderRrh.isPending}
-              sx={{ fontSize: 11.5, bgcolor: '#D97706', '&:hover': { bgcolor: '#B45309' } }}>
-              Valider (RRH)
-            </Button>
-          )}
-          {ev.statut === 'valide_rrh' && (
-            <Button size="small" variant="contained" startIcon={<HowToVote />}
-              onClick={() => setDgDialog(true)}
-              sx={{ fontSize: 11.5, bgcolor: '#059669', '&:hover': { bgcolor: '#047857' } }}>
-              Décision DG
-            </Button>
-          )}
-        </Stack>
-      </Box>
+  /* === SECTIONS === */
+  .page-body { padding: 20px 28px; }
+  .section { margin-bottom: 20px; }
+  .section-title { font-size: 12pt; font-weight: 800; color: #002f59; border-left: 4px solid #ff7631; padding-left: 10px; margin-bottom: 12px; }
+  .sub-title { font-size: 10pt; font-weight: 700; color: #475569; margin: 10px 0 6px; background: #f8fafc; padding: 4px 8px; border-radius: 4px; }
 
-      {/* ═══ FICHE ANASER ═══ */}
-      <Box sx={{ bgcolor: '#fff', border: '1px solid #d1d9e6', borderRadius: '8px',
-        boxShadow: '0 2px 12px rgba(15,23,42,0.08)', overflow: 'hidden' }}>
+  /* === IDENTIFICATION GRID === */
+  .id-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .field { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 5px; padding: 8px 12px; }
+  .field .label { display: block; font-size: 8.5pt; color: #64748b; margin-bottom: 2px; }
+  .field .val { font-size: 10.5pt; font-weight: 700; color: #0f172a; }
 
-        {/* ─── EN-TÊTE ─── */}
-        <Box sx={{ bgcolor: NAVY, color: '#fff', textAlign: 'center', px: 3, py: 2 }}>
-          <Typography sx={{ fontWeight: 800, fontSize: 15 }}>
-            Fiche d'Évaluation Individuelle — Période d'Essai
-          </Typography>
-          <Typography sx={{ fontSize: 11, color: 'rgba(255,255,255,0.65)', mt: 0.25 }}>
-            Direction Administrative et Financière — Ressources Humaines
-            &nbsp;·&nbsp; Réf. ANASER-RH-GE-2025-002
-          </Typography>
-        </Box>
+  /* === GRILLE NOTATION === */
+  .grid-table { width: 100%; border-collapse: collapse; font-size: 9.5pt; }
+  .grid-table th { background: #e8eef5; color: #002f59; font-weight: 700; padding: 6px 8px; border: 1px solid #c8d5e0; text-align: left; }
+  .grid-table td { border: 1px solid #e2e8f0; padding: 5px 8px; vertical-align: middle; }
+  .grid-table tr:nth-child(even) td { background: #fafbfc; }
+  .crit-code { font-weight: 700; color: #002f59; font-size: 9pt; width: 8%; }
+  .crit-label { width: 52%; }
+  .crit-notes { text-align: center; }
+  .crit-obs { font-size: 8.5pt; color: #475569; }
+  .circle { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: 50%; border: 1.5px solid #94a3b8; color: #64748b; font-size: 8.5pt; font-weight: 700; margin: 0 1px; }
+  .circle.active { background: #002f59; border-color: #002f59; color: #fff; }
+  .section-block { margin-bottom: 14px; }
 
-        <Box sx={{ p: 2.5 }}>
+  /* === BILAN PROFESSIONNEL === */
+  .text-block { border: 1px solid #e2e8f0; border-radius: 5px; padding: 10px 12px; min-height: 50px; font-size: 10pt; color: #1a1a2e; background: #fafbfc; }
+  .text-label { font-size: 8.5pt; color: #64748b; margin-bottom: 4px; font-weight: 600; }
 
-          {/* ─── IDENTIFICATION ─── */}
-          <Box sx={{ bgcolor: NAVY, color: '#fff', fontWeight: 800, fontSize: 11.5,
-            px: 1.5, py: 0.75, mb: 0 }}>
-            IDENTIFICATION DE L'AGENT
-          </Box>
-          <Table size="small" sx={{ mb: 2.5,
-            '& td': { border: '1px solid #c5d0de', px: 1.5, py: 0.9, fontSize: 12 } }}>
-            <TableBody>
-              <TableRow>
-                <TableCell sx={{ fontWeight: 700, bgcolor: '#eef4fb', width: '18%' }}>Nom & Prénom :</TableCell>
-                <TableCell sx={{ width: '32%', fontWeight: 600 }}>
-                  {ev.employee ? `${ev.employee.last_name.toUpperCase()} ${ev.employee.first_name}` : `Agent #${ev.employee_id}`}
-                </TableCell>
-                <TableCell sx={{ fontWeight: 700, bgcolor: '#eef4fb', width: '18%' }}>Date d'entrée :</TableCell>
-                <TableCell sx={{ width: '32%' }}>{fmtDate(ev.date_prise_poste)}</TableCell>
-              </TableRow>
-              <TableRow>
-                <TableCell sx={{ fontWeight: 700, bgcolor: '#eef4fb' }}>Matricule :</TableCell>
-                <TableCell sx={{ fontFamily: 'monospace' }}>{ev.employee?.employee_number ?? '—'}</TableCell>
-                <TableCell sx={{ fontWeight: 700, bgcolor: '#eef4fb' }}>Catégorie :</TableCell>
-                <TableCell sx={{ fontWeight: 600 }}>{ev.categorie}</TableCell>
-              </TableRow>
-              <TableRow>
-                <TableCell sx={{ fontWeight: 700, bgcolor: '#eef4fb' }}>Direction / Pôle :</TableCell>
-                <TableCell>{ev.employee?.department?.name ?? '—'}</TableCell>
-                <TableCell sx={{ fontWeight: 700, bgcolor: '#eef4fb' }}>Responsable hiérarchique :</TableCell>
-                <TableCell>{ev.responsable?.name ?? '—'}</TableCell>
-              </TableRow>
-              <TableRow>
-                <TableCell sx={{ fontWeight: 700, bgcolor: '#eef4fb' }}>Poste occupé :</TableCell>
-                <TableCell>{ev.employee?.position?.title ?? '—'}</TableCell>
-                <TableCell sx={{ fontWeight: 700, bgcolor: '#eef4fb' }}>Type d'évaluation :</TableCell>
-                <TableCell sx={{ fontWeight: 600 }}>
-                  {ev.type === '3_mois' ? "Période d'essai — 3 mois" : "Période d'essai — 6 mois"}
-                </TableCell>
-              </TableRow>
-              <TableRow>
-                <TableCell sx={{ fontWeight: 700, bgcolor: '#eef4fb' }}>Fin de période :</TableCell>
-                <TableCell>{fmtDate(ev.date_fin_periode)}</TableCell>
-                <TableCell sx={{ fontWeight: 700, bgcolor: '#eef4fb' }}>Date d'entretien :</TableCell>
-                <TableCell>{fmtDate(ev.date_entretien)}</TableCell>
-              </TableRow>
-            </TableBody>
-          </Table>
+  /* === TABLEAUX BESOINS / OBJECTIFS === */
+  .data-table { width: 100%; border-collapse: collapse; font-size: 9.5pt; margin-top: 6px; }
+  .data-table th { background: #e8eef5; color: #002f59; font-weight: 700; padding: 6px 8px; border: 1px solid #c8d5e0; }
+  .data-table td { border: 1px solid #e2e8f0; padding: 5px 8px; }
+  .data-table tr:nth-child(even) td { background: #fafbfc; }
+  .badge { display: inline-block; padding: 1px 7px; border-radius: 10px; font-size: 8pt; font-weight: 700; }
+  .badge-haute { background: #fee2e2; color: #dc2626; }
+  .badge-moyenne { background: #fef3c7; color: #d97706; }
+  .badge-faible { background: #dcfce7; color: #16a34a; }
 
-          {/* ─── GRILLE NOTATION ─── */}
-          <Box sx={{ bgcolor: NAVY, color: '#fff', fontWeight: 800, fontSize: 11.5,
-            px: 1.5, py: 0.75 }}>
-            GRILLE D'ÉVALUATION — NOTATION SUR 4
-          </Box>
-          <Box sx={{ bgcolor: '#f0f4f8', border: '1px solid #c5d0de', borderTop: 0,
-            px: 1.5, py: 0.7, mb: 0, fontSize: 11.5 }}>
-            <Stack direction="row" spacing={3}>
-              {[['1','Insuffisant','#DC2626'],['2','Passable','#D97706'],['3','Satisfaisant','#2563EB'],['4','Excellent','#059669']].map(([n,l,c]) => (
-                <Box key={n} sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                  <Box sx={{ width: 20, height: 20, borderRadius: '4px', bgcolor: c, color: '#fff',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontWeight: 900, fontSize: 12 }}>{n}</Box>
-                  <Typography sx={{ fontSize: 11.5, fontWeight: 600, color: '#334155' }}>= {l}</Typography>
-                </Box>
-              ))}
-            </Stack>
-          </Box>
+  /* === DÉCISIONS RH === */
+  .dec-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  .dec-item { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 5px; padding: 6px 10px; font-size: 10pt; }
+  .chk { font-size: 14pt; color: #002f59; }
 
-          <Table size="small" sx={{ mb: 0 }}>
-            <TableHead>
-              <TableRow>
-                <TableCell sx={{ ...th, width: '36%', textAlign: 'left' }}>CRITÈRES D'ÉVALUATION</TableCell>
-                <TableCell sx={{ ...th, width: 72 }}>Note<br />(1 à 4)</TableCell>
-                <TableCell sx={{ ...th, width: 70 }}>Pondér.<br />section</TableCell>
-                <TableCell sx={{ ...th, width: 80 }}>Note<br />Pondérée</TableCell>
-                <TableCell sx={{ ...th }}>Commentaire responsable hiérarchique</TableCell>
-                <TableCell sx={{ ...th, width: '15%' }}>Auto-évaluation agent</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {SECTIONS_DEF.map(({ groupe, lettre, titre, poids: sectionPoids }) => {
-                const sectionCriteres = criteres.filter(c => c.groupe === groupe).sort((a, b) => a.ordre - b.ordre);
-                const sousTotal = sectionCriteres.reduce((sum, c) => {
-                  const note = localNotes[c.id]?.note ?? 0;
-                  return sum + note * (c.poids / sectionPoids);
-                }, 0);
-                const contribution = sousTotal * sectionPoids;
+  /* === SIGNATURES === */
+  .sig-row { display: flex; gap: 20px; margin-top: 14px; }
+  .sig-box { flex: 1; border: 2px solid #002f59; border-radius: 8px; padding: 14px 16px; min-height: 110px; text-align: center; }
+  .sig-title { font-size: 9.5pt; font-weight: 800; color: #002f59; margin-bottom: 4px; }
+  .sig-name { font-size: 9pt; color: #475569; margin-bottom: 14px; }
+  .sig-line { border-bottom: 1px dashed #94a3b8; margin: 24px 0 8px; }
+  .sig-date { font-size: 8.5pt; color: #64748b; }
 
-                return (
-                  <>
-                    {/* Section header */}
-                    <TableRow key={`hdr-${groupe}`}>
-                      <TableCell colSpan={6} sx={{ ...td, bgcolor: '#d4e3f5', fontWeight: 800, fontSize: 12, color: NAVY, py: 0.85 }}>
-                        {lettre} — {titre}
-                        <Box component="span" sx={{ ml: 1.5, fontWeight: 600, fontSize: 11, color: '#475569' }}>
-                          (pondération globale : {Math.round(sectionPoids * 100)}%)
-                        </Box>
-                      </TableCell>
-                    </TableRow>
+  /* === FOOTER === */
+  .doc-footer { border-top: 2px solid #002f59; padding: 8px 28px; display: flex; justify-content: space-between; font-size: 8pt; color: #64748b; background: #f8fafc; }
 
-                    {/* Critères */}
-                    {sectionCriteres.map(c => {
-                      const ln       = localNotes[c.id];
-                      const note     = ln?.note ?? null;
-                      const poidsSect = c.poids / sectionPoids;
-                      const notePond = note !== null ? note * poidsSect : null;
-                      const agentNote = ev.notations?.find(n => n.critere_id === c.id);
-                      const noteColor = note === 4 ? '#059669' : note === 3 ? '#2563EB' : note === 2 ? '#D97706' : note === 1 ? '#DC2626' : '#94A3B8';
-
-                      return (
-                        <TableRow key={c.id} sx={{ '&:hover': { bgcolor: '#f8fafc' } }}>
-                          <TableCell sx={{ ...td, fontSize: 12 }}>{c.libelle}</TableCell>
-
-                          {/* Note */}
-                          <TableCell sx={{ ...td, textAlign: 'center', p: 0.5 }}>
-                            <NoteSelect value={note} onChange={v => setNote(c.id, v)} disabled={!isEditable} />
-                          </TableCell>
-
-                          {/* Pondération section */}
-                          <TableCell sx={{ ...td, textAlign: 'center', fontWeight: 600, color: '#475569' }}>
-                            {Math.round(poidsSect * 100)}%
-                          </TableCell>
-
-                          {/* Note pondérée */}
-                          <TableCell sx={{ ...td, textAlign: 'center', fontWeight: 700, color: noteColor }}>
-                            {notePond !== null ? notePond.toFixed(2) : '—'}
-                          </TableCell>
-
-                          {/* Commentaire hiérarchique */}
-                          <TableCell sx={{ ...td, p: 0.5 }}>
-                            {isEditable ? (
-                              <TextField size="small" fullWidth multiline maxRows={2}
-                                placeholder="Observation du responsable…"
-                                value={ln?.commentaire_hierarchique ?? ''}
-                                onChange={e => setComment(c.id, e.target.value)}
-                                sx={{ '& .MuiOutlinedInput-root': { fontSize: 11.5, borderRadius: '6px' },
-                                  '& .MuiOutlinedInput-input': { py: 0.5 } }}
-                              />
-                            ) : (
-                              <Typography sx={{ fontSize: 11.5, fontStyle: ln?.commentaire_hierarchique ? 'normal' : 'italic', color: ln?.commentaire_hierarchique ? '#334155' : '#94A3B8' }}>
-                                {ln?.commentaire_hierarchique || '—'}
-                              </Typography>
-                            )}
-                          </TableCell>
-
-                          {/* Auto-évaluation agent */}
-                          <TableCell sx={{ ...td, fontSize: 11, color: '#1D4ED8', fontStyle: 'italic' }}>
-                            {agentNote?.commentaire_agent || <Box component="span" sx={{ color: '#CBD5E1' }}>—</Box>}
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-
-                    {/* Sous-total section */}
-                    <TableRow key={`sub-${groupe}`}>
-                      <TableCell sx={{ ...td, bgcolor: '#eef4fb', fontWeight: 700, fontSize: 11.5, color: NAVY }}>
-                        Sous-total section {lettre} (pondération globale : {Math.round(sectionPoids * 100)}%)
-                      </TableCell>
-                      <TableCell sx={{ ...td, bgcolor: '#eef4fb', textAlign: 'center', fontWeight: 800, color: NAVY }}>
-                        {Math.round(sectionPoids * 100)}%
-                      </TableCell>
-                      <TableCell sx={{ ...td, bgcolor: '#eef4fb' }} />
-                      <TableCell sx={{ ...td, bgcolor: '#eef4fb', textAlign: 'center', fontWeight: 800, color: NAVY, fontSize: 13 }}>
-                        {contribution.toFixed(2)}
-                      </TableCell>
-                      <TableCell colSpan={2} sx={{ ...td, bgcolor: '#eef4fb' }} />
-                    </TableRow>
-                  </>
-                );
-              })}
-
-              {/* NOTE GLOBALE */}
-              <TableRow>
-                <TableCell colSpan={3} sx={{ bgcolor: NAVY, color: '#fff', fontWeight: 900, fontSize: 13, border: `1px solid ${NAVY}`, px: 1.5, py: 1.25 }}>
-                  NOTE GLOBALE / 4
-                </TableCell>
-                <TableCell sx={{ bgcolor: NAVY, border: `1px solid ${NAVY}`, textAlign: 'center' }}>
-                  <Typography sx={{ fontWeight: 900, fontSize: 22, color: '#fff', lineHeight: 1 }}>
-                    {hasAllNotes ? liveTotal.toFixed(2) : (ev.note_globale?.toFixed(2) ?? '—')}
-                  </Typography>
-                </TableCell>
-                <TableCell colSpan={2} sx={{ bgcolor: NAVY, border: `1px solid ${NAVY}`, px: 2 }}>
-                  {(hasAllNotes || ev.appreciation) && (() => {
-                    const appr  = hasAllNotes ? liveApprec   : ev.appreciation!;
-                    const dec   = hasAllNotes ? liveDecision : ev.decision_recommandee!;
-                    const aColor = APPRECIATION_COLOR_HEX[appr] ?? '#fff';
-                    const dColor = DECISION_COLOR_HEX[dec]   ?? '#fff';
-                    const aLabel: Record<string,string> = { insuffisant:'Insuffisant', passable:'Passable', satisfaisant:'Satisfaisant', excellent:'Excellent' };
-                    const dLabel: Record<string,string> = { confirmation:'Confirmation', renouvellement:'Renouvellement PE', non_confirmation:'Non-confirmation' };
-                    return (
-                      <Stack direction="row" spacing={1.5} alignItems="center">
-                        <Box sx={{ bgcolor: aColor, color: '#fff', px: 1.5, py: 0.4, borderRadius: '6px', fontWeight: 800, fontSize: 12 }}>
-                          {aLabel[appr] ?? appr}
-                        </Box>
-                        <Box sx={{ bgcolor: dColor, color: '#fff', px: 1.5, py: 0.4, borderRadius: '6px', fontWeight: 800, fontSize: 12 }}>
-                          {dLabel[dec] ?? dec}
-                        </Box>
-                        {ev.decision_finale && (
-                          <Chip label={`DG : ${dLabel[ev.decision_finale] ?? ev.decision_finale}`} size="small"
-                            sx={{ bgcolor: '#fff', color: NAVY, fontWeight: 800, fontSize: 11 }} />
-                        )}
-                      </Stack>
-                    );
-                  })()}
-                </TableCell>
-              </TableRow>
-            </TableBody>
-          </Table>
-
-          {/* ─── RECOMMANDATION ─── */}
-          <Box sx={{ bgcolor: NAVY, color: '#fff', fontWeight: 800, fontSize: 11.5, px: 1.5, py: 0.75, mt: 2.5 }}>
-            RECOMMANDATION
-          </Box>
-          <Table size="small" sx={{ '& td': { border: '1px solid #c5d0de', px: 1.5, py: 1, fontSize: 12 } }}>
-            <TableBody>
-              <TableRow>
-                <TableCell sx={{ fontWeight: 700, bgcolor: '#eef4fb', width: '22%', verticalAlign: 'top', pt: 1.25 }}>
-                  Décision proposée :
-                </TableCell>
-                <TableCell>
-                  {ev.decision_finale ? (
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <Box sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: DECISION_COLOR_HEX[ev.decision_finale] ?? '#64748B' }} />
-                      <Typography sx={{ fontWeight: 700, fontSize: 13, color: DECISION_COLOR_HEX[ev.decision_finale] ?? '#0F172A' }}>
-                        {{ confirmation: '✅ Confirmation dans le poste', renouvellement: '🔄 Renouvellement de la période d\'essai', non_confirmation: '❌ Non-confirmation — rupture de la période d\'essai' }[ev.decision_finale] ?? ev.decision_finale}
-                      </Typography>
-                    </Box>
-                  ) : (
-                    <Typography sx={{ fontSize: 12, color: '#94A3B8', fontStyle: 'italic' }}>
-                      En attente de décision
-                    </Typography>
-                  )}
-                </TableCell>
-              </TableRow>
-              <TableRow>
-                <TableCell sx={{ fontWeight: 700, bgcolor: '#eef4fb', verticalAlign: 'top', pt: 1.25 }}>
-                  Commentaire général :
-                </TableCell>
-                <TableCell>
-                  {isEditable ? (
-                    <TextField fullWidth multiline rows={3} size="small"
-                      placeholder="Observations générales du responsable hiérarchique…"
-                      value={commentaireGeneral}
-                      onChange={e => setCommentaireGeneral(e.target.value)}
-                      sx={{ '& .MuiOutlinedInput-root': { fontSize: 12 } }} />
-                  ) : (
-                    <Typography sx={{ fontSize: 12, color: commentaireGeneral ? '#334155' : '#94A3B8', fontStyle: commentaireGeneral ? 'normal' : 'italic', whiteSpace: 'pre-line' }}>
-                      {commentaireGeneral || '—'}
-                    </Typography>
-                  )}
-                </TableCell>
-              </TableRow>
-              <TableRow>
-                <TableCell sx={{ fontWeight: 700, bgcolor: '#eef4fb', verticalAlign: 'top', pt: 1.25 }}>
-                  Plan d'amélioration :
-                </TableCell>
-                <TableCell>
-                  {isEditable ? (
-                    <TextField fullWidth multiline rows={2} size="small"
-                      placeholder="Plan d'amélioration si applicable…"
-                      value={planAmelioration}
-                      onChange={e => setPlanAmelioration(e.target.value)}
-                      sx={{ '& .MuiOutlinedInput-root': { fontSize: 12 } }} />
-                  ) : (
-                    <Typography sx={{ fontSize: 12, color: planAmelioration ? '#334155' : '#94A3B8', fontStyle: planAmelioration ? 'normal' : 'italic', whiteSpace: 'pre-line' }}>
-                      {planAmelioration || '—'}
-                    </Typography>
-                  )}
-                </TableCell>
-              </TableRow>
-              {ev.remarques_dg && (
-                <TableRow>
-                  <TableCell sx={{ fontWeight: 700, bgcolor: '#eef4fb', verticalAlign: 'top' }}>
-                    Remarques DG :
-                  </TableCell>
-                  <TableCell sx={{ fontStyle: 'italic', color: '#1e3a5f', fontWeight: 600 }}>
-                    {ev.remarques_dg}
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-
-          {/* ─── SIGNATURES ─── */}
-          <Box sx={{ bgcolor: NAVY, color: '#fff', fontWeight: 800, fontSize: 11.5, px: 1.5, py: 0.75, mt: 2.5 }}>
-            SIGNATURES
-          </Box>
-          <Table size="small">
-            <TableHead>
-              <TableRow>
-                {["L'Agent", "Le Responsable Hiérarchique", "La Responsable RH"].map(h => (
-                  <TableCell key={h} sx={{ ...th, textAlign: 'center', width: '33%' }}>{h}</TableCell>
-                ))}
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              <TableRow>
-                {[
-                  ev.employee ? `${ev.employee.first_name} ${ev.employee.last_name}` : '—',
-                  ev.responsable?.name ?? '—',
-                  '—',
-                ].map((name, i) => (
-                  <TableCell key={i} sx={{ ...td, fontWeight: 600, bgcolor: '#eef4fb', textAlign: 'center' }}>{name}</TableCell>
-                ))}
-              </TableRow>
-              <TableRow>
-                <TableCell sx={{ ...td, height: 56, verticalAlign: 'bottom', textAlign: 'center' }}>
-                  <Typography sx={{ fontSize: 10.5, color: ev.signe_agent_at ? '#059669' : '#94A3B8' }}>
-                    {ev.signe_agent_at ? `✓ Signé le ${fmtDate(ev.signe_agent_at)}` : 'Date : ___/___/______'}
-                  </Typography>
-                </TableCell>
-                <TableCell sx={{ ...td, height: 56, verticalAlign: 'bottom', textAlign: 'center' }}>
-                  <Typography sx={{ fontSize: 10.5, color: ev.signe_hierarchique_at ? '#059669' : '#94A3B8' }}>
-                    {ev.signe_hierarchique_at ? `✓ Signé le ${fmtDate(ev.signe_hierarchique_at)}` : 'Date : ___/___/______'}
-                  </Typography>
-                </TableCell>
-                <TableCell sx={{ ...td, height: 56, verticalAlign: 'bottom', textAlign: 'center' }}>
-                  <Typography sx={{ fontSize: 10.5, color: ev.valide_rrh_at ? '#059669' : '#94A3B8' }}>
-                    {ev.valide_rrh_at ? `✓ Validé le ${fmtDate(ev.valide_rrh_at)}` : 'Date : ___/___/______'}
-                  </Typography>
-                </TableCell>
-              </TableRow>
-            </TableBody>
-          </Table>
-
-          {/* ─── HISTORIQUE ─── */}
-          {(ev.historique ?? []).length > 0 && (
-            <Box sx={{ mt: 2.5 }}>
-              <Box sx={{ bgcolor: '#64748B', color: '#fff', fontWeight: 700, fontSize: 11.5, px: 1.5, py: 0.75, mb: 0 }}>
-                HISTORIQUE DU DOSSIER
-              </Box>
-              <Table size="small">
-                <TableHead>
-                  <TableRow>
-                    <TableCell sx={{ ...th, bgcolor: '#64748B', textAlign: 'left', width: 140 }}>Étape</TableCell>
-                    <TableCell sx={{ ...th, bgcolor: '#64748B', textAlign: 'left', width: 120 }}>Date</TableCell>
-                    <TableCell sx={{ ...th, bgcolor: '#64748B', textAlign: 'left', width: 140 }}>Acteur</TableCell>
-                    <TableCell sx={{ ...th, bgcolor: '#64748B', textAlign: 'left' }}>Commentaire</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {[...(ev.historique ?? [])].reverse().map(h => (
-                    <TableRow key={h.id} sx={{ '&:nth-of-type(even)': { bgcolor: '#f8fafc' } }}>
-                      <TableCell sx={{ ...td, fontWeight: 600, color: NAVY, fontSize: 11.5 }}>
-                        {STATUT_LABELS[h.etape] ?? h.etape}
-                      </TableCell>
-                      <TableCell sx={{ ...td, fontSize: 11.5, color: '#64748B' }}>{fmtDate(h.created_at)}</TableCell>
-                      <TableCell sx={{ ...td, fontSize: 11.5 }}>{h.user?.name ?? '—'}</TableCell>
-                      <TableCell sx={{ ...td, fontSize: 11.5, fontStyle: 'italic', color: '#475569' }}>{h.commentaire ?? '—'}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </Box>
-          )}
-
-          {/* Pied de page */}
-          <Box textAlign="center" sx={{ borderTop: '1px solid #dde3ea', mt: 2.5, pt: 1.25 }}>
-            <Typography sx={{ fontSize: 10, color: '#94A3B8' }}>
-              Document confidentiel — Usage interne exclusif — ANASER-RH-GE-2025-002
-              · Dossier individuel de l'agent · Imprimé le {fmtDate(new Date().toISOString())}
-            </Typography>
-          </Box>
-        </Box>
-      </Box>
-
-      {ficheOpen && <FicheEvaluation evaluation={ev} criteres={criteres} open={ficheOpen} onClose={() => setFicheOpen(false)} />}
-
-      {/* Dialog Décision DG */}
-      <Dialog open={dgDialog} onClose={() => setDgDialog(false)} maxWidth="sm" fullWidth>
-        <DialogTitle sx={{ fontWeight: 800 }}>Décision du Directeur Général</DialogTitle>
-        <DialogContent>
-          {ev.note_globale !== null && (
-            <Alert severity={ev.appreciation === 'excellent' ? 'success' : ev.appreciation === 'insuffisant' ? 'error' : 'info'} sx={{ mb: 2 }}>
-              Note : <strong>{ev.note_globale}/4</strong> — {ev.appreciation ? APPRECIATION_LABELS[ev.appreciation] : ''}
-              {' '}— Recommandation : <strong>{ev.decision_recommandee ? DECISION_LABELS[ev.decision_recommandee] : '—'}</strong>
-            </Alert>
-          )}
-          <FormControl fullWidth sx={{ mb: 2 }}>
-            <InputLabel>Décision finale</InputLabel>
-            <Select label="Décision finale" value={dgDecision} onChange={e => setDgDecision(e.target.value)}>
-              <MenuItem value="confirmation">✅ Confirmation dans le poste</MenuItem>
-              <MenuItem value="renouvellement">🔄 Renouvellement de la période d'essai</MenuItem>
-              <MenuItem value="non_confirmation">❌ Non-confirmation</MenuItem>
-            </Select>
-          </FormControl>
-          <TextField label="Remarques du DG (optionnel)" multiline rows={3} fullWidth
-            value={dgRemarques} onChange={e => setDgRemarques(e.target.value)} />
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setDgDialog(false)}>Annuler</Button>
-          <Button variant="contained" color="success"
-            onClick={() => mutDecisionDg.mutate()} disabled={mutDecisionDg.isPending}>
-            Confirmer la décision
-          </Button>
-        </DialogActions>
-      </Dialog>
-    </Box>
-  );
-}
-
-// ── Onglet 2 : Liste évaluations ──────────────────────────────────────────────
-
-function EvaluationsTab({ criteres, openId }: { criteres: EvaluationCritere[]; openId?: number }) {
-  const qc = useQueryClient();
-  const [selected, setSelected] = useState<EvaluationPeriodeEssai | null>(null);
-
-  useEffect(() => {
-    if (openId && !selected) {
-      evaluationApi.show(openId).then(r => setSelected(r.data)).catch(() => {});
-    }
-  }, [openId]);
-
-  const [filtreStatut, setFiltreStatut] = useState('');
-  const [filtreType, setFiltreType] = useState('');
-  const [createDialog, setCreateDialog] = useState(false);
-  const [form, setForm] = useState({
-    employee_id: '',
-    type: '3_mois',
-    categorie: 'B1',
-    date_prise_poste: '',
-    date_fin_periode: '',
-    date_entretien: '',
-  });
-
-  const { data: evaluations = [], isLoading } = useQuery({
-    queryKey: ['evaluations', filtreStatut, filtreType],
-    queryFn: () => evaluationApi.list({
-      ...(filtreStatut ? { statut: filtreStatut } : {}),
-      ...(filtreType ? { type: filtreType } : {}),
-    }).then(r => r.data),
-  });
-
-  const mutCreate = useMutation({
-    mutationFn: () => evaluationApi.create({
-      employee_id: Number(form.employee_id),
-      type: form.type as '3_mois' | '6_mois',
-      categorie: form.categorie as any,
-      date_prise_poste: form.date_prise_poste,
-      date_fin_periode: form.date_fin_periode,
-      date_entretien: form.date_entretien || undefined,
-    }),
-    onSuccess: () => {
-      setCreateDialog(false);
-      qc.invalidateQueries({ queryKey: ['evaluations'] });
-      qc.invalidateQueries({ queryKey: ['evaluations-dashboard'] });
-    },
-  });
-
-  if (selected) {
-    return (
-      <EvaluationDetail
-        evaluation={selected}
-        criteres={criteres}
-        onBack={() => setSelected(null)}
-      />
-    );
+  /* === PRINT OVERRIDES === */
+  @media print {
+    @page { size: A4; margin: 0; }
+    body { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+    .no-print { display: none !important; }
+    .page-break { page-break-before: always; }
+    .avoid-break { page-break-inside: avoid; }
   }
+</style>
+</head>
+<body>
 
-  return (
-    <Box>
-      {/* Filtres + bouton créer */}
-      <Box sx={{ display: 'flex', gap: 2, mb: 3, flexWrap: 'wrap', alignItems: 'center' }}>
-        <FormControl size="small" sx={{ minWidth: 180 }}>
-          <InputLabel>Statut</InputLabel>
-          <Select label="Statut" value={filtreStatut} onChange={e => setFiltreStatut(e.target.value)}>
-            <MenuItem value="">Tous les statuts</MenuItem>
-            {Object.entries(STATUT_LABELS).map(([k, v]) => (
-              <MenuItem key={k} value={k}>{v}</MenuItem>
-            ))}
-          </Select>
-        </FormControl>
-        <FormControl size="small" sx={{ minWidth: 140 }}>
-          <InputLabel>Type</InputLabel>
-          <Select label="Type" value={filtreType} onChange={e => setFiltreType(e.target.value)}>
-            <MenuItem value="">Tous</MenuItem>
-            <MenuItem value="3_mois">3 mois</MenuItem>
-            <MenuItem value="6_mois">6 mois</MenuItem>
-          </Select>
-        </FormControl>
-        <Box flex={1} />
-        <Button variant="contained" startIcon={<Add />} onClick={() => setCreateDialog(true)}>
-          Nouvelle évaluation
-        </Button>
-      </Box>
+<!-- BOUTON IMPRESSION (masqué à l'impression) -->
+<div class="no-print" style="position:fixed;top:14px;right:20px;z-index:99;display:flex;gap:10px;">
+  <button onclick="window.print()" style="background:#002f59;color:#fff;border:none;padding:10px 22px;border-radius:8px;font-size:12pt;font-weight:700;cursor:pointer;">Imprimer / PDF</button>
+  <button onclick="window.close()" style="background:#e2e8f0;color:#334155;border:none;padding:10px 18px;border-radius:8px;font-size:12pt;cursor:pointer;">Fermer</button>
+</div>
 
-      {isLoading ? <LinearProgress /> : (
-        <Paper>
-          <Table>
-            <TableHead>
-              <TableRow sx={{ bgcolor: 'grey.50' }}>
-                <TableCell>Agent</TableCell>
-                <TableCell>Type</TableCell>
-                <TableCell>Catégorie</TableCell>
-                <TableCell>Date entretien</TableCell>
-                <TableCell>Note</TableCell>
-                <TableCell>Appréciation</TableCell>
-                <TableCell>Statut</TableCell>
-                <TableCell>Décision</TableCell>
-                <TableCell />
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {evaluations.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={9} align="center">
-                    <Typography color="text.secondary" py={3}>Aucune évaluation trouvée.</Typography>
-                  </TableCell>
-                </TableRow>
-              ) : evaluations.map(ev => (
-                <TableRow key={ev.id} hover sx={{ cursor: 'pointer' }} onClick={() => setSelected(ev)}>
-                  <TableCell>
-                    <Typography variant="body2" fontWeight={500}>
-                      {ev.employee?.first_name} {ev.employee?.last_name}
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      {ev.employee?.matricule}
-                    </Typography>
-                  </TableCell>
-                  <TableCell><Chip label={ev.type.replace('_', ' ')} size="small" variant="outlined" /></TableCell>
-                  <TableCell><Chip label={`Cat. ${ev.categorie}`} size="small" /></TableCell>
-                  <TableCell>
-                    <Typography variant="body2">{fmtDate(ev.date_entretien)}</Typography>
-                  </TableCell>
-                  <TableCell sx={{ minWidth: 120 }}>
-                    <NoteBar note={ev.note_globale} />
-                  </TableCell>
-                  <TableCell><AppreciationChip appreciation={ev.appreciation} /></TableCell>
-                  <TableCell><StatutBadge statut={ev.statut} /></TableCell>
-                  <TableCell>
-                    {ev.decision_finale
-                      ? <DecisionChip decision={ev.decision_finale} />
-                      : ev.decision_recommandee
-                        ? <Tooltip title="Décision recommandée (provisoire)">
-                            <span><DecisionChip decision={ev.decision_recommandee} /></span>
-                          </Tooltip>
-                        : null
-                    }
-                  </TableCell>
-                  <TableCell>
-                    <IconButton size="small"><Edit fontSize="small" /></IconButton>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </Paper>
-      )}
+<!-- EN-TÊTE DOCUMENT -->
+<div class="header">
+  <div class="header-logo">${(fiche.employee?.first_name?.[0] ?? '') + (fiche.employee?.last_name?.[0] ?? '')}</div>
+  <div class="header-text">
+    <h1>AGENCE NATIONALE DE LA SÉCURITÉ ROUTIÈRE</h1>
+    <h2>FICHE D'ÉVALUATION ANNUELLE DU PERSONNEL — CDC-ANASER-EVAL-2026-01</h2>
+  </div>
+  <div class="header-meta">
+    <div class="exercice">${fiche.campagne?.exercice ?? '—'}</div>
+    <div class="statut">${fiche.campagne?.titre ?? ''}</div>
+  </div>
+</div>
+<div class="orange-bar"></div>
 
-      {/* Dialog création */}
-      <Dialog open={createDialog} onClose={() => setCreateDialog(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>Nouvelle évaluation en période d'essai</DialogTitle>
-        <DialogContent>
-          <Grid container spacing={2} sx={{ mt: 0.5 }}>
-            <Grid item xs={12}>
-              <TextField
-                label="ID Employé"
-                type="number"
-                fullWidth
-                size="small"
-                value={form.employee_id}
-                onChange={e => setForm(f => ({ ...f, employee_id: e.target.value }))}
-              />
-            </Grid>
-            <Grid item xs={6}>
-              <FormControl fullWidth size="small">
-                <InputLabel>Type</InputLabel>
-                <Select label="Type" value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value }))}>
-                  <MenuItem value="3_mois">3 mois</MenuItem>
-                  <MenuItem value="6_mois">6 mois</MenuItem>
-                </Select>
-              </FormControl>
-            </Grid>
-            <Grid item xs={6}>
-              <FormControl fullWidth size="small">
-                <InputLabel>Catégorie</InputLabel>
-                <Select label="Catégorie" value={form.categorie} onChange={e => setForm(f => ({ ...f, categorie: e.target.value }))}>
-                  {['A1', 'A2', 'B1', 'B2', 'C', 'D', 'E'].map(c => (
-                    <MenuItem key={c} value={c}>Catégorie {c}</MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            </Grid>
-            <Grid item xs={6}>
-              <TextField
-                label="Date de prise de poste"
-                type="date"
-                fullWidth size="small"
-                InputLabelProps={{ shrink: true }}
-                value={form.date_prise_poste}
-                onChange={e => setForm(f => ({ ...f, date_prise_poste: e.target.value }))}
-              />
-            </Grid>
-            <Grid item xs={6}>
-              <TextField
-                label="Date fin période"
-                type="date"
-                fullWidth size="small"
-                InputLabelProps={{ shrink: true }}
-                value={form.date_fin_periode}
-                onChange={e => setForm(f => ({ ...f, date_fin_periode: e.target.value }))}
-              />
-            </Grid>
-            <Grid item xs={12}>
-              <TextField
-                label="Date d'entretien (optionnel)"
-                type="date"
-                fullWidth size="small"
-                InputLabelProps={{ shrink: true }}
-                value={form.date_entretien}
-                onChange={e => setForm(f => ({ ...f, date_entretien: e.target.value }))}
-              />
-            </Grid>
-          </Grid>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setCreateDialog(false)}>Annuler</Button>
-          <Button
-            variant="contained"
-            onClick={() => mutCreate.mutate()}
-            disabled={!form.employee_id || !form.date_prise_poste || !form.date_fin_periode || mutCreate.isPending}
-          >
-            Créer
-          </Button>
-        </DialogActions>
-      </Dialog>
-    </Box>
-  );
+<!-- IDENTITÉ AGENT & MOYENNE -->
+<div class="fiche-meta">
+  <div>
+    <div class="agent-name">${fiche.employee?.first_name ?? ''} ${fiche.employee?.last_name ?? ''}</div>
+    <div class="agent-sub">${fiche.snapshot_fonction ?? '—'} &nbsp;|&nbsp; ${fiche.snapshot_direction ?? '—'}</div>
+    <div class="agent-sub" style="margin-top:3px;color:#002f59;font-weight:600;">Matricule : ${fiche.snapshot_matricule ?? '—'}</div>
+  </div>
+  ${fiche.moyenne !== null ? `
+  <div class="moyenne-badge">
+    <div class="moy-val">${fiche.moyenne}/5</div>
+    <div class="moy-apprec">${apprecLabel(fiche.moyenne)}</div>
+  </div>` : ''}
+</div>
+
+<!-- CORPS DU DOCUMENT -->
+<div class="page-body">
+
+  <!-- === PAGE 1 : IDENTIFICATION === -->
+  <div class="section avoid-break">
+    <div class="section-title">1. Identification de l'agent</div>
+    <div class="id-grid">
+      ${field('Matricule', fiche.snapshot_matricule)}
+      ${field('Nom complet', `${fiche.employee?.first_name ?? ''} ${fiche.employee?.last_name ?? ''}`)}
+      ${field('Fonction', fiche.snapshot_fonction)}
+      ${field('Direction / Service', fiche.snapshot_direction)}
+      ${field('Poste', fiche.snapshot_service)}
+      ${field('Statut agent', fiche.statut_agent === 'fonctionnaire' ? 'Fonctionnaire (mis à disposition)' : fiche.statut_agent === 'decisionnaire' ? 'Décisionnaire' : 'Contractuel')}
+      ${field('Ancienneté', fiche.snapshot_anciennete_mois !== null && fiche.snapshot_anciennete_mois !== undefined ? `${fiche.snapshot_anciennete_mois} mois` : '—')}
+      ${field('Évaluateur', fiche.evaluateur?.name)}
+      ${field('Date d\'entretien', fmt(fiche.date_entretien))}
+      ${field('Lieu d\'entretien', fiche.lieu_entretien)}
+    </div>
+  </div>
+
+  <!-- === PAGE 2 : GRILLE DE NOTATION === -->
+  <div class="section page-break">
+    <div class="section-title">2. Grille de notation (barème /5)</div>
+    <div style="background:#e8f4fd;border:1px solid #bee3f8;border-radius:5px;padding:8px 12px;margin-bottom:12px;font-size:9.5pt;">
+      <strong>${criteres.length} critère(s) applicables</strong> pour un agent
+      <strong>${fiche.statut_agent === 'fonctionnaire' ? 'fonctionnaire' : 'contractuel/décisionnaire'}</strong>.
+      &nbsp;—&nbsp; Barème : 1 Insuffisant · 2 À améliorer · 3 Satisfaisant · 4 Très satisfaisant · 5 Excellent
+    </div>
+    ${grille}
+  </div>
+
+  <!-- === PAGE 3 : BILAN PROFESSIONNEL === -->
+  <div class="section page-break">
+    <div class="section-title">3. Bilan professionnel</div>
+    <div style="margin-bottom:10px;">
+      <div class="text-label">Principales réalisations de la période</div>
+      <div class="text-block">${fiche.realisations || '<em style="color:#94a3b8">Non renseigné</em>'}</div>
+    </div>
+    <div style="margin-bottom:10px;">
+      <div class="text-label">Difficultés rencontrées dans l'exercice des fonctions</div>
+      <div class="text-block">${fiche.difficultes || '<em style="color:#94a3b8">Non renseigné</em>'}</div>
+    </div>
+    <div style="margin-bottom:14px;">
+      <div class="text-label">Compétences démontrées</div>
+      <div class="text-block">${fiche.competences_demontrees || '<em style="color:#94a3b8">Non renseigné</em>'}</div>
+    </div>
+
+    <div class="sub-title">Besoins de formation et renforcement des capacités</div>
+    <table class="data-table">
+      <thead><tr><th style="width:5%">#</th><th>Formation souhaitée</th><th style="width:15%">Priorité</th></tr></thead>
+      <tbody>${besoinsRows}</tbody>
+    </table>
+  </div>
+
+  <!-- === PAGE 4 : OBJECTIFS & DÉCISIONS === -->
+  <div class="section page-break">
+    <div class="section-title">4. Objectifs assignés pour l'exercice suivant</div>
+    <table class="data-table">
+      <thead><tr><th style="width:5%">#</th><th>Objectif</th><th style="width:22%">Indicateur</th><th style="width:13%">Échéance</th></tr></thead>
+      <tbody>${objectifsRows}</tbody>
+    </table>
+
+    <div class="sub-title" style="margin-top:16px;">Observations de l'évaluateur</div>
+    <div class="text-block">${fiche.observations_evaluateur || '<em style="color:#94a3b8">Aucune observation</em>'}</div>
+
+    <div class="sub-title" style="margin-top:14px;">Observations de l'agent</div>
+    <div class="text-block">${fiche.observations_agent || '<em style="color:#94a3b8">Aucune observation</em>'}</div>
+
+    <div class="sub-title" style="margin-top:14px;">Avis du Directeur Général</div>
+    <div class="text-block">${fiche.avis_dg || '<em style="color:#94a3b8">Aucun avis</em>'}</div>
+
+    ${dec ? `
+    <div class="sub-title" style="margin-top:14px;">Décisions de la Division des Ressources Humaines</div>
+    <div class="dec-grid">${decChecks}</div>` : ''}
+
+    <!-- SIGNATURES -->
+    <div class="section-title" style="margin-top:20px;">5. Signatures</div>
+    <div class="sig-row">
+      ${sigBlock("L'Évaluateur", fiche.evaluateur?.name ?? '—', fiche.signe_evaluateur_at)}
+      ${sigBlock("L'Agent évalué", `${fiche.employee?.first_name ?? ''} ${fiche.employee?.last_name ?? ''}`, fiche.signe_agent_at)}
+      ${sigBlock("Le Directeur Général", fiche.avis_dg ? 'DG / SG' : '—', fiche.signe_agent_at ? fiche.signe_agent_at : null)}
+    </div>
+    ${fiche.refus_signature_agent ? `<div style="margin-top:8px;background:#fef2f2;border:1px solid #fca5a5;border-radius:5px;padding:8px 12px;font-size:9.5pt;color:#dc2626;"><strong>Refus de signature :</strong> ${fiche.motif_refus_signature || 'Motif non précisé'}</div>` : ''}
+  </div>
+
+</div>
+
+<!-- PIED DE PAGE -->
+<div class="doc-footer">
+  <span>ANASER — Fiche d'évaluation annuelle du personnel</span>
+  <span>Statut : ${fiche.statut ? fiche.statut.replace(/_/g, ' ').toUpperCase() : '—'}</span>
+  <span>Imprimé le ${new Date().toLocaleDateString('fr-FR')}</span>
+</div>
+
+</body>
+</html>`;
+
+  const w = window.open('', '_blank', 'width=900,height=1100');
+  if (!w) return;
+  w.document.write(html);
+  w.document.close();
 }
 
-// ── Onglet 3 : Barème & Guide ─────────────────────────────────────────────────
+// ── Constantes ────────────────────────────────────────────────────────────────
 
-function BaremeGuideTab() {
-  return (
-    <Grid container spacing={3}>
-      <Grid item xs={12} md={6}>
-        <Card>
-          <CardContent>
-            <Typography variant="subtitle1" fontWeight={700} mb={2}>Barème de décision</Typography>
-            <Table size="small">
-              <TableHead>
-                <TableRow sx={{ bgcolor: 'grey.50' }}>
-                  <TableCell>Note globale (/4)</TableCell>
-                  <TableCell>Appréciation</TableCell>
-                  <TableCell>Décision recommandée</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {[
-                  ['< 1,5', 'Insuffisant', 'Non-confirmation', 'error'],
-                  ['1,5 – 2,49', 'Passable', 'Renouvellement', 'warning'],
-                  ['2,5 – 3,24', 'Satisfaisant', 'Confirmation', 'primary'],
-                  ['≥ 3,25', 'Excellent', 'Confirmation', 'success'],
-                ].map(([range, appr, dec, color]) => (
-                  <TableRow key={range}>
-                    <TableCell><Typography variant="body2" fontWeight={600}>{range}</Typography></TableCell>
-                    <TableCell><Chip label={appr} color={color as any} size="small" /></TableCell>
-                    <TableCell><Typography variant="body2">{dec}</Typography></TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-      </Grid>
+const STATUT_LABELS: Record<EvalStatutFiche, string> = {
+  a_planifier:       'À planifier',
+  planifiee:         'Planifiée',
+  en_cours:          'En cours',
+  signee_evaluateur: 'Signée évaluateur',
+  signee_agent:      'Signée agent',
+  transmise_daf:     'Transmise DAF',
+  annotee_dg:        'Annotée DG',
+  notifiee:          'Notifiée',
+  archivee:          'Archivée',
+};
 
-      <Grid item xs={12} md={6}>
-        <Card>
-          <CardContent>
-            <Typography variant="subtitle1" fontWeight={700} mb={2}>Durées légales par catégorie</Typography>
-            <Table size="small">
-              <TableHead>
-                <TableRow sx={{ bgcolor: 'grey.50' }}>
-                  <TableCell>Catégorie</TableCell>
-                  <TableCell>Durée initiale</TableCell>
-                  <TableCell>Renouvellement possible</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {[
-                  ['A1, A2', '6 mois', '1 fois × 6 mois'],
-                  ['B1, B2', '3 mois', '1 fois × 3 mois'],
-                  ['C', '3 mois', '1 fois × 3 mois'],
-                  ['D', '1 mois', '1 fois × 1 mois'],
-                  ['E', '1 mois', '1 fois × 1 mois'],
-                ].map(([cat, duree, renouv]) => (
-                  <TableRow key={cat}>
-                    <TableCell><Chip label={cat} size="small" /></TableCell>
-                    <TableCell>{duree}</TableCell>
-                    <TableCell>{renouv}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-      </Grid>
+const STATUT_COLORS: Record<EvalStatutFiche, string> = {
+  a_planifier:       '#94A3B8',
+  planifiee:         '#3B82F6',
+  en_cours:          '#F59E0B',
+  signee_evaluateur: '#8B5CF6',
+  signee_agent:      '#06B6D4',
+  transmise_daf:     '#10B981',
+  annotee_dg:        '#F97316',
+  notifiee:          '#059669',
+  archivee:          '#6B7280',
+};
 
-      <Grid item xs={12} md={6}>
-        <Card>
-          <CardContent>
-            <Typography variant="subtitle1" fontWeight={700} mb={2}>Actes administratifs selon décision</Typography>
-            {[
-              { dec: 'Confirmation', color: 'success', actes: ["Lettre de confirmation de stage", "Avenant au contrat de travail", "Mise à jour du dossier individuel"] },
-              { dec: 'Renouvellement', color: 'warning', actes: ["Lettre de renouvellement de la période d'essai", "Notification à l'agent et au responsable", "Planification de la nouvelle date d'évaluation"] },
-              { dec: 'Non-confirmation', color: 'error', actes: ["Lettre de non-confirmation (motifs détaillés)", "Respect du préavis légal", "Solde de tout compte et attestations", "Archivage du dossier complet"] },
-            ].map(({ dec, color, actes }) => (
-              <Box key={dec} mb={2}>
-                <Chip label={dec} color={color as any} size="small" sx={{ mb: 1 }} />
-                <Box component="ul" sx={{ m: 0, pl: 3 }}>
-                  {actes.map(a => <Box component="li" key={a}><Typography variant="body2">{a}</Typography></Box>)}
-                </Box>
-              </Box>
-            ))}
-          </CardContent>
-        </Card>
-      </Grid>
+const APPRECIATION_LABELS: Record<EvalAppreciation, string> = {
+  excellent:        'Excellent',
+  tres_satisfaisant:'Très satisfaisant',
+  satisfaisant:     'Satisfaisant',
+  a_ameliorer:      'À améliorer',
+  insuffisant:      'Insuffisant',
+};
 
-      <Grid item xs={12} md={6}>
-        <Card>
-          <CardContent>
-            <Typography variant="subtitle1" fontWeight={700} mb={2}>Processus — 5 étapes</Typography>
-            {[
-              ["1", "Envoi de la fiche", "RRH envoie la fiche vide au responsable et à l'agent 5 jours ouvrables avant l'entretien."],
-              ["2", "Préparation", "Le responsable et l'agent préparent leur partie de façon indépendante."],
-              ["3", "Entretien", "Le responsable saisit les notes en concertation avec l'agent. Discussion de chaque critère."],
-              ["4", "Signature", "La fiche est signée par les deux parties à l'issue de l'entretien."],
-              ["5", "Validation & Archivage", "Validation RRH → Décision DG → Archivage au dossier individuel de l'agent."],
-            ].map(([num, titre, desc]) => (
-              <Box key={num} sx={{ display: 'flex', gap: 2, mb: 2 }}>
-                <Box sx={{
-                  width: 32, height: 32, borderRadius: '50%', bgcolor: 'primary.main',
-                  color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontWeight: 700, fontSize: 14, flexShrink: 0,
-                }}>{num}</Box>
-                <Box>
-                  <Typography variant="body2" fontWeight={600}>{titre}</Typography>
-                  <Typography variant="caption" color="text.secondary">{desc}</Typography>
-                </Box>
-              </Box>
-            ))}
-          </CardContent>
-        </Card>
-      </Grid>
+const APPRECIATION_COLORS: Record<EvalAppreciation, 'success' | 'info' | 'primary' | 'warning' | 'error'> = {
+  excellent:        'success',
+  tres_satisfaisant:'info',
+  satisfaisant:     'primary',
+  a_ameliorer:      'warning',
+  insuffisant:      'error',
+};
 
-      <Grid item xs={12}>
-        <Alert severity="info">
-          <Typography variant="body2">
-            <strong>Confidentialité :</strong> L'original de la fiche est versé au dossier individuel de l'agent (DRH).
-            Une copie est remise à l'agent. Les données sont strictement confidentielles (DG, DAF, RRH, responsable hiérarchique direct uniquement).
-          </Typography>
-        </Alert>
-      </Grid>
-    </Grid>
-  );
-}
+const WORKFLOW_STEPS: EvalStatutFiche[] = [
+  'a_planifier', 'planifiee', 'en_cours',
+  'signee_evaluateur', 'signee_agent', 'transmise_daf',
+  'annotee_dg', 'notifiee', 'archivee',
+];
 
-// ── Fiche d'Évaluation Individuelle (imprimable) ─────────────────────────────
+// ── Dialog confirmation suppression ──────────────────────────────────────────
 
-function FicheEvaluation({
-  evaluation: ev,
-  criteres,
-  open,
-  onClose,
+function ConfirmDeleteDialog({
+  open, title, description, loading, onConfirm, onClose,
 }: {
-  evaluation: EvaluationPeriodeEssai;
-  criteres: EvaluationCritere[];
   open: boolean;
+  title: string;
+  description: string;
+  loading: boolean;
+  onConfirm: () => void;
   onClose: () => void;
 }) {
-  const { logoUrl, name: companyName } = useCompany();
-  const notationsMap = new Map(
-    (ev.notations ?? []).map(n => [n.critere_id, n])
-  );
-
-  const SECTIONS: { groupe: GroupeCritere; lettre: string; titre: string; poids: number }[] = [
-    { groupe: 'competences_techniques', lettre: 'A', titre: 'COMPÉTENCES TECHNIQUES ET PROFESSIONNELLES', poids: 0.40 },
-    { groupe: 'comportement_relations', lettre: 'B', titre: 'COMPORTEMENT ET RELATIONS PROFESSIONNELLES',  poids: 0.30 },
-    { groupe: 'aptitudes_personnelles', lettre: 'C', titre: 'APTITUDES PERSONNELLES',                      poids: 0.30 },
-  ];
-
-  const noteGlobale  = ev.note_globale ?? 0;
-  const appreciation = ev.appreciation ?? (noteGlobale < 1.5 ? 'insuffisant' : noteGlobale < 2.5 ? 'passable' : noteGlobale < 3.25 ? 'satisfaisant' : 'excellent');
-
-  const decisionLabel: Record<string, string> = {
-    confirmation:     '✅ Confirmation dans le poste',
-    renouvellement:   '🔄 Renouvellement de la période d\'essai',
-    non_confirmation: '❌ Non-confirmation — rupture de la période d\'essai',
-  };
-
-  const appreciationLabel: Record<string, string> = {
-    insuffisant:  'Insuffisant',
-    passable:     'Passable',
-    satisfaisant: 'Satisfaisant',
-    excellent:    'Excellent',
-  };
-
-  const handlePrint = () => {
-    const el = document.getElementById('fiche-anaser-print');
-    if (!el) return;
-    const w = window.open('', '_blank', 'width=900,height=700');
-    if (!w) return;
-    const logoHtml = logoUrl
-      ? `<div style="display:flex;align-items:center;justify-content:flex-end;margin-bottom:6px">
-           <img src="${logoUrl}" alt="${companyName}" style="height:64px;max-width:130px;object-fit:contain" />
-         </div>`
-      : '';
-    w.document.write(`
-      <html><head><title>Fiche Évaluation ANASER</title>
-      <style>
-        body { font-family: Arial, sans-serif; font-size: 11px; margin: 20px; color: #000; }
-        h1 { font-size: 14px; text-align: center; margin: 4px 0; }
-        h2 { font-size: 12px; text-align: center; margin: 2px 0; color: #555; }
-        h3 { font-size: 11px; background: #1e3a5f; color: #fff; padding: 4px 8px; margin: 8px 0 0 0; }
-        table { width: 100%; border-collapse: collapse; margin-bottom: 4px; }
-        th { background: #1e3a5f; color: #fff; font-size: 10px; padding: 4px; border: 1px solid #999; text-align: center; }
-        td { border: 1px solid #bbb; padding: 3px 5px; font-size: 10px; }
-        .section-header { background: #d4e3f5; font-weight: bold; }
-        .subtotal { background: #eef4fb; font-weight: bold; }
-        .global { background: #1e3a5f; color: #fff; font-weight: bold; font-size: 12px; text-align: center; }
-        .sig-table { margin-top: 20px; }
-        .sig-table td { height: 50px; vertical-align: top; padding: 5px; }
-        .legend { font-size: 10px; color: #555; margin: 4px 0; }
-        .note-glob { font-size: 18px; font-weight: bold; }
-        @media print { body { margin: 10px; } }
-      </style></head><body>${logoHtml}${el.innerHTML}</body></html>
-    `);
-    w.document.close();
-    w.focus();
-    setTimeout(() => { w.print(); }, 400);
-  };
-
-  const cellSx = { border: '1px solid #bbb', px: 1, py: 0.5, fontSize: 11 };
-  const hdrSx  = { bgcolor: '#1e3a5f', color: '#fff', fontWeight: 700, fontSize: 10.5, border: '1px solid #999', px: 1, py: 0.75, textAlign: 'center' as const };
-
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="lg" fullWidth
-      PaperProps={{ sx: { borderRadius: '12px', maxHeight: '95vh' } }}>
-      <DialogTitle sx={{ borderBottom: '1px solid #E2E8F0', py: 1.5 }}>
-        <Stack direction="row" alignItems="center" justifyContent="space-between">
-          <Typography fontWeight={800} fontSize={15}>
-            Fiche d'Évaluation Individuelle — Période d'Essai
-          </Typography>
-          <Button variant="contained" startIcon={<Print />} onClick={handlePrint}
-            sx={{ bgcolor: '#1e3a5f', '&:hover': { bgcolor: '#162d4a' }, borderRadius: '8px', fontSize: 13 }}>
-            Imprimer
-          </Button>
-        </Stack>
+    <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth PaperProps={{ sx: { borderRadius: 3 } }}>
+      <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1.5, pb: 1 }}>
+        <DeleteForever sx={{ color: '#DC2626', fontSize: 28 }} />
+        <Typography fontWeight={800} fontSize={17}>{title}</Typography>
       </DialogTitle>
-
-      <DialogContent sx={{ p: 3, bgcolor: '#f9fafb' }}>
-        <Box id="fiche-anaser-print" sx={{ bgcolor: '#fff', p: 3, maxWidth: 860, mx: 'auto',
-          fontFamily: 'Arial, sans-serif', fontSize: 12, color: '#000' }}>
-
-          {/* ── EN-TÊTE ── */}
-          <Box textAlign="center" mb={2} sx={{ borderBottom: '3px solid #1e3a5f', pb: 1.5 }}>
-            <Typography sx={{ fontWeight: 900, fontSize: 14, color: '#1e3a5f', letterSpacing: 1 }}>
-              AGENCE NATIONALE DE LA SÉCURITÉ ROUTIÈRE — ANASER
-            </Typography>
-            <Typography sx={{ fontWeight: 800, fontSize: 13, mt: 0.5 }}>
-              FICHE D'ÉVALUATION INDIVIDUELLE — PÉRIODE D'ESSAI
-            </Typography>
-            <Typography sx={{ fontSize: 11, color: '#555', mt: 0.25 }}>
-              Direction Administrative et Financière — Ressources Humaines
-            </Typography>
-            <Typography sx={{ fontSize: 10, color: '#888', mt: 0.25 }}>
-              Réf. : ANASER-RH-GE-2025-002 · Version 1.0 · Juin 2025
-            </Typography>
-          </Box>
-
-          {/* ── IDENTIFICATION ── */}
-          <Box sx={{ bgcolor: '#1e3a5f', color: '#fff', fontWeight: 800, fontSize: 11,
-            px: 1.5, py: 0.75, mb: 0.5 }}>
-            IDENTIFICATION DE L'AGENT
-          </Box>
-          <Table size="small" sx={{ mb: 2, '& td': { border: '1px solid #bbb', px: 1.5, py: 0.75, fontSize: 11 } }}>
-            <TableBody>
-              <TableRow>
-                <TableCell sx={{ fontWeight: 700, bgcolor: '#f0f4f8', width: '18%' }}>Nom & Prénom :</TableCell>
-                <TableCell sx={{ width: '32%' }}>
-                  {ev.employee ? `${ev.employee.last_name} ${ev.employee.first_name}` : `Agent #${ev.employee_id}`}
-                </TableCell>
-                <TableCell sx={{ fontWeight: 700, bgcolor: '#f0f4f8', width: '18%' }}>Date d'entrée :</TableCell>
-                <TableCell sx={{ width: '32%' }}>{fmtDate(ev.date_prise_poste)}</TableCell>
-              </TableRow>
-              <TableRow>
-                <TableCell sx={{ fontWeight: 700, bgcolor: '#f0f4f8' }}>Matricule :</TableCell>
-                <TableCell>{ev.employee?.employee_number ?? '—'}</TableCell>
-                <TableCell sx={{ fontWeight: 700, bgcolor: '#f0f4f8' }}>Catégorie :</TableCell>
-                <TableCell>{ev.categorie}</TableCell>
-              </TableRow>
-              <TableRow>
-                <TableCell sx={{ fontWeight: 700, bgcolor: '#f0f4f8' }}>Direction / Pôle :</TableCell>
-                <TableCell>{ev.employee?.department?.name ?? '—'}</TableCell>
-                <TableCell sx={{ fontWeight: 700, bgcolor: '#f0f4f8' }}>Responsable hiérarchique :</TableCell>
-                <TableCell>{ev.responsable?.name ?? '—'}</TableCell>
-              </TableRow>
-              <TableRow>
-                <TableCell sx={{ fontWeight: 700, bgcolor: '#f0f4f8' }}>Poste occupé :</TableCell>
-                <TableCell>{ev.employee?.position?.title ?? '—'}</TableCell>
-                <TableCell sx={{ fontWeight: 700, bgcolor: '#f0f4f8' }}>Type d'évaluation :</TableCell>
-                <TableCell>{ev.type === '3_mois' ? 'Période d\'essai 3 mois' : 'Période d\'essai 6 mois'}</TableCell>
-              </TableRow>
-            </TableBody>
-          </Table>
-
-          {/* ── GRILLE D'ÉVALUATION ── */}
-          <Box sx={{ bgcolor: '#1e3a5f', color: '#fff', fontWeight: 800, fontSize: 11,
-            px: 1.5, py: 0.75, mb: 0.5 }}>
-            GRILLE D'ÉVALUATION — NOTATION SUR 4
-          </Box>
-          <Box sx={{ bgcolor: '#f0f4f8', border: '1px solid #bbb', px: 1.5, py: 0.75, mb: 1, fontSize: 11 }}>
-            <strong>1 = Insuffisant</strong> &nbsp;|&nbsp; <strong>2 = Passable</strong> &nbsp;|&nbsp;
-            <strong>3 = Satisfaisant</strong> &nbsp;|&nbsp; <strong>4 = Excellent</strong>
-          </Box>
-
-          <Table size="small" sx={{ mb: 2 }}>
-            <TableHead>
-              <TableRow>
-                <TableCell sx={{ ...hdrSx, width: '38%', textAlign: 'left' }}>CRITÈRES D'ÉVALUATION</TableCell>
-                <TableCell sx={{ ...hdrSx, width: '9%' }}>Note<br />(1 à 4)</TableCell>
-                <TableCell sx={{ ...hdrSx, width: '9%' }}>Pondér.<br />(%)</TableCell>
-                <TableCell sx={{ ...hdrSx, width: '11%' }}>Note<br />Pondérée</TableCell>
-                <TableCell sx={{ ...hdrSx }}>Commentaires</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {SECTIONS.map(({ groupe, lettre, titre, poids: sectionPoids }) => {
-                const sectionCriteres = criteres.filter(c => c.groupe === groupe).sort((a, b) => a.ordre - b.ordre);
-                let sousTotal = 0;
-
-                return (
-                  <>
-                    <TableRow key={`hdr-${groupe}`}>
-                      <TableCell colSpan={5} sx={{ ...cellSx, bgcolor: '#d4e3f5', fontWeight: 800, fontSize: 11 }}>
-                        {lettre} — {titre}
-                      </TableCell>
-                    </TableRow>
-                    {sectionCriteres.map(c => {
-                      const notation      = notationsMap.get(c.id);
-                      const note          = notation?.note ?? null;
-                      const poidsSect     = c.poids / sectionPoids;
-                      const notePond      = note !== null ? +(note * poidsSect).toFixed(4) : null;
-                      if (notePond) sousTotal += notePond;
-                      return (
-                        <TableRow key={c.id}>
-                          <TableCell sx={cellSx}>{c.libelle}</TableCell>
-                          <TableCell sx={{ ...cellSx, textAlign: 'center', fontWeight: note ? 700 : 400 }}>
-                            {note ?? '—'}
-                          </TableCell>
-                          <TableCell sx={{ ...cellSx, textAlign: 'center' }}>
-                            {Math.round(poidsSect * 100)}%
-                          </TableCell>
-                          <TableCell sx={{ ...cellSx, textAlign: 'center' }}>
-                            {notePond !== null ? notePond.toFixed(2) : '—'}
-                          </TableCell>
-                          <TableCell sx={{ ...cellSx, color: '#555', fontStyle: 'italic', fontSize: 10.5 }}>
-                            {notation?.commentaire_hierarchique ?? ''}
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                    <TableRow key={`sub-${groupe}`}>
-                      <TableCell sx={{ ...cellSx, bgcolor: '#eef4fb', fontWeight: 700 }}>
-                        Sous-total section (pondération globale : {Math.round(sectionPoids * 100)}%)
-                      </TableCell>
-                      <TableCell sx={{ ...cellSx, bgcolor: '#eef4fb', textAlign: 'center', fontWeight: 700 }}>
-                        {Math.round(sectionPoids * 100)}%
-                      </TableCell>
-                      <TableCell sx={{ ...cellSx, bgcolor: '#eef4fb' }} />
-                      <TableCell sx={{ ...cellSx, bgcolor: '#eef4fb', textAlign: 'center', fontWeight: 700, color: '#1e3a5f' }}>
-                        {(sousTotal * sectionPoids).toFixed(2)}
-                      </TableCell>
-                      <TableCell sx={{ ...cellSx, bgcolor: '#eef4fb' }} />
-                    </TableRow>
-                  </>
-                );
-              })}
-            </TableBody>
-          </Table>
-
-          {/* ── NOTE GLOBALE ── */}
-          <Box sx={{ bgcolor: '#1e3a5f', color: '#fff', display: 'flex', alignItems: 'center',
-            justifyContent: 'center', gap: 3, py: 1.5, mb: 2, borderRadius: '4px' }}>
-            <Typography sx={{ fontWeight: 700, fontSize: 13 }}>NOTE GLOBALE / 4</Typography>
-            <Typography sx={{ fontWeight: 900, fontSize: 22 }}>{noteGlobale.toFixed(2)}</Typography>
-            <Box sx={{ bgcolor: '#fff', color: '#1e3a5f', px: 2, py: 0.5, borderRadius: '4px',
-              fontWeight: 800, fontSize: 13 }}>
-              {appreciationLabel[appreciation] ?? appreciation}
-            </Box>
-          </Box>
-
-          {/* ── RECOMMANDATION ── */}
-          <Box sx={{ bgcolor: '#1e3a5f', color: '#fff', fontWeight: 800, fontSize: 11,
-            px: 1.5, py: 0.75, mb: 0.5 }}>
-            RECOMMANDATION
-          </Box>
-          <Table size="small" sx={{ mb: 2, '& td': { border: '1px solid #bbb', px: 1.5, py: 1, fontSize: 11 } }}>
-            <TableBody>
-              <TableRow>
-                <TableCell sx={{ fontWeight: 700, bgcolor: '#f0f4f8', width: '22%' }}>Décision proposée :</TableCell>
-                <TableCell>
-                  {decisionLabel[ev.decision_finale ?? ev.decision_recommandee ?? ''] ?? '—'}
-                </TableCell>
-              </TableRow>
-              <TableRow>
-                <TableCell sx={{ fontWeight: 700, bgcolor: '#f0f4f8' }}>Commentaire général :</TableCell>
-                <TableCell sx={{ minHeight: 50 }}>{ev.commentaire_general ?? ''}</TableCell>
-              </TableRow>
-              <TableRow>
-                <TableCell sx={{ fontWeight: 700, bgcolor: '#f0f4f8' }}>Plan d'amélioration :</TableCell>
-                <TableCell>{ev.plan_amelioration ?? ''}</TableCell>
-              </TableRow>
-              {ev.remarques_dg && (
-                <TableRow>
-                  <TableCell sx={{ fontWeight: 700, bgcolor: '#f0f4f8' }}>Remarques DG :</TableCell>
-                  <TableCell>{ev.remarques_dg}</TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-
-          {/* ── SIGNATURES ── */}
-          <Box sx={{ bgcolor: '#1e3a5f', color: '#fff', fontWeight: 800, fontSize: 11,
-            px: 1.5, py: 0.75, mb: 0.5 }}>
-            SIGNATURES
-          </Box>
-          <Table size="small">
-            <TableHead>
-              <TableRow>
-                <TableCell sx={{ ...hdrSx }}>L'Agent</TableCell>
-                <TableCell sx={{ ...hdrSx }}>Le Responsable Hiérarchique</TableCell>
-                <TableCell sx={{ ...hdrSx }}>La Responsable RH</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              <TableRow>
-                {['Nom & Signature :', 'Nom & Signature :', 'Nom & Signature :'].map((txt, i) => (
-                  <TableCell key={i} sx={{ border: '1px solid #bbb', px: 1.5, py: 0.5, fontSize: 11, fontWeight: 600, bgcolor: '#f0f4f8' }}>
-                    {txt}
-                  </TableCell>
-                ))}
-              </TableRow>
-              <TableRow>
-                {[
-                  ev.employee ? `${ev.employee.first_name} ${ev.employee.last_name}` : '—',
-                  ev.responsable?.name ?? '—',
-                  '—',
-                ].map((val, i) => (
-                  <TableCell key={i} sx={{ border: '1px solid #bbb', height: 48, px: 1.5, fontSize: 11, verticalAlign: 'top', pt: 1 }}>
-                    {val}
-                  </TableCell>
-                ))}
-              </TableRow>
-              <TableRow>
-                {[
-                  ev.signe_agent_at ? `Signé le ${fmtDate(ev.signe_agent_at)}` : 'Date : ___/___/______',
-                  ev.signe_hierarchique_at ? `Signé le ${fmtDate(ev.signe_hierarchique_at)}` : 'Date : ___/___/______',
-                  ev.valide_rrh_at ? `Validé le ${fmtDate(ev.valide_rrh_at)}` : 'Date : ___/___/______',
-                ].map((d, i) => (
-                  <TableCell key={i} sx={{ border: '1px solid #bbb', px: 1.5, py: 0.75, fontSize: 10.5, color: '#555' }}>
-                    {d}
-                  </TableCell>
-                ))}
-              </TableRow>
-            </TableBody>
-          </Table>
-
-          {/* Pied de page */}
-          <Box textAlign="center" mt={2} sx={{ borderTop: '1px solid #ddd', pt: 1 }}>
-            <Typography sx={{ fontSize: 9.5, color: '#888' }}>
-              Document confidentiel — Usage interne exclusif — ANASER-RH-GE-2025-002
-              · Dossier individuel de l'agent · {fmtDate(new Date().toISOString())}
-            </Typography>
-          </Box>
-        </Box>
+      <DialogContent>
+        <Alert severity="error" sx={{ borderRadius: 2, fontSize: 13 }}>{description}</Alert>
       </DialogContent>
-
-      <DialogActions sx={{ px: 3, py: 2, borderTop: '1px solid #E2E8F0' }}>
-        <Button onClick={onClose} sx={{ color: '#64748B' }}>Fermer</Button>
-        <Button variant="contained" startIcon={<Print />} onClick={handlePrint}
-          sx={{ bgcolor: '#1e3a5f', '&:hover': { bgcolor: '#162d4a' }, borderRadius: '8px' }}>
-          Imprimer
+      <DialogActions sx={{ px: 3, pb: 2.5 }}>
+        <Button onClick={onClose} sx={{ textTransform: 'none' }} disabled={loading}>Annuler</Button>
+        <Button
+          variant="contained"
+          onClick={onConfirm}
+          disabled={loading}
+          sx={{ bgcolor: '#DC2626', textTransform: 'none', fontWeight: 700, borderRadius: 2, '&:hover': { bgcolor: '#B91C1C' } }}
+        >
+          {loading ? <CircularProgress size={16} sx={{ color: '#fff' }} /> : 'Supprimer définitivement'}
         </Button>
       </DialogActions>
     </Dialog>
   );
 }
 
-// ── Page principale ───────────────────────────────────────────────────────────
+function fmtDate(d: string | null | undefined) {
+  if (!d) return '—';
+  return new Date(d).toLocaleDateString('fr-FR');
+}
 
-export default function EvaluationsPage() {
-  const location = useLocation();
-  const openId   = (location.state as { openId?: number } | null)?.openId;
-  const [tab, setTab] = useState(openId ? 1 : 0);
+function StatutChip({ statut }: { statut: EvalStatutFiche }) {
+  return (
+    <Chip
+      label={STATUT_LABELS[statut]}
+      size="small"
+      sx={{ bgcolor: STATUT_COLORS[statut] + '22', color: STATUT_COLORS[statut], fontWeight: 700, fontSize: 11 }}
+    />
+  );
+}
 
-  const { data: criteres = [] } = useQuery({
-    queryKey: ['evaluation-criteres'],
-    queryFn: () => evaluationApi.criteres().then(r => r.data),
+function ApprecChip({ appreciation }: { appreciation: EvalAppreciation | null }) {
+  if (!appreciation) return <Typography variant="body2" color="text.disabled">—</Typography>;
+  return (
+    <Chip
+      label={APPRECIATION_LABELS[appreciation]}
+      color={APPRECIATION_COLORS[appreciation]}
+      size="small"
+      variant="outlined"
+    />
+  );
+}
+
+function MoyenneBar({ moyenne }: { moyenne: number | null }) {
+  if (moyenne === null) return <Typography variant="body2" color="text.disabled">—/5</Typography>;
+  const pct = (moyenne / 5) * 100;
+  const color = moyenne >= 4.5 ? 'success' : moyenne >= 3.5 ? 'info' : moyenne >= 2.5 ? 'primary' : moyenne >= 1.5 ? 'warning' : 'error';
+  return (
+    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+      <Box sx={{ flex: 1 }}>
+        <LinearProgress variant="determinate" value={pct} color={color} sx={{ height: 7, borderRadius: 4 }} />
+      </Box>
+      <Typography variant="body2" fontWeight={700} sx={{ minWidth: 36 }}>{moyenne}/5</Typography>
+    </Box>
+  );
+}
+
+// ── Onglet 1 — Tableau de bord ────────────────────────────────────────────────
+
+function DashboardTab() {
+  const { data: campagnes, isLoading } = useQuery({
+    queryKey: ['eval-campagnes'],
+    queryFn: () => evalCampagneApi.list().then(r => r.data),
+  });
+
+  if (isLoading) return <LinearProgress />;
+
+  const active = campagnes?.find(c => c.statut === 'active');
+  const stats = active?.stats;
+
+  return (
+    <Box>
+      {!active && (
+        <Alert severity="info" sx={{ mb: 3, borderRadius: 2 }}>
+          Aucune campagne active. Créez une campagne dans l'onglet <strong>Campagnes</strong> et lancez-la.
+        </Alert>
+      )}
+
+      {active && (
+        <>
+          <Paper elevation={0} sx={{ p: 3, mb: 3, borderRadius: 2, border: '1px solid #E2E8F0', background: 'linear-gradient(135deg, #002f59 0%, #004080 100%)' }}>
+            <Typography variant="h6" sx={{ color: '#fff', fontWeight: 800 }}>
+              Campagne {active.exercice} — {active.titre}
+            </Typography>
+            <Typography sx={{ color: 'rgba(255,255,255,0.7)', fontSize: 13, mt: 0.5 }}>
+              Période : {fmtDate(active.periode_debut)} → {fmtDate(active.periode_fin)}
+            </Typography>
+            {active.date_limite_entretiens && (
+              <Typography sx={{ color: '#ff7631', fontSize: 13, mt: 0.5, fontWeight: 600 }}>
+                Limite entretiens : {fmtDate(active.date_limite_entretiens)}
+              </Typography>
+            )}
+          </Paper>
+
+          {stats && (
+            <Grid container spacing={2} mb={3}>
+              {[
+                { label: 'Total fiches',   value: stats.total,      color: '#6366F1' },
+                { label: 'À planifier',    value: stats.a_planifier,color: '#94A3B8' },
+                { label: 'Planifiées',     value: stats.planifiees, color: '#3B82F6' },
+                { label: 'En cours',       value: stats.en_cours,   color: '#F59E0B' },
+                { label: 'Signées',        value: stats.signees,    color: '#8B5CF6' },
+                { label: 'Transmises DAF', value: stats.transmises, color: '#10B981' },
+                { label: 'Notifiées',      value: stats.notifiees,  color: '#059669' },
+                { label: 'Archivées',      value: stats.archivees,  color: '#6B7280' },
+              ].map(kpi => (
+                <Grid item xs={6} sm={3} md={3} key={kpi.label}>
+                  <Card elevation={0} sx={{ border: `2px solid ${kpi.color}22`, borderTop: `4px solid ${kpi.color}`, borderRadius: 2 }}>
+                    <CardContent sx={{ textAlign: 'center', py: 1.5 }}>
+                      <Typography variant="h4" fontWeight={800} sx={{ color: kpi.color }}>{kpi.value}</Typography>
+                      <Typography variant="caption" color="text.secondary">{kpi.label}</Typography>
+                    </CardContent>
+                  </Card>
+                </Grid>
+              ))}
+            </Grid>
+          )}
+
+          {stats && (
+            <Paper elevation={0} sx={{ p: 2.5, borderRadius: 2, border: '1px solid #E2E8F0' }}>
+              <Typography fontWeight={700} mb={1.5}>Avancement global</Typography>
+              <Box sx={{ display: 'flex', gap: 0.5, height: 24, borderRadius: 2, overflow: 'hidden' }}>
+                {stats.total > 0 && [
+                  { val: stats.a_planifier, color: '#94A3B8' },
+                  { val: stats.planifiees,  color: '#3B82F6' },
+                  { val: stats.en_cours,    color: '#F59E0B' },
+                  { val: stats.signees,     color: '#8B5CF6' },
+                  { val: stats.transmises,  color: '#10B981' },
+                  { val: stats.notifiees + stats.archivees, color: '#059669' },
+                ].filter(s => s.val > 0).map((s, i) => (
+                  <Box key={i} sx={{ flex: s.val, bgcolor: s.color, minWidth: 4 }} />
+                ))}
+              </Box>
+              <Typography variant="caption" color="text.secondary" mt={1} display="block">
+                {stats.notifiees + stats.archivees} / {stats.total} fiches finalisées
+              </Typography>
+            </Paper>
+          )}
+        </>
+      )}
+    </Box>
+  );
+}
+
+// ── Onglet 2 — Campagnes (liste + vue détail avec fiches) ─────────────────────
+
+const STATUT_CAMPAGNE_LABELS: Record<string, string> = {
+  preparation: 'Préparation', active: 'Active', synthese: 'Synthèse', cloturee: 'Clôturée',
+};
+const STATUT_CAMPAGNE_COLORS: Record<string, 'default' | 'primary' | 'success' | 'warning'> = {
+  preparation: 'default', active: 'primary', synthese: 'warning', cloturee: 'success',
+};
+
+const EMPTY_FORM = {
+  exercice: new Date().getFullYear(),
+  titre: '',
+  periode_debut: '',
+  periode_fin: '',
+};
+
+function CampagnesTab() {
+  const qc = useQueryClient();
+  const [openCreate, setOpenCreate] = useState(false);
+  const [editTarget, setEditTarget] = useState<EvalCampagne | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<EvalCampagne | null>(null);
+  const [selected, setSelected] = useState<EvalCampagne | null>(null);
+  const [form, setForm] = useState(EMPTY_FORM);
+
+  const { data: campagnes, isLoading } = useQuery({
+    queryKey: ['eval-campagnes'],
+    queryFn: () => evalCampagneApi.list().then(r => r.data),
+  });
+
+  const createMut = useMutation({
+    mutationFn: (data: typeof form) => evalCampagneApi.create(data),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['eval-campagnes'] }); setOpenCreate(false); setForm(EMPTY_FORM); },
+  });
+
+  const updateMut = useMutation({
+    mutationFn: (data: typeof form) => evalCampagneApi.update(editTarget!.id, data),
+    onSuccess: (res) => {
+      qc.invalidateQueries({ queryKey: ['eval-campagnes'] });
+      if (selected?.id === editTarget?.id) setSelected(res.data as EvalCampagne);
+      setEditTarget(null);
+    },
+  });
+
+  const lancerMut = useMutation({
+    mutationFn: (id: number) => evalCampagneApi.lancer(id),
+    onSuccess: (_, id) => {
+      qc.invalidateQueries({ queryKey: ['eval-campagnes'] });
+      qc.invalidateQueries({ queryKey: ['eval-fiches-campagne', id] });
+    },
+  });
+
+  const deleteMut = useMutation({
+    mutationFn: (id: number) => evalCampagneApi.destroy(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['eval-campagnes'] });
+      qc.invalidateQueries({ queryKey: ['eval-fiches'] });
+      setDeleteTarget(null);
+      setSelected(null);
+    },
+  });
+
+  if (isLoading) return <LinearProgress />;
+
+  // Vue détail d'une campagne
+  if (selected) {
+    return (
+      <CampagneDetail
+        campagne={selected}
+        onBack={() => setSelected(null)}
+        onDelete={() => setDeleteTarget(selected)}
+        onEdit={() => {
+          setEditTarget(selected);
+          setForm({ exercice: selected.exercice, titre: selected.titre ?? '', periode_debut: selected.periode_debut ?? '', periode_fin: selected.periode_fin ?? '' });
+        }}
+        onLancer={() => lancerMut.mutate(selected.id)}
+        lancerLoading={lancerMut.isPending}
+        deleteConfirm={
+          <ConfirmDeleteDialog
+            open={!!deleteTarget}
+            title="Supprimer la campagne"
+            description={`La campagne "${deleteTarget?.titre}" et toutes ses fiches (${deleteTarget?.stats?.total ?? 0}) seront supprimées définitivement.`}
+            loading={deleteMut.isPending}
+            onConfirm={() => deleteTarget && deleteMut.mutate(deleteTarget.id)}
+            onClose={() => setDeleteTarget(null)}
+          />
+        }
+      />
+    );
+  }
+
+  return (
+    <Box>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+        <Typography fontWeight={700} fontSize={16}>Campagnes d'évaluation</Typography>
+        <Button variant="contained" startIcon={<Add />} onClick={() => setOpenCreate(true)}
+          sx={{ bgcolor: '#002f59', borderRadius: 2, textTransform: 'none', fontWeight: 700 }}>
+          Nouvelle campagne
+        </Button>
+      </Box>
+
+      {!campagnes?.length && !isLoading && (
+        <Alert severity="info" sx={{ borderRadius: 2 }}>Aucune campagne. Créez la première.</Alert>
+      )}
+
+      <Grid container spacing={2}>
+        {campagnes?.map(c => (
+          <Grid item xs={12} key={c.id}>
+            <Paper elevation={0} sx={{
+              border: '1px solid #E2E8F0', borderRadius: 2, p: 2,
+              '&:hover': { borderColor: '#002f59', boxShadow: '0 2px 12px rgba(0,47,89,0.08)' },
+              transition: 'all .15s', cursor: 'pointer',
+            }}
+              onClick={() => setSelected(c)}
+            >
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                {/* Année en gros */}
+                <Box sx={{
+                  minWidth: 64, height: 64, borderRadius: 2,
+                  bgcolor: c.statut === 'active' ? '#002f59' : '#F1F5F9',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                }}>
+                  <Typography sx={{ fontSize: 20, fontWeight: 900, color: c.statut === 'active' ? '#fff' : '#64748B' }}>
+                    {c.exercice}
+                  </Typography>
+                </Box>
+
+                <Box sx={{ flex: 1, minWidth: 0 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
+                    <Typography fontWeight={800} fontSize={15} noWrap>{c.titre}</Typography>
+                    <Chip label={STATUT_CAMPAGNE_LABELS[c.statut]} color={STATUT_CAMPAGNE_COLORS[c.statut]} size="small" />
+                  </Box>
+                  <Typography fontSize={12} color="text.secondary" mt={0.5}>
+                    Période : {fmtDate(c.periode_debut)} → {fmtDate(c.periode_fin)}
+                    {c.date_limite_entretiens && ` · Limite entretiens : ${fmtDate(c.date_limite_entretiens)}`}
+                  </Typography>
+                </Box>
+
+                {/* Mini stats */}
+                {c.stats && (
+                  <Stack direction="row" spacing={2} sx={{ display: { xs: 'none', sm: 'flex' } }}>
+                    {[
+                      { label: 'Total', value: c.stats.total,     color: '#6366F1' },
+                      { label: 'En cours', value: c.stats.en_cours + c.stats.planifiees + c.stats.a_planifier, color: '#F59E0B' },
+                      { label: 'Finalisées', value: c.stats.notifiees + c.stats.archivees, color: '#10B981' },
+                    ].map(s => (
+                      <Box key={s.label} sx={{ textAlign: 'center', minWidth: 52 }}>
+                        <Typography fontWeight={800} fontSize={18} sx={{ color: s.color }}>{s.value}</Typography>
+                        <Typography fontSize={10} color="text.secondary">{s.label}</Typography>
+                      </Box>
+                    ))}
+                  </Stack>
+                )}
+
+                <Stack direction="row" spacing={0.5} onClick={e => e.stopPropagation()}>
+                  {c.statut === 'preparation' && (
+                    <Button size="small" variant="contained"
+                      disabled={lancerMut.isPending}
+                      onClick={e => { e.stopPropagation(); lancerMut.mutate(c.id); }}
+                      sx={{ bgcolor: '#002f59', borderRadius: 1.5, textTransform: 'none', fontSize: 12 }}>
+                      {lancerMut.isPending ? <CircularProgress size={14} sx={{ color: '#fff' }} /> : 'Lancer'}
+                    </Button>
+                  )}
+                  <Tooltip title="Modifier">
+                    <IconButton size="small" onClick={e => {
+                      e.stopPropagation();
+                      setEditTarget(c);
+                      setForm({ exercice: c.exercice, titre: c.titre ?? '', periode_debut: c.periode_debut ?? '', periode_fin: c.periode_fin ?? '' });
+                    }}>
+                      <Edit fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
+                  <Tooltip title="Supprimer">
+                    <IconButton size="small" onClick={e => { e.stopPropagation(); setDeleteTarget(c); }}
+                      sx={{ color: '#DC2626', '&:hover': { bgcolor: '#FEE2E2' } }}>
+                      <Delete fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
+                </Stack>
+              </Box>
+
+              {/* Barre avancement */}
+              {c.stats && c.stats.total > 0 && (
+                <Box sx={{ mt: 1.5, display: 'flex', gap: 0.5, height: 6, borderRadius: 3, overflow: 'hidden' }}>
+                  {[
+                    { val: c.stats.a_planifier, color: '#CBD5E1' },
+                    { val: c.stats.planifiees,  color: '#93C5FD' },
+                    { val: c.stats.en_cours,    color: '#FCD34D' },
+                    { val: c.stats.signees,     color: '#C4B5FD' },
+                    { val: c.stats.transmises,  color: '#6EE7B7' },
+                    { val: c.stats.notifiees + c.stats.archivees, color: '#10B981' },
+                  ].filter(s => s.val > 0).map((s, i) => (
+                    <Box key={i} sx={{ flex: s.val, bgcolor: s.color }} />
+                  ))}
+                </Box>
+              )}
+            </Paper>
+          </Grid>
+        ))}
+      </Grid>
+
+      {/* Dialog suppression campagne */}
+      <ConfirmDeleteDialog
+        open={!!deleteTarget}
+        title="Supprimer la campagne"
+        description={`La campagne "${deleteTarget?.titre}" et toutes ses fiches (${deleteTarget?.stats?.total ?? 0}) seront supprimées définitivement.`}
+        loading={deleteMut.isPending}
+        onConfirm={() => deleteTarget && deleteMut.mutate(deleteTarget.id)}
+        onClose={() => setDeleteTarget(null)}
+      />
+
+      {/* Dialog création campagne */}
+      <Dialog open={openCreate} onClose={() => setOpenCreate(false)} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ fontWeight: 800 }}>Nouvelle campagne d'évaluation</DialogTitle>
+        <DialogContent dividers>
+          <Grid container spacing={2} pt={1}>
+            <Grid item xs={12} sm={4}>
+              <TextField fullWidth label="Exercice *" type="number" size="small"
+                value={form.exercice} onChange={e => setForm(f => ({ ...f, exercice: +e.target.value }))} />
+            </Grid>
+            <Grid item xs={12} sm={8}>
+              <TextField fullWidth label="Titre" size="small"
+                value={form.titre} onChange={e => setForm(f => ({ ...f, titre: e.target.value }))}
+                placeholder={`Campagne d'évaluation ${form.exercice}`} />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField fullWidth label="Début période" type="date" size="small" InputLabelProps={{ shrink: true }}
+                value={form.periode_debut} onChange={e => setForm(f => ({ ...f, periode_debut: e.target.value }))} />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField fullWidth label="Fin période" type="date" size="small" InputLabelProps={{ shrink: true }}
+                value={form.periode_fin} onChange={e => setForm(f => ({ ...f, periode_fin: e.target.value }))} />
+            </Grid>
+          </Grid>
+          {createMut.isError && <Alert severity="error" sx={{ mt: 2 }}>Erreur lors de la création.</Alert>}
+        </DialogContent>
+        <DialogActions sx={{ px: 3, py: 2 }}>
+          <Button onClick={() => setOpenCreate(false)} sx={{ textTransform: 'none' }}>Annuler</Button>
+          <Button variant="contained" disabled={createMut.isPending} onClick={() => createMut.mutate(form)}
+            sx={{ bgcolor: '#002f59', textTransform: 'none', fontWeight: 700 }}>
+            {createMut.isPending ? <CircularProgress size={18} sx={{ color: '#fff' }} /> : 'Créer'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Dialog modification campagne */}
+      <Dialog open={!!editTarget} onClose={() => setEditTarget(null)} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ fontWeight: 800 }}>Modifier la campagne</DialogTitle>
+        <DialogContent dividers>
+          <Grid container spacing={2} pt={1}>
+            <Grid item xs={12} sm={4}>
+              <TextField fullWidth label="Exercice *" type="number" size="small"
+                value={form.exercice} onChange={e => setForm(f => ({ ...f, exercice: +e.target.value }))} />
+            </Grid>
+            <Grid item xs={12} sm={8}>
+              <TextField fullWidth label="Titre" size="small"
+                value={form.titre} onChange={e => setForm(f => ({ ...f, titre: e.target.value }))}
+                placeholder={`Campagne d'évaluation ${form.exercice}`} />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField fullWidth label="Début période" type="date" size="small" InputLabelProps={{ shrink: true }}
+                value={form.periode_debut} onChange={e => setForm(f => ({ ...f, periode_debut: e.target.value }))} />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField fullWidth label="Fin période" type="date" size="small" InputLabelProps={{ shrink: true }}
+                value={form.periode_fin} onChange={e => setForm(f => ({ ...f, periode_fin: e.target.value }))} />
+            </Grid>
+          </Grid>
+          {updateMut.isError && <Alert severity="error" sx={{ mt: 2 }}>Erreur lors de la modification.</Alert>}
+        </DialogContent>
+        <DialogActions sx={{ px: 3, py: 2 }}>
+          <Button onClick={() => setEditTarget(null)} sx={{ textTransform: 'none' }}>Annuler</Button>
+          <Button variant="contained" disabled={updateMut.isPending} onClick={() => updateMut.mutate(form)}
+            sx={{ bgcolor: '#002f59', textTransform: 'none', fontWeight: 700 }}>
+            {updateMut.isPending ? <CircularProgress size={18} sx={{ color: '#fff' }} /> : 'Enregistrer'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </Box>
+  );
+}
+
+// ── Vue détail campagne avec liste de fiches ──────────────────────────────────
+
+function CampagneDetail({
+  campagne, onBack, onDelete, onEdit, onLancer, lancerLoading, deleteConfirm,
+}: {
+  campagne: EvalCampagne;
+  onBack: () => void;
+  onDelete: () => void;
+  onEdit: () => void;
+  onLancer: () => void;
+  lancerLoading: boolean;
+  deleteConfirm: React.ReactNode;
+}) {
+  const qc = useQueryClient();
+  const [openAddFiche, setOpenAddFiche] = useState(false);
+  const [selectedFiche, setSelectedFiche] = useState<EvalFiche | null>(null);
+  const [deleteFicheTarget, setDeleteFicheTarget] = useState<EvalFiche | null>(null);
+  const [statutFilter, setStatutFilter] = useState<EvalStatutFiche | ''>('');
+  const [pg, setPg] = useState(0);
+  const [rpp, setRpp] = useState(15);
+
+  const { data: fiches, isLoading } = useQuery({
+    queryKey: ['eval-fiches-campagne', campagne.id, statutFilter],
+    queryFn: () => evalFicheApi.list({ campagne_id: campagne.id, statut: statutFilter || undefined }).then(r => r.data),
+  });
+
+  const deleteFicheMut = useMutation({
+    mutationFn: (id: number) => evalFicheApi.destroy(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['eval-fiches-campagne', campagne.id] });
+      qc.invalidateQueries({ queryKey: ['eval-campagnes'] });
+      setDeleteFicheTarget(null);
+    },
+  });
+
+  const stats = campagne.stats;
+
+  return (
+    <Box>
+      {/* Breadcrumb */}
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+        <Button size="small" startIcon={<Assignment />} onClick={onBack}
+          sx={{ textTransform: 'none', color: '#64748B', '&:hover': { bgcolor: '#F1F5F9' } }}>
+          Campagnes
+        </Button>
+        <Typography color="text.disabled">/</Typography>
+        <Typography fontWeight={700} fontSize={14}>{campagne.titre}</Typography>
+      </Box>
+
+      {/* Header campagne */}
+      <Paper elevation={0} sx={{
+        p: 2.5, mb: 3, borderRadius: 2,
+        background: 'linear-gradient(135deg, #002f59 0%, #004080 100%)',
+      }}>
+        <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2 }}>
+          <Box>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 0.5 }}>
+              <Typography sx={{ color: '#fff', fontWeight: 800, fontSize: 18 }}>
+                {campagne.titre}
+              </Typography>
+              <Chip label={STATUT_CAMPAGNE_LABELS[campagne.statut]} color={STATUT_CAMPAGNE_COLORS[campagne.statut]} size="small" />
+            </Box>
+            <Typography sx={{ color: 'rgba(255,255,255,0.7)', fontSize: 12 }}>
+              Période : {fmtDate(campagne.periode_debut)} → {fmtDate(campagne.periode_fin)}
+            </Typography>
+            {campagne.date_limite_entretiens && (
+              <Typography sx={{ color: '#ff7631', fontSize: 12, mt: 0.5, fontWeight: 600 }}>
+                Limite entretiens : {fmtDate(campagne.date_limite_entretiens)}
+              </Typography>
+            )}
+          </Box>
+          <Stack direction="row" spacing={1}>
+            {campagne.statut === 'preparation' && (
+              <Button size="small" variant="contained" disabled={lancerLoading} onClick={onLancer}
+                sx={{ bgcolor: '#ff7631', textTransform: 'none', fontWeight: 700, borderRadius: 2, '&:hover': { bgcolor: '#e06520' } }}>
+                {lancerLoading ? <CircularProgress size={14} sx={{ color: '#fff' }} /> : 'Lancer la campagne'}
+              </Button>
+            )}
+            <Button size="small" variant="outlined" startIcon={<Edit />} onClick={onEdit}
+              sx={{ color: '#fff', borderColor: 'rgba(255,255,255,0.5)', textTransform: 'none', borderRadius: 2, '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' } }}>
+              Modifier
+            </Button>
+            <Button size="small" variant="outlined" startIcon={<Delete />} onClick={onDelete}
+              sx={{ color: '#FCA5A5', borderColor: '#FCA5A5', textTransform: 'none', borderRadius: 2, '&:hover': { bgcolor: 'rgba(239,68,68,0.1)', borderColor: '#EF4444' } }}>
+              Supprimer
+            </Button>
+          </Stack>
+        </Box>
+
+        {/* Barre avancement */}
+        {stats && stats.total > 0 && (
+          <Box sx={{ mt: 2 }}>
+            <Box sx={{ display: 'flex', gap: 0.5, height: 8, borderRadius: 4, overflow: 'hidden', mb: 1 }}>
+              {[
+                { val: stats.a_planifier, color: '#CBD5E1' },
+                { val: stats.planifiees,  color: '#93C5FD' },
+                { val: stats.en_cours,    color: '#FCD34D' },
+                { val: stats.signees,     color: '#C4B5FD' },
+                { val: stats.transmises,  color: '#6EE7B7' },
+                { val: stats.notifiees + stats.archivees, color: '#10B981' },
+              ].filter(s => s.val > 0).map((s, i) => (
+                <Box key={i} sx={{ flex: s.val, bgcolor: s.color }} />
+              ))}
+            </Box>
+            <Stack direction="row" spacing={2} flexWrap="wrap">
+              {[
+                { label: 'Total', value: stats.total, color: '#fff' },
+                { label: 'À planifier', value: stats.a_planifier, color: '#CBD5E1' },
+                { label: 'En cours', value: stats.en_cours, color: '#FCD34D' },
+                { label: 'Signées', value: stats.signees, color: '#C4B5FD' },
+                { label: 'DAF', value: stats.transmises, color: '#6EE7B7' },
+                { label: 'Finalisées', value: stats.notifiees + stats.archivees, color: '#10B981' },
+              ].map(s => (
+                <Box key={s.label} sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                  <FiberManualRecord sx={{ fontSize: 8, color: s.color }} />
+                  <Typography sx={{ fontSize: 11, color: 'rgba(255,255,255,0.7)' }}>
+                    {s.label} : <strong style={{ color: s.color }}>{s.value}</strong>
+                  </Typography>
+                </Box>
+              ))}
+            </Stack>
+          </Box>
+        )}
+      </Paper>
+
+      {/* Toolbar fiches */}
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2, flexWrap: 'wrap' }}>
+        <Typography fontWeight={700} fontSize={15} sx={{ mr: 'auto' }}>
+          Fiches d'évaluation ({fiches?.length ?? 0})
+        </Typography>
+        <FormControl size="small" sx={{ minWidth: 160 }}>
+          <InputLabel>Statut</InputLabel>
+          <Select value={statutFilter} label="Statut"
+            onChange={e => { setStatutFilter(e.target.value as EvalStatutFiche | ''); setPg(0); }}>
+            <MenuItem value="">Tous</MenuItem>
+            {(Object.keys(STATUT_LABELS) as EvalStatutFiche[]).map(s => (
+              <MenuItem key={s} value={s}>{STATUT_LABELS[s]}</MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+        <Button variant="contained" startIcon={<Add />} onClick={() => setOpenAddFiche(true)}
+          sx={{ bgcolor: '#002f59', borderRadius: 2, textTransform: 'none', fontWeight: 700 }}>
+          Ajouter une fiche
+        </Button>
+      </Box>
+
+      {isLoading && <LinearProgress />}
+
+      {/* Table fiches */}
+      <Paper elevation={0} sx={{ border: '1px solid #E2E8F0', borderRadius: 2, overflow: 'hidden' }}>
+        <TableContainer sx={{ maxHeight: 520 }}>
+          <Table size="small" stickyHeader>
+            <TableHead>
+              <TableRow>
+                {['Agent / Matricule', 'Fonction', 'Direction', 'Évaluateur', 'Entretien', 'Moy.', 'Appréciation', 'Statut', ''].map(h => (
+                  <TableCell key={h} sx={{ fontWeight: 700, fontSize: 12, color: '#64748B', whiteSpace: 'nowrap', bgcolor: '#F8FAFC', borderBottom: '2px solid #E2E8F0' }}>{h}</TableCell>
+                ))}
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {!fiches?.length && !isLoading && (
+                <TableRow>
+                  <TableCell colSpan={9} align="center" sx={{ py: 6, color: '#94A3B8' }}>
+                    {campagne.statut === 'preparation'
+                      ? 'Lancez la campagne pour générer les fiches automatiquement, ou ajoutez-en une manuellement.'
+                      : 'Aucune fiche correspondant au filtre.'}
+                  </TableCell>
+                </TableRow>
+              )}
+              {fiches?.slice(pg * rpp, pg * rpp + rpp).map(f => (
+                <TableRow key={f.id} hover sx={{ '&:last-child td': { borderBottom: 0 } }}>
+                  <TableCell>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Avatar sx={{ width: 30, height: 30, fontSize: 11, bgcolor: '#002f59', color: '#fff' }}>
+                        {`${f.employee?.first_name?.[0] ?? ''}${f.employee?.last_name?.[0] ?? ''}`}
+                      </Avatar>
+                      <Box>
+                        <Typography fontSize={13} fontWeight={700} lineHeight={1.2}>
+                          {f.employee?.first_name} {f.employee?.last_name}
+                        </Typography>
+                        <Typography fontSize={11} color="text.secondary">{f.snapshot_matricule}</Typography>
+                      </Box>
+                    </Box>
+                  </TableCell>
+                  <TableCell sx={{ maxWidth: 140 }}>
+                    <Typography fontSize={12} noWrap title={f.snapshot_fonction ?? ''}>{f.snapshot_fonction ?? '—'}</Typography>
+                  </TableCell>
+                  <TableCell sx={{ maxWidth: 140 }}>
+                    <Typography fontSize={12} noWrap title={f.snapshot_direction ?? ''}>{f.snapshot_direction ?? '—'}</Typography>
+                  </TableCell>
+                  <TableCell sx={{ fontSize: 12, whiteSpace: 'nowrap' }}>{f.evaluateur?.name ?? '—'}</TableCell>
+                  <TableCell sx={{ fontSize: 12, whiteSpace: 'nowrap' }}>{fmtDate(f.date_entretien)}</TableCell>
+                  <TableCell>
+                    {f.moyenne !== null
+                      ? <Typography fontSize={13} fontWeight={800} sx={{ color: (f.moyenne ?? 0) >= 3.5 ? '#10B981' : (f.moyenne ?? 0) >= 2.5 ? '#3B82F6' : '#EF4444' }}>
+                          {f.moyenne}/5
+                        </Typography>
+                      : <Typography fontSize={12} color="text.disabled">—</Typography>}
+                  </TableCell>
+                  <TableCell><ApprecChip appreciation={f.appreciation} /></TableCell>
+                  <TableCell><StatutChip statut={f.statut} /></TableCell>
+                  <TableCell sx={{ whiteSpace: 'nowrap' }}>
+                    <Stack direction="row" spacing={0.5}>
+                      <Tooltip title="Ouvrir la fiche">
+                        <IconButton size="small" onClick={() => setSelectedFiche(f)}>
+                          <Visibility fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title="Supprimer">
+                        <IconButton size="small" onClick={() => setDeleteFicheTarget(f)}
+                          sx={{ color: '#DC2626', '&:hover': { bgcolor: '#FEE2E2' } }}>
+                          <Delete fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    </Stack>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TableContainer>
+        {(fiches?.length ?? 0) > 0 && (
+          <TablePagination
+            component="div"
+            count={fiches?.length ?? 0}
+            page={pg}
+            onPageChange={(_, p) => setPg(p)}
+            rowsPerPage={rpp}
+            onRowsPerPageChange={e => { setRpp(+e.target.value); setPg(0); }}
+            rowsPerPageOptions={[10, 15, 25, 50]}
+            labelRowsPerPage="Lignes :"
+            labelDisplayedRows={({ from, to, count }) => `${from}–${to} sur ${count}`}
+            sx={{ borderTop: '1px solid #E2E8F0', fontSize: 12 }}
+          />
+        )}
+      </Paper>
+
+      {/* Dialog fiche détail */}
+      {selectedFiche && (
+        <FicheDetailDialog fiche={selectedFiche} onClose={() => setSelectedFiche(null)} />
+      )}
+
+      {/* Dialog ajouter fiche */}
+      {openAddFiche && (
+        <AddFicheDialog
+          campagneId={campagne.id}
+          onClose={() => setOpenAddFiche(false)}
+          onSuccess={() => {
+            qc.invalidateQueries({ queryKey: ['eval-fiches-campagne', campagne.id] });
+            qc.invalidateQueries({ queryKey: ['eval-campagnes'] });
+            setOpenAddFiche(false);
+          }}
+        />
+      )}
+
+      {/* Dialog supprimer fiche */}
+      <ConfirmDeleteDialog
+        open={!!deleteFicheTarget}
+        title="Supprimer la fiche"
+        description={`La fiche de ${deleteFicheTarget?.employee?.first_name ?? ''} ${deleteFicheTarget?.employee?.last_name ?? ''} (${deleteFicheTarget?.snapshot_matricule ?? ''}) sera supprimée avec toutes ses données.`}
+        loading={deleteFicheMut.isPending}
+        onConfirm={() => deleteFicheTarget && deleteFicheMut.mutate(deleteFicheTarget.id)}
+        onClose={() => setDeleteFicheTarget(null)}
+      />
+
+      {deleteConfirm}
+    </Box>
+  );
+}
+
+// ── Dialog ajout d'une fiche individuelle ────────────────────────────────────
+
+function AddFicheDialog({ campagneId, onClose, onSuccess }: {
+  campagneId: number;
+  onClose: () => void;
+  onSuccess: () => void;
+}) {
+  const [employeeSearch, setEmployeeSearch] = useState('');
+  const [selectedEmp, setSelectedEmp] = useState<Employee | null>(null);
+  const [statutAgent, setStatutAgent] = useState<'contractuel' | 'fonctionnaire' | 'decisionnaire'>('contractuel');
+  const [errMsg, setErrMsg] = useState('');
+
+  const { data: empPage } = useQuery({
+    queryKey: ['employees-search', employeeSearch],
+    queryFn: () => employeesApi.list({ search: employeeSearch, per_page: 20, status: 'active' }).then(r => r.data),
+    enabled: employeeSearch.length >= 2 || !employeeSearch,
+  });
+
+  const createMut = useMutation({
+    mutationFn: () => evalFicheApi.create({
+      campagne_id: campagneId,
+      employee_id: selectedEmp!.id,
+      statut_agent: statutAgent,
+    }),
+    onSuccess,
+    onError: (e: unknown) => {
+      setErrMsg((e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Erreur');
+    },
+  });
+
+  return (
+    <Dialog open onClose={onClose} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: 3 } }}>
+      <DialogTitle sx={{ fontWeight: 800, display: 'flex', alignItems: 'center', gap: 1 }}>
+        <Add sx={{ color: '#002f59' }} /> Ajouter une fiche d'évaluation
+      </DialogTitle>
+      <DialogContent dividers>
+        <Grid container spacing={2} pt={1}>
+          {/* Recherche agent */}
+          <Grid item xs={12}>
+            <TextField
+              fullWidth label="Rechercher un agent *" size="small"
+              value={employeeSearch}
+              onChange={e => { setEmployeeSearch(e.target.value); setSelectedEmp(null); }}
+              placeholder="Nom, prénom ou matricule…"
+              helperText={selectedEmp ? `✓ ${selectedEmp.first_name} ${selectedEmp.last_name} — ${selectedEmp.employee_number}` : 'Saisissez au moins 2 caractères'}
+              FormHelperTextProps={{ sx: { color: selectedEmp ? '#10B981' : undefined, fontWeight: selectedEmp ? 700 : 400 } }}
+            />
+          </Grid>
+
+          {/* Liste résultats */}
+          {empPage?.data && !selectedEmp && employeeSearch.length >= 2 && (
+            <Grid item xs={12}>
+              <Paper elevation={0} sx={{ border: '1px solid #E2E8F0', borderRadius: 2, maxHeight: 220, overflow: 'auto' }}>
+                {empPage.data.length === 0 && (
+                  <Typography sx={{ p: 2, color: '#94A3B8', fontSize: 13 }}>Aucun agent trouvé.</Typography>
+                )}
+                {empPage.data.map(emp => (
+                  <Box key={emp.id}
+                    onClick={() => { setSelectedEmp(emp); setEmployeeSearch(`${emp.first_name} ${emp.last_name}`); }}
+                    sx={{
+                      px: 2, py: 1.2, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 1.5,
+                      '&:hover': { bgcolor: '#F0F9FF' }, borderBottom: '1px solid #F1F5F9',
+                    }}
+                  >
+                    <Avatar sx={{ width: 32, height: 32, fontSize: 12, bgcolor: '#002f59', color: '#fff' }}>
+                      {`${emp.first_name?.[0] ?? ''}${emp.last_name?.[0] ?? ''}`}
+                    </Avatar>
+                    <Box>
+                      <Typography fontSize={13} fontWeight={600}>{emp.first_name} {emp.last_name}</Typography>
+                      <Typography fontSize={11} color="text.secondary">{emp.employee_number} · {emp.fonction ?? '—'}</Typography>
+                    </Box>
+                  </Box>
+                ))}
+              </Paper>
+            </Grid>
+          )}
+
+          {/* Statut agent */}
+          <Grid item xs={12}>
+            <FormControl fullWidth size="small">
+              <InputLabel>Statut de l'agent *</InputLabel>
+              <Select value={statutAgent} label="Statut de l'agent *"
+                onChange={e => setStatutAgent(e.target.value as typeof statutAgent)}>
+                <MenuItem value="contractuel">Contractuel</MenuItem>
+                <MenuItem value="fonctionnaire">Fonctionnaire (mis à disposition État)</MenuItem>
+                <MenuItem value="decisionnaire">Décisionnaire</MenuItem>
+              </Select>
+            </FormControl>
+            <Typography fontSize={11} color="text.secondary" mt={0.5}>
+              Détermine la grille de critères applicable (7, 12 ou 18 critères).
+            </Typography>
+          </Grid>
+
+          {errMsg && (
+            <Grid item xs={12}>
+              <Alert severity="error" sx={{ borderRadius: 2 }}>{errMsg}</Alert>
+            </Grid>
+          )}
+        </Grid>
+      </DialogContent>
+      <DialogActions sx={{ px: 3, py: 2 }}>
+        <Button onClick={onClose} sx={{ textTransform: 'none' }}>Annuler</Button>
+        <Button variant="contained" disabled={!selectedEmp || createMut.isPending} onClick={() => createMut.mutate()}
+          sx={{ bgcolor: '#002f59', textTransform: 'none', fontWeight: 700, borderRadius: 2 }}>
+          {createMut.isPending ? <CircularProgress size={18} sx={{ color: '#fff' }} /> : 'Ajouter la fiche'}
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
+// ── Onglet 3 — Fiches ─────────────────────────────────────────────────────────
+
+function FichesTab() {
+  const [campagneFilter, setCampagneFilter] = useState<number | ''>('');
+  const [statutFilter, setStatutFilter] = useState<EvalStatutFiche | ''>('');
+  const [selectedFiche, setSelectedFiche] = useState<EvalFiche | null>(null);
+  const [pg, setPg] = useState(0);
+  const [rpp, setRpp] = useState(15);
+
+  const { data: campagnes } = useQuery({
+    queryKey: ['eval-campagnes'],
+    queryFn: () => evalCampagneApi.list().then(r => r.data),
+  });
+
+  const { data: fiches, isLoading } = useQuery({
+    queryKey: ['eval-fiches', campagneFilter, statutFilter],
+    queryFn: () => evalFicheApi.list({
+      campagne_id: campagneFilter || undefined,
+      statut: statutFilter || undefined,
+    }).then(r => r.data),
   });
 
   return (
     <Box>
-      <Typography variant="h5" fontWeight={700} mb={0.5}>
-        Évaluation
-      </Typography>
-      <Typography variant="body2" color="text.secondary" mb={3}>
-        Grille ANASER-RH-GE-2025-002 · Suivi des dossiers d'évaluation et gestion du workflow de confirmation
-      </Typography>
+      <Stack direction="row" spacing={2} mb={2} flexWrap="wrap">
+        <FormControl size="small" sx={{ minWidth: 180 }}>
+          <InputLabel>Campagne</InputLabel>
+          <Select value={campagneFilter} label="Campagne" onChange={e => { setCampagneFilter(e.target.value as number | ''); setPg(0); }}>
+            <MenuItem value="">Toutes</MenuItem>
+            {campagnes?.map(c => <MenuItem key={c.id} value={c.id}>{c.exercice} — {c.titre}</MenuItem>)}
+          </Select>
+        </FormControl>
+        <FormControl size="small" sx={{ minWidth: 180 }}>
+          <InputLabel>Statut</InputLabel>
+          <Select value={statutFilter} label="Statut" onChange={e => { setStatutFilter(e.target.value as EvalStatutFiche | ''); setPg(0); }}>
+            <MenuItem value="">Tous</MenuItem>
+            {(Object.keys(STATUT_LABELS) as EvalStatutFiche[]).map(s => (
+              <MenuItem key={s} value={s}>{STATUT_LABELS[s]}</MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+      </Stack>
 
-      <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 3, borderBottom: 1, borderColor: 'divider' }}>
-        <Tab label="Tableau de bord" />
-        <Tab label="Évaluations" />
-        <Tab label="Barème & Guide" />
+      {isLoading && <LinearProgress />}
+
+      <Paper elevation={0} sx={{ border: '1px solid #E2E8F0', borderRadius: 2, overflow: 'hidden' }}>
+        <TableContainer sx={{ maxHeight: 520 }}>
+          <Table size="small" stickyHeader>
+            <TableHead>
+              <TableRow>
+                {['Agent', 'Matricule', 'Direction', 'Fonction', 'Évaluateur', 'Entretien', 'Moyenne', 'Appréciation', 'Statut', ''].map(h => (
+                  <TableCell key={h} sx={{ fontWeight: 700, fontSize: 12, color: '#64748B', whiteSpace: 'nowrap', bgcolor: '#F8FAFC', borderBottom: '2px solid #E2E8F0' }}>{h}</TableCell>
+                ))}
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {!fiches?.length && !isLoading && (
+                <TableRow>
+                  <TableCell colSpan={10} align="center" sx={{ py: 6, color: '#94A3B8' }}>
+                    {campagneFilter ? 'Aucune fiche correspondant au filtre.' : 'Sélectionnez une campagne pour filtrer les fiches.'}
+                  </TableCell>
+                </TableRow>
+              )}
+              {fiches?.slice(pg * rpp, pg * rpp + rpp).map(f => (
+                <TableRow key={f.id} hover sx={{ '&:last-child td': { borderBottom: 0 } }}>
+                  <TableCell>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Avatar sx={{ width: 30, height: 30, fontSize: 12, bgcolor: '#002f59', color: '#fff' }}>
+                        {`${f.employee?.first_name?.[0] ?? ''}${f.employee?.last_name?.[0] ?? ''}`}
+                      </Avatar>
+                      <Box>
+                        <Typography fontSize={13} fontWeight={700} lineHeight={1.2}>
+                          {f.employee?.first_name} {f.employee?.last_name}
+                        </Typography>
+                        <Typography fontSize={11} color="text.secondary">{f.campagne?.exercice}</Typography>
+                      </Box>
+                    </Box>
+                  </TableCell>
+                  <TableCell sx={{ fontSize: 12 }}>{f.snapshot_matricule}</TableCell>
+                  <TableCell sx={{ maxWidth: 130 }}>
+                    <Typography fontSize={12} noWrap>{f.employee?.department?.name ?? f.snapshot_direction ?? '—'}</Typography>
+                  </TableCell>
+                  <TableCell sx={{ maxWidth: 130 }}>
+                    <Typography fontSize={12} noWrap>{f.snapshot_fonction ?? '—'}</Typography>
+                  </TableCell>
+                  <TableCell sx={{ fontSize: 12, whiteSpace: 'nowrap' }}>{f.evaluateur?.name ?? '—'}</TableCell>
+                  <TableCell sx={{ fontSize: 12, whiteSpace: 'nowrap' }}>{fmtDate(f.date_entretien)}</TableCell>
+                  <TableCell sx={{ minWidth: 100 }}><MoyenneBar moyenne={f.moyenne} /></TableCell>
+                  <TableCell><ApprecChip appreciation={f.appreciation} /></TableCell>
+                  <TableCell><StatutChip statut={f.statut} /></TableCell>
+                  <TableCell>
+                    <Tooltip title="Ouvrir la fiche">
+                      <IconButton size="small" onClick={() => setSelectedFiche(f)}>
+                        <Visibility fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TableContainer>
+        {(fiches?.length ?? 0) > 0 && (
+          <TablePagination
+            component="div"
+            count={fiches?.length ?? 0}
+            page={pg}
+            onPageChange={(_, p) => setPg(p)}
+            rowsPerPage={rpp}
+            onRowsPerPageChange={e => { setRpp(+e.target.value); setPg(0); }}
+            rowsPerPageOptions={[10, 15, 25, 50]}
+            labelRowsPerPage="Lignes :"
+            labelDisplayedRows={({ from, to, count }) => `${from}–${to} sur ${count}`}
+            sx={{ borderTop: '1px solid #E2E8F0', fontSize: 12 }}
+          />
+        )}
+      </Paper>
+
+      {selectedFiche && (
+        <FicheDetailDialog fiche={selectedFiche} onClose={() => setSelectedFiche(null)} />
+      )}
+    </Box>
+  );
+}
+
+// ── Dialog Fiche Détail (4 pages) ─────────────────────────────────────────────
+
+function FicheDetailDialog({ fiche: ficheInit, onClose }: { fiche: EvalFiche; onClose: () => void }) {
+  const qc = useQueryClient();
+  const [page, setPage] = useState(0);
+  const [saving, setSaving] = useState(false);
+  const [errMsg, setErrMsg] = useState('');
+
+  const { data: detail, isLoading } = useQuery({
+    queryKey: ['eval-fiche', ficheInit.id],
+    queryFn: () => evalFicheApi.show(ficheInit.id).then(r => r.data),
+  });
+
+  const fiche   = detail?.fiche ?? ficheInit;
+  const criteres = detail?.criteres ?? [];
+
+  // États locaux notation page 2
+  const [notations, setNotations] = useState<Record<number, { note: number; observation: string }>>({});
+  const [bilan, setBilan] = useState({ realisations: '', difficultes: '', competences_demontrees: '' });
+  const [observations_evaluateur, setObsEval] = useState('');
+  const [entretien_tenu, setEntretienTenu] = useState(false);
+
+  // Besoins formation page 3
+  const [besoins, setBesoins] = useState<EvalBesoinFormation[]>([]);
+  // Objectifs page 4
+  const [objectifs, setObjectifs] = useState<EvalObjectif[]>([]);
+  // Décision RH page 4
+  const [decision, setDecision] = useState<Partial<EvalDecisionRh>>({
+    formation: false, coaching: false, mobilite: false,
+    felicitations: false, suivi_particulier: false, gratification: false,
+  });
+  const [avis_dg, setAvisDG] = useState('');
+
+  // Sync depuis API quand le détail arrive
+  useState(() => {
+    if (!detail) return;
+    const f = detail.fiche;
+    setBilan({
+      realisations: f.realisations ?? '',
+      difficultes: f.difficultes ?? '',
+      competences_demontrees: f.competences_demontrees ?? '',
+    });
+    setObsEval(f.observations_evaluateur ?? '');
+    setEntretienTenu(f.entretien_tenu ?? false);
+    setAvisDG(f.avis_dg ?? '');
+    if (f.besoins_formation) setBesoins(f.besoins_formation);
+    if (f.objectifs) setObjectifs(f.objectifs);
+    if (f.decision_rh) setDecision(f.decision_rh);
+    const map: typeof notations = {};
+    f.notations?.forEach(n => {
+      map[n.critere_id] = { note: n.note ?? 0, observation: n.observation ?? '' };
+    });
+    setNotations(map);
+  });
+
+  const invalidate = () => {
+    qc.invalidateQueries({ queryKey: ['eval-fiche', ficheInit.id] });
+    qc.invalidateQueries({ queryKey: ['eval-fiches'] });
+  };
+
+  const action = async (fn: () => Promise<unknown>) => {
+    setSaving(true); setErrMsg('');
+    try { await fn(); invalidate(); }
+    catch (e: unknown) { setErrMsg((e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Erreur'); }
+    finally { setSaving(false); }
+  };
+
+  const handleNoter = () => action(async () => {
+    const payload = Object.entries(notations).map(([cid, v]) => ({
+      critere_id: +cid, note: v.note, observation: v.observation,
+    }));
+    await evalFicheApi.noter(fiche.id, {
+      notations: payload,
+      ...bilan, observations_evaluateur, entretien_tenu,
+    });
+    await evalFicheApi.sauvegarderBesoins(fiche.id, besoins);
+    await evalFicheApi.sauvegarderObjectifs(fiche.id, objectifs);
+  });
+
+  const handleSignerEval = () => action(() => evalFicheApi.signerEvaluateur(fiche.id, observations_evaluateur));
+  const handleSignerAgent = () => action(() => evalFicheApi.signerAgent(fiche.id, { observations_agent: fiche.observations_agent ?? '' }));
+  const handleTransmettre = () => action(() => evalFicheApi.transmettreDAF(fiche.id));
+  const handleAnnoterDG   = () => action(() => evalFicheApi.annoterDG(fiche.id, { avis_dg, decision }));
+  const handleNotifier    = () => action(() => evalFicheApi.notifier(fiche.id));
+  const handleArchiver    = () => action(() => evalFicheApi.archiver(fiche.id));
+
+  // Calcul moyenne temps réel
+  const notesRemplies = Object.values(notations).filter(n => n.note > 0);
+  const moyenneTemp   = notesRemplies.length > 0
+    ? Math.round(notesRemplies.reduce((s, n) => s + n.note, 0) / notesRemplies.length * 100) / 100
+    : null;
+
+  const stepIndex = WORKFLOW_STEPS.indexOf(fiche.statut);
+
+  return (
+    <Dialog open onClose={onClose} maxWidth="lg" fullWidth PaperProps={{ sx: { borderRadius: 3, maxHeight: '95vh' } }}>
+      {/* Header */}
+      <Box sx={{ background: 'linear-gradient(135deg, #002f59 0%, #004080 100%)', px: 3, py: 2.5 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1.5 }}>
+          <Avatar sx={{ width: 52, height: 52, bgcolor: 'rgba(255,255,255,0.15)', border: '2px solid rgba(255,255,255,0.4)', fontSize: 18, fontWeight: 800, color: '#fff' }}>
+            {`${fiche.employee?.first_name?.[0] ?? ''}${fiche.employee?.last_name?.[0] ?? ''}`}
+          </Avatar>
+          <Box>
+            <Typography sx={{ color: '#fff', fontWeight: 800, fontSize: 17, lineHeight: 1.2 }}>
+              {fiche.employee?.first_name} {fiche.employee?.last_name}
+            </Typography>
+            <Typography sx={{ color: 'rgba(255,255,255,0.7)', fontSize: 12 }}>
+              {fiche.snapshot_fonction} — {fiche.snapshot_direction}
+            </Typography>
+          </Box>
+          <Box sx={{ ml: 'auto', textAlign: 'right' }}>
+            <StatutChip statut={fiche.statut} />
+            {fiche.moyenne !== null && (
+              <Typography sx={{ color: '#ff7631', fontWeight: 800, fontSize: 18, mt: 0.5 }}>
+                {fiche.moyenne}/5
+              </Typography>
+            )}
+          </Box>
+        </Box>
+        {/* Stepper workflow */}
+        <Stepper activeStep={stepIndex} connector={<StepConnector sx={{ '& .MuiStepConnector-line': { borderColor: 'rgba(255,255,255,0.3)' } }} />}>
+          {WORKFLOW_STEPS.map((s, i) => (
+            <Step key={s} completed={i < stepIndex}>
+              <StepLabel
+                sx={{
+                  '& .MuiStepLabel-label': { color: i <= stepIndex ? '#fff' : 'rgba(255,255,255,0.4)', fontSize: 10 },
+                  '& .MuiStepIcon-root': { color: i < stepIndex ? '#10B981' : i === stepIndex ? '#ff7631' : 'rgba(255,255,255,0.2)' },
+                }}
+              >
+                {STATUT_LABELS[s].split(' ')[0]}
+              </StepLabel>
+            </Step>
+          ))}
+        </Stepper>
+      </Box>
+
+      {/* Onglets pages */}
+      <Tabs value={page} onChange={(_, v) => setPage(v)} sx={{ borderBottom: '1px solid #E2E8F0', px: 2 }}>
+        <Tab label="Page 1 — Identification" sx={{ textTransform: 'none', fontWeight: 600, fontSize: 13 }} />
+        <Tab label="Page 2 — Notation" sx={{ textTransform: 'none', fontWeight: 600, fontSize: 13 }} />
+        <Tab label="Page 3 — Bilan" sx={{ textTransform: 'none', fontWeight: 600, fontSize: 13 }} />
+        <Tab label="Page 4 — Développement & Décisions" sx={{ textTransform: 'none', fontWeight: 600, fontSize: 13 }} />
       </Tabs>
 
-      {tab === 0 && <DashboardTab />}
-      {tab === 1 && <EvaluationsTab criteres={criteres} openId={openId} />}
-      {tab === 2 && <BaremeGuideTab />}
+      <DialogContent sx={{ p: 0, overflow: 'auto' }}>
+        {isLoading && <LinearProgress />}
+        {errMsg && <Alert severity="error" sx={{ m: 2 }}>{errMsg}</Alert>}
+
+        {/* ── Page 1 : Identification ── */}
+        {page === 0 && (
+          <Box sx={{ p: 3 }}>
+            <Typography fontWeight={800} mb={2} color="#002f59">Identification de l'agent</Typography>
+            <Grid container spacing={2}>
+              {[
+                ['Matricule',         fiche.snapshot_matricule],
+                ['Nom complet',       `${fiche.employee?.first_name ?? ''} ${fiche.employee?.last_name ?? ''}`],
+                ['Fonction',          fiche.snapshot_fonction],
+                ['Direction',         fiche.snapshot_direction],
+                ['Service / Poste',   fiche.snapshot_service],
+                ['Supérieur',         fiche.snapshot_superieur],
+                ['Statut agent',      fiche.statut_agent === 'fonctionnaire' ? 'Fonctionnaire (mis à disposition)' : fiche.statut_agent === 'decisionnaire' ? 'Décisionnaire' : 'Contractuel'],
+                ['Ancienneté',        fiche.snapshot_anciennete_mois !== null ? `${fiche.snapshot_anciennete_mois} mois` : '—'],
+                ['Évaluateur',        fiche.evaluateur?.name ?? '—'],
+                ['Date entretien',    fmtDate(fiche.date_entretien)],
+                ['Lieu entretien',    fiche.lieu_entretien ?? '—'],
+                ['Campagne',          fiche.campagne ? `${fiche.campagne.exercice} — ${fiche.campagne.titre}` : '—'],
+              ].map(([label, val]) => (
+                <Grid item xs={12} sm={6} key={label}>
+                  <Paper elevation={0} sx={{ p: 1.5, bgcolor: '#F8FAFC', borderRadius: 1.5, border: '1px solid #E2E8F0' }}>
+                    <Typography variant="caption" color="text.secondary" display="block">{label}</Typography>
+                    <Typography fontWeight={600} fontSize={14}>{val || '—'}</Typography>
+                  </Paper>
+                </Grid>
+              ))}
+            </Grid>
+          </Box>
+        )}
+
+        {/* ── Page 2 : Notation ── */}
+        {page === 1 && (
+          <Box sx={{ p: 3 }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+              <Typography fontWeight={800} color="#002f59">Grille de notation — /5</Typography>
+              {moyenneTemp !== null && (
+                <Paper elevation={0} sx={{ px: 2, py: 0.75, bgcolor: '#002f59', borderRadius: 2 }}>
+                  <Typography sx={{ color: '#fff', fontWeight: 800, fontSize: 15 }}>
+                    Moy. : {moyenneTemp}/5
+                    {moyenneTemp >= 4.5 ? ' — Excellent' : moyenneTemp >= 3.5 ? ' — Très satisfaisant' : moyenneTemp >= 2.5 ? ' — Satisfaisant' : moyenneTemp >= 1.5 ? ' — À améliorer' : ' — Insuffisant'}
+                  </Typography>
+                </Paper>
+              )}
+            </Box>
+
+            <Alert severity="info" sx={{ mb: 2, borderRadius: 2, fontSize: 12 }}>
+              <strong>{fiche.statut_agent === 'fonctionnaire' ? '18 critères' : '12 critères'}</strong> applicables pour un agent{' '}
+              <strong>{fiche.statut_agent === 'fonctionnaire' ? 'fonctionnaire' : 'contractuel/décisionnaire'}</strong>.
+            </Alert>
+
+            {['base', 'complementaire', 'fonctionnaire'].map(categorie => {
+              const cats = criteres.filter(c => c.categorie === categorie);
+              if (!cats.length) return null;
+              const labels: Record<string, string> = { base: '7 Critères de base', complementaire: '5 Critères complémentaires', fonctionnaire: '6 Critères spécifiques fonctionnaires' };
+              return (
+                <Box key={categorie} mb={3}>
+                  <Typography fontWeight={700} color="#475569" mb={1} fontSize={13}>{labels[categorie]}</Typography>
+                  <Paper elevation={0} sx={{ border: '1px solid #E2E8F0', borderRadius: 2, overflow: 'hidden' }}>
+                    <Table size="small">
+                      <TableHead sx={{ bgcolor: '#F8FAFC' }}>
+                        <TableRow>
+                          <TableCell sx={{ fontWeight: 700, fontSize: 12 }}>Critère</TableCell>
+                          {[1, 2, 3, 4, 5].map(n => (
+                            <TableCell key={n} align="center" sx={{ fontWeight: 700, fontSize: 12, width: 48 }}>{n}</TableCell>
+                          ))}
+                          <TableCell sx={{ fontWeight: 700, fontSize: 12 }}>Observation</TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {cats.map((c: EvalCritere) => {
+                          const n = notations[c.id] ?? { note: 0, observation: '' };
+                          return (
+                            <TableRow key={c.id} hover>
+                              <TableCell sx={{ fontSize: 13 }}>
+                                <Typography fontSize={12} color="text.secondary" component="span" mr={0.5}>{c.code}</Typography>
+                                {c.libelle}
+                              </TableCell>
+                              {[1, 2, 3, 4, 5].map(val => (
+                                <TableCell key={val} align="center">
+                                  <Box
+                                    onClick={() => setNotations(prev => ({ ...prev, [c.id]: { ...n, note: val } }))}
+                                    sx={{
+                                      width: 28, height: 28, borderRadius: '50%', cursor: 'pointer',
+                                      bgcolor: n.note === val ? '#002f59' : '#F1F5F9',
+                                      color: n.note === val ? '#fff' : '#64748B',
+                                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                      mx: 'auto', fontWeight: 700, fontSize: 13, transition: 'all .15s',
+                                      '&:hover': { bgcolor: n.note === val ? '#002f59' : '#CBD5E1' },
+                                    }}
+                                  >{val}</Box>
+                                </TableCell>
+                              ))}
+                              <TableCell>
+                                <TextField size="small" fullWidth placeholder="Observation…"
+                                  value={n.observation}
+                                  onChange={e => setNotations(prev => ({ ...prev, [c.id]: { ...n, observation: e.target.value } }))}
+                                  sx={{ '& .MuiInputBase-input': { fontSize: 12, py: 0.5 } }}
+                                />
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </Paper>
+                </Box>
+              );
+            })}
+
+            {/* Entretien tenu */}
+            <FormControlLabel
+              control={<Checkbox checked={entretien_tenu} onChange={e => setEntretienTenu(e.target.checked)} />}
+              label={<Typography fontSize={13}>Entretien tenu le {fmtDate(fiche.date_entretien)}</Typography>}
+            />
+          </Box>
+        )}
+
+        {/* ── Page 3 : Bilan professionnel ── */}
+        {page === 2 && (
+          <Box sx={{ p: 3 }}>
+            <Typography fontWeight={800} color="#002f59" mb={2}>Bilan professionnel</Typography>
+            <Grid container spacing={2.5}>
+              <Grid item xs={12}>
+                <TextField fullWidth multiline minRows={3} label="Principales réalisations de la période"
+                  value={bilan.realisations}
+                  onChange={e => setBilan(b => ({ ...b, realisations: e.target.value }))} />
+              </Grid>
+              <Grid item xs={12}>
+                <TextField fullWidth multiline minRows={3} label="Difficultés rencontrées dans l'exercice des fonctions"
+                  value={bilan.difficultes}
+                  onChange={e => setBilan(b => ({ ...b, difficultes: e.target.value }))} />
+              </Grid>
+              <Grid item xs={12}>
+                <TextField fullWidth multiline minRows={3} label="Compétences démontrées"
+                  value={bilan.competences_demontrees}
+                  onChange={e => setBilan(b => ({ ...b, competences_demontrees: e.target.value }))} />
+              </Grid>
+              <Grid item xs={12}>
+                <Divider sx={{ borderStyle: 'dashed', my: 1 }} />
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
+                  <Typography fontWeight={700} fontSize={14}>Besoins de formation et renforcement des capacités</Typography>
+                  <Button size="small" startIcon={<Add />}
+                    onClick={() => setBesoins(b => [...b, { intitule: '', priorite: 'moyenne' }])}
+                    sx={{ textTransform: 'none' }}>Ajouter</Button>
+                </Box>
+                {besoins.map((b, i) => (
+                  <Box key={i} sx={{ display: 'flex', gap: 1.5, mb: 1.5, alignItems: 'center' }}>
+                    <TextField size="small" label="Formation souhaitée" value={b.intitule} sx={{ flex: 1 }}
+                      onChange={e => setBesoins(prev => prev.map((x, j) => j === i ? { ...x, intitule: e.target.value } : x))} />
+                    <FormControl size="small" sx={{ width: 140 }}>
+                      <InputLabel>Priorité</InputLabel>
+                      <Select value={b.priorite} label="Priorité"
+                        onChange={e => setBesoins(prev => prev.map((x, j) => j === i ? { ...x, priorite: e.target.value as EvalBesoinFormation['priorite'] } : x))}>
+                        <MenuItem value="haute">Haute</MenuItem>
+                        <MenuItem value="moyenne">Moyenne</MenuItem>
+                        <MenuItem value="faible">Faible</MenuItem>
+                      </Select>
+                    </FormControl>
+                    <IconButton size="small" color="error" onClick={() => setBesoins(prev => prev.filter((_, j) => j !== i))}>
+                      <Block fontSize="small" />
+                    </IconButton>
+                  </Box>
+                ))}
+              </Grid>
+            </Grid>
+          </Box>
+        )}
+
+        {/* ── Page 4 : Développement & Décisions ── */}
+        {page === 3 && (
+          <Box sx={{ p: 3 }}>
+            <Typography fontWeight={800} color="#002f59" mb={2}>Plan de développement & Signatures</Typography>
+            <Grid container spacing={2.5}>
+              {/* Objectifs N+1 */}
+              <Grid item xs={12}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
+                  <Typography fontWeight={700} fontSize={14}>Objectifs assignés pour l'exercice suivant</Typography>
+                  <Button size="small" startIcon={<Add />}
+                    onClick={() => setObjectifs(o => [...o, { objectif: '', indicateur: '', echeance: null }])}
+                    sx={{ textTransform: 'none' }}>Ajouter</Button>
+                </Box>
+                {objectifs.map((o, i) => (
+                  <Box key={i} sx={{ display: 'flex', gap: 1.5, mb: 1.5, alignItems: 'flex-start' }}>
+                    <TextField size="small" label="Objectif" value={o.objectif} multiline sx={{ flex: 2 }}
+                      onChange={e => setObjectifs(prev => prev.map((x, j) => j === i ? { ...x, objectif: e.target.value } : x))} />
+                    <TextField size="small" label="Indicateur" value={o.indicateur ?? ''} sx={{ flex: 1 }}
+                      onChange={e => setObjectifs(prev => prev.map((x, j) => j === i ? { ...x, indicateur: e.target.value } : x))} />
+                    <TextField size="small" label="Échéance" type="date" InputLabelProps={{ shrink: true }} value={o.echeance ?? ''} sx={{ width: 140 }}
+                      onChange={e => setObjectifs(prev => prev.map((x, j) => j === i ? { ...x, echeance: e.target.value } : x))} />
+                    <IconButton size="small" color="error" onClick={() => setObjectifs(prev => prev.filter((_, j) => j !== i))}>
+                      <Block fontSize="small" />
+                    </IconButton>
+                  </Box>
+                ))}
+              </Grid>
+
+              {/* Observations */}
+              <Grid item xs={12} sm={6}>
+                <TextField fullWidth multiline minRows={3} label="Observations de l'évaluateur"
+                  value={observations_evaluateur}
+                  onChange={e => setObsEval(e.target.value)} />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <Paper elevation={0} sx={{ p: 1.5, bgcolor: '#F8FAFC', borderRadius: 1.5, border: '1px solid #E2E8F0', minHeight: 100 }}>
+                  <Typography variant="caption" color="text.secondary" display="block" mb={0.5}>Observations de l'agent</Typography>
+                  <Typography fontSize={13}>{fiche.observations_agent || '—'}</Typography>
+                  {fiche.refus_signature_agent && (
+                    <Alert severity="warning" sx={{ mt: 1, py: 0.5, fontSize: 12 }}>
+                      Refus de signature : {fiche.motif_refus_signature}
+                    </Alert>
+                  )}
+                </Paper>
+              </Grid>
+
+              {/* Décisions RH */}
+              <Grid item xs={12}>
+                <Divider sx={{ borderStyle: 'dashed', my: 0.5 }} />
+                <Typography fontWeight={700} fontSize={14} mb={1}>Décisions de la Division des Ressources humaines</Typography>
+                <Paper elevation={0} sx={{ p: 2, border: '1px solid #E2E8F0', borderRadius: 2 }}>
+                  <Grid container spacing={1}>
+                    {([
+                      ['formation',        'Formation'],
+                      ['coaching',         'Coaching'],
+                      ['mobilite',         'Mobilité'],
+                      ['felicitations',    'Félicitations'],
+                      ['suivi_particulier','Suivi particulier'],
+                      ['gratification',    'Gratification'],
+                    ] as [keyof EvalDecisionRh, string][]).map(([key, label]) => (
+                      <Grid item xs={6} sm={4} key={key}>
+                        <FormControlLabel
+                          control={
+                            <Checkbox
+                              size="small"
+                              checked={!!(decision[key])}
+                              onChange={e => setDecision(d => ({ ...d, [key]: e.target.checked }))}
+                            />
+                          }
+                          label={<Typography fontSize={13}>{label}</Typography>}
+                        />
+                      </Grid>
+                    ))}
+                    <Grid item xs={12} sm={6}>
+                      <TextField fullWidth size="small" label="Autres décisions"
+                        value={decision.autre ?? ''}
+                        onChange={e => setDecision(d => ({ ...d, autre: e.target.value }))} />
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                      <TextField fullWidth size="small" label="Commentaire"
+                        value={decision.commentaire ?? ''}
+                        onChange={e => setDecision(d => ({ ...d, commentaire: e.target.value }))} />
+                    </Grid>
+                  </Grid>
+                </Paper>
+              </Grid>
+
+              {/* Avis DG */}
+              <Grid item xs={12}>
+                <TextField fullWidth multiline minRows={2} label="Avis du Directeur Général"
+                  value={avis_dg}
+                  onChange={e => setAvisDG(e.target.value)} />
+              </Grid>
+
+              {/* Signatures */}
+              <Grid item xs={12}>
+                <Divider sx={{ borderStyle: 'dashed', my: 0.5 }} />
+                <Typography fontWeight={700} fontSize={14} mb={1.5}>Signatures</Typography>
+                <Grid container spacing={2}>
+                  {[
+                    {
+                      label: 'Évaluateur',
+                      signed: fiche.signe_evaluateur_at,
+                      name: fiche.evaluateur?.name,
+                      icon: <Person />,
+                    },
+                    {
+                      label: 'Agent évalué',
+                      signed: fiche.signe_agent_at,
+                      name: `${fiche.employee?.first_name ?? ''} ${fiche.employee?.last_name ?? ''}`,
+                      icon: <Grade />,
+                    },
+                  ].map(sig => (
+                    <Grid item xs={12} sm={6} key={sig.label}>
+                      <Paper elevation={0} sx={{
+                        p: 2, border: `2px solid ${sig.signed ? '#10B981' : '#E2E8F0'}`,
+                        borderRadius: 2, textAlign: 'center',
+                      }}>
+                        {sig.signed
+                          ? <CheckCircle sx={{ color: '#10B981', fontSize: 32, mb: 0.5 }} />
+                          : <Box sx={{ width: 32, height: 32, mx: 'auto', mb: 0.5 }}>{sig.icon}</Box>}
+                        <Typography fontWeight={700} fontSize={13}>{sig.label}</Typography>
+                        <Typography fontSize={12} color="text.secondary">{sig.name}</Typography>
+                        {sig.signed && (
+                          <Typography fontSize={11} color="#10B981" mt={0.5}>Signé le {fmtDate(sig.signed)}</Typography>
+                        )}
+                        {!sig.signed && (
+                          <Typography fontSize={11} color="#94A3B8" mt={0.5}>En attente de signature</Typography>
+                        )}
+                      </Paper>
+                    </Grid>
+                  ))}
+                  <Grid item xs={12}>
+                    <Alert severity="info" sx={{ fontSize: 11, py: 0.5, borderRadius: 1.5 }}>
+                      La signature de l'agent atteste uniquement sa prise de connaissance de l'évaluation, sans valoir approbation du contenu.
+                    </Alert>
+                  </Grid>
+                </Grid>
+              </Grid>
+            </Grid>
+          </Box>
+        )}
+      </DialogContent>
+
+      {/* Actions workflow */}
+      <DialogActions sx={{ px: 3, py: 2, borderTop: '1px solid #E2E8F0', flexWrap: 'wrap', gap: 1 }}>
+        <Button onClick={onClose} sx={{ textTransform: 'none' }}>Fermer</Button>
+        <Button
+          startIcon={<Print />}
+          onClick={() => printFiche(fiche, criteres, notations)}
+          disabled={isLoading}
+          sx={{ textTransform: 'none', color: '#002f59', borderColor: '#002f59', mr: 'auto' }}
+          variant="outlined"
+        >
+          Imprimer / PDF
+        </Button>
+
+        {/* Sauvegarder notes (pages 2+3) */}
+        {['a_planifier','planifiee','en_cours'].includes(fiche.statut) && (
+          <Button variant="outlined" startIcon={<Assignment />} disabled={saving}
+            onClick={handleNoter} sx={{ textTransform: 'none', borderRadius: 2 }}>
+            {saving ? <CircularProgress size={16} /> : 'Sauvegarder'}
+          </Button>
+        )}
+
+        {/* Signer évaluateur */}
+        {fiche.statut === 'en_cours' && fiche.moyenne !== null && (
+          <Button variant="contained" startIcon={<CheckCircle />} disabled={saving}
+            onClick={handleSignerEval}
+            sx={{ bgcolor: '#8B5CF6', textTransform: 'none', borderRadius: 2 }}>
+            {saving ? <CircularProgress size={16} sx={{ color: '#fff' }} /> : 'Signer (évaluateur)'}
+          </Button>
+        )}
+
+        {/* Signer agent */}
+        {fiche.statut === 'signee_evaluateur' && (
+          <Button variant="contained" startIcon={<CheckCircle />} disabled={saving}
+            onClick={handleSignerAgent}
+            sx={{ bgcolor: '#06B6D4', textTransform: 'none', borderRadius: 2 }}>
+            {saving ? <CircularProgress size={16} sx={{ color: '#fff' }} /> : 'Signer (agent)'}
+          </Button>
+        )}
+
+        {/* Transmettre DAF */}
+        {fiche.statut === 'signee_agent' && (
+          <Button variant="contained" startIcon={<Send />} disabled={saving}
+            onClick={handleTransmettre}
+            sx={{ bgcolor: '#10B981', textTransform: 'none', borderRadius: 2 }}>
+            {saving ? <CircularProgress size={16} sx={{ color: '#fff' }} /> : 'Transmettre au DAF'}
+          </Button>
+        )}
+
+        {/* Annoter DG */}
+        {['transmise_daf', 'annotee_dg'].includes(fiche.statut) && (
+          <Button variant="contained" startIcon={<Star />} disabled={saving}
+            onClick={handleAnnoterDG}
+            sx={{ bgcolor: '#F97316', textTransform: 'none', borderRadius: 2 }}>
+            {saving ? <CircularProgress size={16} sx={{ color: '#fff' }} /> : 'Enregistrer décisions DG'}
+          </Button>
+        )}
+
+        {/* Notifier */}
+        {fiche.statut === 'annotee_dg' && (
+          <Button variant="contained" startIcon={<Send />} disabled={saving}
+            onClick={handleNotifier}
+            sx={{ bgcolor: '#059669', textTransform: 'none', borderRadius: 2 }}>
+            {saving ? <CircularProgress size={16} sx={{ color: '#fff' }} /> : 'Notifier l\'agent'}
+          </Button>
+        )}
+
+        {/* Archiver */}
+        {fiche.statut === 'notifiee' && (
+          <Button variant="outlined" startIcon={<Archive />} disabled={saving}
+            onClick={handleArchiver}
+            sx={{ textTransform: 'none', borderRadius: 2 }}>
+            {saving ? <CircularProgress size={16} /> : 'Archiver'}
+          </Button>
+        )}
+      </DialogActions>
+    </Dialog>
+  );
+}
+
+// ── Onglet 4 — Synthèse ───────────────────────────────────────────────────────
+
+function SyntheseTab() {
+  const [campagneId, setCampagneId] = useState<number | ''>('');
+
+  const { data: campagnes } = useQuery({
+    queryKey: ['eval-campagnes'],
+    queryFn: () => evalCampagneApi.list().then(r => r.data),
+  });
+
+  const { data: synthese, isLoading } = useQuery({
+    queryKey: ['eval-synthese', campagneId],
+    queryFn: () => evalCampagneApi.synthese(campagneId as number).then(r => r.data),
+    enabled: !!campagneId,
+  });
+
+  const APPREC_COLOR: Record<string, string> = {
+    excellent: '#059669', tres_satisfaisant: '#3B82F6',
+    satisfaisant: '#6366F1', a_ameliorer: '#F59E0B', insuffisant: '#EF4444',
+  };
+
+  return (
+    <Box>
+      <Box sx={{ display: 'flex', gap: 2, mb: 3, alignItems: 'center' }}>
+        <FormControl size="small" sx={{ minWidth: 240 }}>
+          <InputLabel>Sélectionner une campagne</InputLabel>
+          <Select value={campagneId} label="Sélectionner une campagne" onChange={e => setCampagneId(e.target.value as number)}>
+            {campagnes?.map(c => <MenuItem key={c.id} value={c.id}>{c.exercice} — {c.titre}</MenuItem>)}
+          </Select>
+        </FormControl>
+      </Box>
+
+      {isLoading && <LinearProgress />}
+
+      {synthese && (
+        <>
+          {/* KPIs globaux */}
+          <Grid container spacing={2} mb={3}>
+            <Grid item xs={12} sm={4}>
+              <Paper elevation={0} sx={{ p: 2, border: '1px solid #E2E8F0', borderRadius: 2, textAlign: 'center' }}>
+                <Typography variant="h3" fontWeight={800} color="#002f59">{synthese.total_fiches}</Typography>
+                <Typography variant="caption" color="text.secondary">Fiches finalisées</Typography>
+              </Paper>
+            </Grid>
+            <Grid item xs={12} sm={4}>
+              <Paper elevation={0} sx={{ p: 2, border: '1px solid #E2E8F0', borderRadius: 2, textAlign: 'center' }}>
+                <Typography variant="h3" fontWeight={800} color="#10B981">{synthese.moyenne_globale}/5</Typography>
+                <Typography variant="caption" color="text.secondary">Moyenne globale ANASER</Typography>
+              </Paper>
+            </Grid>
+            <Grid item xs={12} sm={4}>
+              <Paper elevation={0} sx={{ p: 2, border: '1px solid #E2E8F0', borderRadius: 2, textAlign: 'center' }}>
+                <Typography variant="h3" fontWeight={800} color="#6366F1">{synthese.synthese.length}</Typography>
+                <Typography variant="caption" color="text.secondary">Directions évaluées</Typography>
+              </Paper>
+            </Grid>
+          </Grid>
+
+          {/* Tableau par direction */}
+          {synthese.synthese.map(dir => (
+            <Paper key={dir.direction} elevation={0} sx={{ mb: 3, border: '1px solid #E2E8F0', borderRadius: 2, overflow: 'hidden' }}>
+              <Box sx={{ px: 2.5, py: 1.5, bgcolor: '#F8FAFC', borderBottom: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Typography fontWeight={800}>{dir.direction}</Typography>
+                <Stack direction="row" spacing={2}>
+                  <Typography variant="caption" color="text.secondary">{dir.nb_agents} agent(s)</Typography>
+                  <Typography variant="caption" fontWeight={700} color="#002f59">Moy. : {dir.moyenne_direction}/5</Typography>
+                </Stack>
+              </Box>
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    {['Matricule', 'Agent', 'Fonction', 'Moyenne', 'Appréciation', 'Décisions', 'Besoins formation'].map(h => (
+                      <TableCell key={h} sx={{ fontWeight: 700, fontSize: 12, color: '#64748B' }}>{h}</TableCell>
+                    ))}
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {dir.agents.map(a => (
+                    <TableRow key={a.id} hover>
+                      <TableCell sx={{ fontSize: 12 }}>{a.matricule}</TableCell>
+                      <TableCell fontWeight={600}>{a.nom_complet}</TableCell>
+                      <TableCell sx={{ fontSize: 12 }}>{a.fonction}</TableCell>
+                      <TableCell>
+                        {a.moyenne !== null
+                          ? <Typography fontWeight={700} sx={{ color: a.moyenne >= 3.5 ? '#10B981' : a.moyenne >= 2.5 ? '#3B82F6' : '#EF4444' }}>{a.moyenne}/5</Typography>
+                          : '—'}
+                      </TableCell>
+                      <TableCell>
+                        {a.appreciation
+                          ? <Chip label={APPRECIATION_LABELS[a.appreciation]} size="small"
+                              sx={{ bgcolor: APPREC_COLOR[a.appreciation] + '22', color: APPREC_COLOR[a.appreciation], fontWeight: 700, fontSize: 11 }} />
+                          : '—'}
+                      </TableCell>
+                      <TableCell>
+                        {a.decisions && (
+                          <Stack direction="row" spacing={0.5} flexWrap="wrap">
+                            {a.decisions.formation && <Chip label="Formation" size="small" color="primary" variant="outlined" sx={{ fontSize: 10 }} />}
+                            {a.decisions.coaching && <Chip label="Coaching" size="small" color="success" variant="outlined" sx={{ fontSize: 10 }} />}
+                            {a.decisions.mobilite && <Chip label="Mobilité" size="small" color="warning" variant="outlined" sx={{ fontSize: 10 }} />}
+                            {a.decisions.felicitations && <Chip label="Félicitations" size="small" color="success" variant="outlined" sx={{ fontSize: 10 }} />}
+                            {a.decisions.gratification && <Chip label="Gratification" size="small" color="error" variant="outlined" sx={{ fontSize: 10 }} />}
+                          </Stack>
+                        )}
+                      </TableCell>
+                      <TableCell sx={{ fontSize: 12 }}>{a.besoins.join(', ') || '—'}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </Paper>
+          ))}
+        </>
+      )}
+
+      {!campagneId && (
+        <Alert severity="info" sx={{ borderRadius: 2 }}>Sélectionnez une campagne pour afficher le tableau de synthèse.</Alert>
+      )}
+    </Box>
+  );
+}
+
+// ── Page principale ───────────────────────────────────────────────────────────
+
+export default function EvaluationsPage() {
+  const [tab, setTab] = useState(0);
+
+  return (
+    <Box sx={{ p: { xs: 2, md: 3 } }}>
+      {/* En-tête */}
+      <Box sx={{ mb: 3 }}>
+        <Typography variant="h5" fontWeight={800} color="#0F172A">
+          Évaluation annuelle du personnel
+        </Typography>
+        <Typography variant="body2" color="text.secondary" mt={0.5}>
+          Campagne ANASER — CDC-ANASER-EVAL-2026-01
+        </Typography>
+      </Box>
+
+      <Paper elevation={0} sx={{ border: '1px solid #E2E8F0', borderRadius: 2 }}>
+        <Tabs
+          value={tab}
+          onChange={(_, v) => setTab(v)}
+          sx={{
+            borderBottom: '1px solid #E2E8F0', px: 2,
+            '& .MuiTab-root': { textTransform: 'none', fontWeight: 600, fontSize: 14, minHeight: 48 },
+            '& .Mui-selected': { color: '#002f59', fontWeight: 700 },
+            '& .MuiTabs-indicator': { bgcolor: '#002f59' },
+          }}
+        >
+          <Tab icon={<BarChart sx={{ fontSize: 18 }} />} iconPosition="start" label="Tableau de bord" />
+          <Tab icon={<EventNote sx={{ fontSize: 18 }} />} iconPosition="start" label="Campagnes" />
+          <Tab icon={<Assignment sx={{ fontSize: 18 }} />} iconPosition="start" label="Fiches" />
+          <Tab icon={<Grade sx={{ fontSize: 18 }} />} iconPosition="start" label="Synthèse" />
+        </Tabs>
+
+        <Box sx={{ p: 3 }}>
+          {tab === 0 && <DashboardTab />}
+          {tab === 1 && <CampagnesTab />}
+          {tab === 2 && <FichesTab />}
+          {tab === 3 && <SyntheseTab />}
+        </Box>
+      </Paper>
     </Box>
   );
 }
