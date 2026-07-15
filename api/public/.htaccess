@@ -1,4 +1,12 @@
-# CORS géré par Laravel (config/cors.php + FRONTEND_URL dans .env)
+<IfModule mod_headers.c>
+    # Accepter les deux domaines frontend
+    SetEnvIf Origin "^https://(rh\.lamadoneadn\.com|rh\.dstcomputing\.com)$" CORS_ORIGIN=$0
+    Header always set Access-Control-Allow-Origin "%{CORS_ORIGIN}e" env=CORS_ORIGIN
+    Header always set Access-Control-Allow-Methods "GET, POST, PUT, PATCH, DELETE, OPTIONS"
+    Header always set Access-Control-Allow-Headers "Content-Type, Authorization, X-Requested-With, X-XSRF-TOKEN"
+    Header always set Access-Control-Allow-Credentials "true"
+</IfModule>
+
 # Répondre immédiatement aux requêtes OPTIONS (preflight)
 RewriteCond %{REQUEST_METHOD} OPTIONS
 RewriteRule ^ - [R=200,L]
