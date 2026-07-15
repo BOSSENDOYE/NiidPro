@@ -1,10 +1,4 @@
-<IfModule mod_headers.c>
-    Header always set Access-Control-Allow-Origin "https://rh.lamadoneadn.com"
-    Header always set Access-Control-Allow-Methods "GET, POST, PUT, PATCH, DELETE, OPTIONS"
-    Header always set Access-Control-Allow-Headers "Content-Type, Authorization, X-Requested-With, X-XSRF-TOKEN"
-    Header always set Access-Control-Allow-Credentials "true"
-</IfModule>
-
+# CORS géré par Laravel (config/cors.php + FRONTEND_URL dans .env)
 # Répondre immédiatement aux requêtes OPTIONS (preflight)
 RewriteCond %{REQUEST_METHOD} OPTIONS
 RewriteRule ^ - [R=200,L]
