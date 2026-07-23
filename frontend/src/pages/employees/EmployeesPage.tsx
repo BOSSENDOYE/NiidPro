@@ -20,7 +20,7 @@ import { useNavigate } from 'react-router-dom';
 import { employeesApi } from '../../api/employees';
 import { tasksApi } from '../../api/tasks';
 import client from '../../api/client';
-import { formatDate } from '../../utils/format';
+import { formatDate, fmtMatricule } from '../../utils/format';
 import EmployeeCreateModal from '../../components/employees/EmployeeCreateModal';
 import ContractTab from '../../components/employees/ContractTab';
 import EvaluationTab from '../../components/employees/EvaluationTab';
@@ -503,7 +503,7 @@ export default function EmployeesPage() {
                                   px: 0.75, py: 0.2, borderRadius: '5px',
                                   border: '1px solid rgba(59,130,246,0.25)',
                                 }}>
-                                  {emp.employee_number}
+                                  {fmtMatricule(emp.employee_number)}
                                 </Box>
                               )}
                               {emp.department?.name && (
@@ -634,7 +634,7 @@ export default function EmployeesPage() {
                                   </Typography>
                                   {emp.employee_number && (
                                     <Typography sx={{ fontSize: 10.5, color: '#2563EB', fontFamily: 'monospace', fontWeight: 600 }}>
-                                      {emp.employee_number}
+                                      {fmtMatricule(emp.employee_number)}
                                     </Typography>
                                   )}
                                 </Box>
@@ -742,7 +742,7 @@ export default function EmployeesPage() {
                           {taskEmp.first_name} {taskEmp.last_name}
                         </Typography>
                         <Typography sx={{ fontSize: 11, color: '#0369A1' }}>
-                          {taskEmp.employee_number} · {taskEmp.position?.title ?? '—'}
+                          {fmtMatricule(taskEmp.employee_number)} · {taskEmp.position?.title ?? '—'}
                         </Typography>
                       </Box>
                     </Box>

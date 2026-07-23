@@ -8,6 +8,7 @@ import {
   CalendarMonth, CheckCircle, ErrorOutline, CameraAlt, DeleteOutline,
 } from '@mui/icons-material';
 import axios from 'axios';
+import PhotoCropperModal from './PhotoCropperModal';
 
 const API = import.meta.env.VITE_API_URL ?? 'http://localhost:8000/api';
 
@@ -26,8 +27,10 @@ export default function EnrollmentPage() {
   const [message, setMessage] = useState('');
   const [logoUrl, setLogoUrl]     = useState<string | null>(null);
   const [companyName, setCompanyName] = useState('ANASER');
-  const [photoFile, setPhotoFile]   = useState<File | null>(null);
+  const [photoFile, setPhotoFile]       = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [rawImageSrc, setRawImageSrc]   = useState<string | null>(null);
+  const [cropperOpen, setCropperOpen]   = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -44,15 +47,32 @@ export default function EnrollmentPage() {
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 3 * 1024 * 1024) {
-      setErrors(prev => ({ ...prev, photo: 'La photo ne doit pas dépasser 3 Mo.' }));
+    if (file.size > 10 * 1024 * 1024) {
+      setErrors(prev => ({ ...prev, photo: 'La photo ne doit pas dépasser 10 Mo.' }));
       return;
     }
     setErrors(prev => { const { photo: _, ...rest } = prev; return rest; });
-    setPhotoFile(file);
+    // Lire l'image brute et ouvrir le recadreur
     const reader = new FileReader();
-    reader.onload = ev => setPhotoPreview(ev.target?.result as string);
+    reader.onload = ev => {
+      setRawImageSrc(ev.target?.result as string);
+      setCropperOpen(true);
+    };
     reader.readAsDataURL(file);
+    // Réinitialiser l'input pour permettre de re-sélectionner le même fichier
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const handleCropConfirm = (file: File, previewUrl: string) => {
+    setPhotoFile(file);
+    setPhotoPreview(previewUrl);
+    setCropperOpen(false);
+    setRawImageSrc(null);
+  };
+
+  const handleCropCancel = () => {
+    setCropperOpen(false);
+    setRawImageSrc(null);
   };
 
   const removePhoto = () => {
@@ -233,7 +253,7 @@ export default function EnrollmentPage() {
                     {photoPreview ? 'Changer la photo' : 'Ajouter une photo'}
                   </Button>
                   <Typography sx={{ fontSize: 12, color: errors.photo ? '#DC2626' : '#94A3B8' }}>
-                    {errors.photo ?? 'JPG, PNG ou WEBP — max 3 Mo (facultatif)'}
+                    {errors.photo ?? 'JPG, PNG ou WEBP — recadrage possible après sélection'}
                   </Typography>
                 </Box>
               </Box>
@@ -345,6 +365,16 @@ export default function EnrollmentPage() {
           Plateforme RH ANASER — Vos données sont traitées de manière confidentielle
         </Typography>
       </Box>
+
+      {/* Recadreur photo */}
+      {rawImageSrc && (
+        <PhotoCropperModal
+          open={cropperOpen}
+          imageSrc={rawImageSrc}
+          onConfirm={handleCropConfirm}
+          onCancel={handleCropCancel}
+        />
+      )}
     </Box>
   );
 }

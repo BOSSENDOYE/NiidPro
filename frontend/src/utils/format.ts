@@ -37,6 +37,13 @@ export const statusColor = (status: string): 'success' | 'error' | 'warning' | '
   return map[status] ?? 'default';
 };
 
+/** Affiche un matricule en préservant les zéros initiaux.
+ *  Si la valeur est purement numérique, elle est paddée à 4 chiffres (ex: "66" → "0066"). */
+export const fmtMatricule = (value: string | null | undefined): string => {
+  if (!value) return '—';
+  return /^\d+$/.test(value) ? value.padStart(4, '0') : value;
+};
+
 export const contractTypeLabel = (type: string) => {
   const map: Record<string, string> = {
     CDI: 'CDI', CDD: 'CDD', Interim: 'Intérim', Freelance: 'Freelance',

@@ -11,7 +11,7 @@ import {
   Badge as BadgeIcon, FlipCameraAndroid,
 } from '@mui/icons-material';
 import { attendancesApi } from '../../api/attendances';
-import { formatDate } from '../../utils/format';
+import { formatDate, fmtMatricule } from '../../utils/format';
 import { useCompany } from '../../hooks/useCompany';
 import type { Employee } from '../../types';
 
@@ -129,7 +129,7 @@ function Recto({ emp, cardRef }: { emp: Employee; cardRef?: React.RefObject<HTML
           { label: 'Nom',       value: (emp.last_name ?? '').toUpperCase() },
           { label: 'Prénom',    value: emp.first_name ?? '' },
           { label: 'Fonctions', value: emp.position?.title ?? '—' },
-          { label: 'Matricule', value: emp.employee_number ?? '' },
+          { label: 'Matricule', value: fmtMatricule(emp.employee_number) },
         ].map(({ label, value }) => (
           <Box key={label} sx={{ display: 'flex', alignItems: 'flex-start', mb: 0.35 }}>
             <Typography sx={{ fontSize: 11, fontWeight: 700, color: '#111', minWidth: 62, lineHeight: 1.5 }}>
@@ -380,7 +380,7 @@ export default function EmployeeBadgeCard({ open, onClose, employee }: Props) {
                 Carte professionnelle {companyName}
               </Typography>
               <Typography sx={{ color: '#64748B', fontSize: 11.5 }}>
-                {employee.first_name} {employee.last_name} · {employee.employee_number}
+                {employee.first_name} {employee.last_name} · {fmtMatricule(employee.employee_number)}
               </Typography>
             </Box>
           </Stack>
@@ -442,7 +442,7 @@ export default function EmployeeBadgeCard({ open, onClose, employee }: Props) {
                 <Stack spacing={1}>
                   {[
                     { label: 'Nom complet',  value: `${employee.first_name} ${employee.last_name}` },
-                    { label: 'Matricule',    value: employee.employee_number, mono: true },
+                    { label: 'Matricule',    value: fmtMatricule(employee.employee_number), mono: true },
                     { label: 'Poste',        value: employee.position?.title ?? '—' },
                     { label: 'Service',      value: employee.department?.name ?? '—' },
                     { label: 'Recrutement',  value: formatDate(employee.hire_date) },

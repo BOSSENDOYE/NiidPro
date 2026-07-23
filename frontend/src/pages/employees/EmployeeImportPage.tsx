@@ -212,8 +212,10 @@ export default function EmployeeImportPage() {
               row[key] = null;
             }
           } else if (key === 'employee_number') {
-            // Ignorer "-" comme matricule (sera auto-généré)
-            const s = String(val ?? '').trim();
+            // Lire la valeur FORMATÉE de la cellule (.w) pour préserver
+            // les zéros initiaux (ex : "0066" stocké comme nombre dans Excel)
+            const cell = ws[XLSX.utils.encode_cell({ r: i, c: idx })];
+            const s = String(cell?.w ?? cell?.v ?? val ?? '').trim();
             row[key] = (s && s !== '-') ? s : null;
           } else {
             row[key] = val !== '' && val != null ? String(val).trim() : null;

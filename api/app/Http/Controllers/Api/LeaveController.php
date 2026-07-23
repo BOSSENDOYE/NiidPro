@@ -18,7 +18,7 @@ class LeaveController extends Controller
     // ─── Liste avec filtres ─────────────────────────────────────────
     public function index(Request $request)
     {
-        $query = Leave::with(['employee.department', 'leaveType', 'approver'])
+        $query = Leave::with(['employee.department', 'employee.organisationUnit', 'leaveType', 'approver'])
             ->when($request->employee_id,   fn($q, $e) => $q->where('employee_id', $e))
             ->when($request->status,        fn($q, $s) => $q->where('status', $s))
             ->when($request->leave_type_id, fn($q, $t) => $q->where('leave_type_id', $t))
@@ -34,7 +34,7 @@ class LeaveController extends Controller
     // ─── Congés en attente ──────────────────────────────────────────
     public function pending()
     {
-        $leaves = Leave::with(['employee.department', 'leaveType'])
+        $leaves = Leave::with(['employee.department', 'employee.organisationUnit', 'leaveType'])
             ->where('status', 'pending')
             ->orderBy('start_date')
             ->get();

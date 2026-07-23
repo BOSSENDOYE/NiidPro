@@ -11,6 +11,8 @@ import { Add, Search, Clear, CheckCircle, Cancel, Print, Description } from '@mu
 import { leavesApi } from '../../api/leaves';
 import { employeesApi } from '../../api/employees';
 import { documentsApi } from '../../api/documents';
+import { organisationUnitApi } from '../../api/organisationUnits';
+import type { OrgUnit } from '../../api/organisationUnits';
 import StatusChip from '../../components/common/StatusChip';
 import LeavePlanningTab from '../../components/employees/LeavePlanningTab';
 import LeaveBalanceTab from '../../components/employees/LeaveBalanceTab';
@@ -37,11 +39,12 @@ export default function LeavesPage() {
   const [globalSearch, setGlobalSearch] = useState('');
 
   /* filtres avancés */
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo,   setDateTo]   = useState('');
-  const [service,  setService]  = useState('');
-  const [typeFilter, setTypeFilter] = useState('');
-  const [matricule, setMatricule]   = useState('');
+  const [dateFrom,     setDateFrom]     = useState('');
+  const [dateTo,       setDateTo]       = useState('');
+  const [directionId,  setDirectionId]  = useState<number | ''>('');
+  const [divisionId,   setDivisionId]   = useState<number | ''>('');
+  const [typeFilter,   setTypeFilter]   = useState('');
+  const [matricule,    setMatricule]    = useState('');
 
   /* dialogs */
   const [newOpen,     setNewOpen]     = useState(false);
@@ -86,6 +89,37 @@ export default function LeavesPage() {
   });
   const employees = employeesData?.data ?? [];
 
+  const { data: orgUnits = [] } = useQuery<OrgUnit[]>({
+    queryKey: ['organisation-units'],
+    queryFn: () => organisationUnitApi.list().then((r) => r.data),
+  });
+
+  // Directions / Entités : même logique que le formulaire agent
+  // = unités sans parent OU dont le parent est de type "gouvernance"
+  const directions = useMemo(() => {
+    const govIds = new Set(orgUnits.filter((u) => u.type === 'gouvernance').map((u) => u.id));
+    return orgUnits.filter((u) => u.parent_id === null || govIds.has(u.parent_id));
+  }, [orgUnits]);
+
+  // Enfants directs de la direction sélectionnée = Divisions / Services
+  const divisions = useMemo(
+    () => directionId ? orgUnits.filter((u) => u.parent_id === directionId) : [],
+    [orgUnits, directionId],
+  );
+
+  // Tous les IDs de la direction sélectionnée et ses descendants
+  const selectedOrgIds = useMemo((): Set<number> => {
+    if (!directionId) return new Set();
+    const result = new Set<number>();
+    const queue = [directionId as number];
+    while (queue.length) {
+      const id = queue.shift()!;
+      result.add(id);
+      orgUnits.filter((u) => u.parent_id === id).forEach((u) => queue.push(u.id));
+    }
+    return result;
+  }, [orgUnits, directionId]);
+
   /* mutations */
   const createMutation = useMutation({
     mutationFn: (d: Partial<Leave>) => leavesApi.create(d),
@@ -129,13 +163,19 @@ export default function LeavesPage() {
       if (!matchSearch(l)) return false;
       if (dateFrom && l.start_date < dateFrom) return false;
       if (dateTo   && l.end_date   > dateTo)   return false;
-      if (service  && l.employee?.department?.name?.toLowerCase().indexOf(service.toLowerCase()) === -1) return false;
+      // Filtre org : division prime sur direction
+      if (divisionId) {
+        if (l.employee?.organisation_unit_id !== divisionId) return false;
+      } else if (directionId) {
+        const uid = l.employee?.organisation_unit_id;
+        if (!uid || !selectedOrgIds.has(uid)) return false;
+      }
       if (typeFilter && String(l.leave_type_id) !== typeFilter) return false;
       if (matricule && !(l.employee?.employee_number ?? '').toLowerCase().includes(matricule.toLowerCase())) return false;
       return true;
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [allLeaves, globalSearch, dateFrom, dateTo, service, typeFilter, matricule]);
+  }, [allLeaves, globalSearch, dateFrom, dateTo, directionId, divisionId, selectedOrgIds, typeFilter, matricule]);
 
   const filteredPending = useMemo(
     () => pendingLeaves.filter(matchSearch),
@@ -149,7 +189,11 @@ export default function LeavesPage() {
   );
 
   const handleSearch = () => { /* filtrage réactif */ };
-  const handleClear  = () => { setDateFrom(''); setDateTo(''); setService(''); setTypeFilter(''); setMatricule(''); };
+  const handleClear  = () => {
+    setDateFrom(''); setDateTo('');
+    setDirectionId(''); setDivisionId('');
+    setTypeFilter(''); setMatricule('');
+  };
 
   const selectedLeave = allLeaves.find((l) => l.id === selectedId) ?? null;
 
@@ -186,9 +230,36 @@ export default function LeavesPage() {
               <TextField label="À" type="date" size="small" value={dateTo}
                 onChange={e => setDateTo(e.target.value)} InputLabelProps={{ shrink: true }}
                 sx={{ bgcolor: '#fff', width: 155 }} />
-              <TextField label="Service" size="small" value={service}
-                onChange={e => setService(e.target.value)} sx={{ bgcolor: '#fff', width: 160 }} />
-              <FormControl size="small" sx={{ bgcolor: '#fff', width: 200 }}>
+              <FormControl size="small" sx={{ bgcolor: '#fff', width: 190 }}>
+                <InputLabel>Direction / Entité</InputLabel>
+                <Select
+                  value={directionId}
+                  label="Direction / Entité"
+                  onChange={e => {
+                    setDirectionId(e.target.value as number | '');
+                    setDivisionId('');
+                  }}
+                >
+                  <MenuItem value="">Toutes</MenuItem>
+                  {directions.map((d) => (
+                    <MenuItem key={d.id} value={d.id}>{d.libelle}</MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+              <FormControl size="small" sx={{ bgcolor: '#fff', width: 190 }} disabled={!directionId}>
+                <InputLabel>Division / Service</InputLabel>
+                <Select
+                  value={divisionId}
+                  label="Division / Service"
+                  onChange={e => setDivisionId(e.target.value as number | '')}
+                >
+                  <MenuItem value="">Tous</MenuItem>
+                  {divisions.map((d) => (
+                    <MenuItem key={d.id} value={d.id}>{d.libelle}</MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+              <FormControl size="small" sx={{ bgcolor: '#fff', width: 190 }}>
                 <InputLabel>Type</InputLabel>
                 <Select value={typeFilter} label="Type" onChange={e => setTypeFilter(e.target.value)}>
                   <MenuItem value="">Tous</MenuItem>
