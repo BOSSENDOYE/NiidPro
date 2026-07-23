@@ -143,33 +143,18 @@ function Recto({ emp, cardRef }: { emp: Employee; cardRef?: React.RefObject<HTML
       </Box>
 
       {/* ── BANDE DIAGONALE (drapeau sénégal) ── */}
-      {/* Vert */}
       <Box sx={{
         position: 'absolute',
-        width: '170%', height: 22,
-        left: '-35%',
-        top: '58%',
-        transform: 'translateY(-50%) rotate(-26deg)',
-        bgcolor: '#00853F', zIndex: 3,
-      }} />
-      {/* Jaune */}
-      <Box sx={{
-        position: 'absolute',
-        width: '170%', height: 22,
-        left: '-35%',
-        top: '67%',
-        transform: 'translateY(-50%) rotate(-26deg)',
-        bgcolor: '#FDEF42', zIndex: 3,
-      }} />
-      {/* Rouge */}
-      <Box sx={{
-        position: 'absolute',
-        width: '170%', height: 22,
-        left: '-35%',
-        top: '76%',
-        transform: 'translateY(-50%) rotate(-26deg)',
-        bgcolor: '#E31937', zIndex: 3,
-      }} />
+        width: '170%', left: '-35%',
+        top: '67%', transform: 'translateY(-50%) rotate(-26deg)',
+        zIndex: 3, display: 'flex', flexDirection: 'column',
+      }}>
+        <Box sx={{ height: 22, bgcolor: '#00853F' }} />
+        <Box sx={{ height: 22, bgcolor: '#FDEF42', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <Typography sx={{ fontSize: 14, color: '#00853F', lineHeight: 1, transform: 'rotate(26deg)' }}>★</Typography>
+        </Box>
+        <Box sx={{ height: 22, bgcolor: '#E31937' }} />
+      </Box>
 
       {/* ── PHOTO (bas droite) ── */}
       <Box sx={{

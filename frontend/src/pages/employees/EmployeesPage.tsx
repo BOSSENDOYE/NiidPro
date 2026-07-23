@@ -123,7 +123,11 @@ export default function EmployeesPage() {
   };
 
   return (
-    <Box>
+    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+
+      {/* ══ ENTÊTE FIXE : header + onglets + filtres ══ */}
+      <Box sx={{ flexShrink: 0 }}>
+
       {/* ══════════════════════════════════════════════════════════
           HEADER GRADIENT SOMBRE + ONGLETS
       ══════════════════════════════════════════════════════════ */}
@@ -202,14 +206,10 @@ export default function EmployeesPage() {
         </Tabs>
       </Box>
 
-      {/* ══════════════════════════════════════════════════════════
-          CONTENU PRINCIPAL
-      ══════════════════════════════════════════════════════════ */}
-      <Card sx={{ borderRadius: '0 0 16px 16px', border: 'none', boxShadow: '0 8px 40px rgba(15,23,42,0.1)', overflow: 'visible' }}>
-        {activeTab === 0 ? (
-          <>
-            {/* ── BARRE RECHERCHE + ACTIONS ── */}
-            <Box sx={{ px: 2, py: 1.25, bgcolor: '#F8FAFC', borderBottom: '1.5px solid #E2E8F0', background: 'linear-gradient(180deg,#F8FAFC 0%,#F1F5F9 100%)' }}>
+      {/* ── BARRE RECHERCHE + ACTIONS (dans le bloc sticky) ── */}
+      {activeTab === 0 && (
+        <Box sx={{ bgcolor: '#F8FAFC', borderBottom: '1.5px solid #E2E8F0', background: 'linear-gradient(180deg,#F8FAFC 0%,#F1F5F9 100%)' }}>
+        <Box sx={{ px: 2, py: 1.25 }}>
               <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
                 {/* Champs de recherche */}
                 <TextField placeholder="Matricule" size="small" value={matricule} onChange={e => setMatricule(e.target.value)}
@@ -331,16 +331,22 @@ export default function EmployeesPage() {
                 </Stack>
               </Stack>
             </Stack>
+        </Box>
+      )}
+      </Box>
+      {/* ══ FIN ENTÊTE FIXE ══ */}
 
-            {/* ══════════════════════════════════════════════════════
-                GRILLE DE CARTES AGENTS
-            ══════════════════════════════════════════════════════ */}
+      {/* ══ ZONE SCROLLABLE ══ */}
+      <Box sx={{ flex: 1, overflow: 'auto', minHeight: 0 }}>
+      <Card sx={{ borderRadius: '0 0 16px 16px', border: 'none', boxShadow: '0 8px 40px rgba(15,23,42,0.1)', overflow: 'visible' }}>
+        {activeTab === 0 ? (
+          <>
             <Box sx={{ p: 2.5, bgcolor: '#F1F5F9', minHeight: 340 }}>
               {isLoading ? (
                 viewMode === 'grid' ? (
-                  <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2,1fr)', md: 'repeat(3,1fr)', lg: 'repeat(5,1fr)' }, gap: 2 }}>
+                  <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2,1fr)', md: 'repeat(3,1fr)', lg: 'repeat(5,1fr)' }, gap: 1.5 }}>
                     {Array.from({ length: 10 }).map((_, i) => (
-                      <Skeleton key={i} variant="rounded" height={310} sx={{ borderRadius: '16px' }} />
+                      <Skeleton key={i} variant="rounded" height={240} sx={{ borderRadius: '14px' }} />
                     ))}
                   </Box>
                 ) : (
@@ -376,7 +382,7 @@ export default function EmployeesPage() {
                   </Stack>
                 </Box>
               ) : viewMode === 'grid' ? (
-                <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2,1fr)', md: 'repeat(3,1fr)', lg: 'repeat(5,1fr)' }, gap: 2 }}>
+                <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2,1fr)', md: 'repeat(3,1fr)', lg: 'repeat(5,1fr)' }, gap: 1.5 }}>
                   {data.data.map((emp, idx) => {
                     const isActive   = emp.status === 'active';
                     const isSelected = selected.includes(emp.id);
@@ -405,7 +411,7 @@ export default function EmployeesPage() {
                         >
                           {/* ── Bannière colorée ── */}
                           <Box sx={{
-                            height: 76,
+                            height: 52,
                             backgroundImage: isActive
                               ? 'linear-gradient(135deg, #1E3A8A 0%, #2563EB 55%, #3B82F6 100%)'
                               : 'linear-gradient(135deg, #7F1D1D 0%, #DC2626 55%, #EF4444 100%)',
@@ -415,9 +421,8 @@ export default function EmployeesPage() {
                             overflow: 'hidden',
                           }}>
                             {/* Cercles décoratifs */}
-                            <Box sx={{ position: 'absolute', width: 110, height: 110, borderRadius: '50%', bgcolor: 'rgba(255,255,255,0.07)', top: -40, right: -28 }} />
-                            <Box sx={{ position: 'absolute', width: 65, height: 65, borderRadius: '50%', bgcolor: 'rgba(255,255,255,0.05)', top: 20, left: -18 }} />
-                            <Box sx={{ position: 'absolute', width: 40, height: 40, borderRadius: '50%', bgcolor: 'rgba(255,255,255,0.04)', bottom: -15, right: 55 }} />
+                            <Box sx={{ position: 'absolute', width: 80, height: 80, borderRadius: '50%', bgcolor: 'rgba(255,255,255,0.07)', top: -30, right: -20 }} />
+                            <Box sx={{ position: 'absolute', width: 48, height: 48, borderRadius: '50%', bgcolor: 'rgba(255,255,255,0.05)', top: 10, left: -14 }} />
 
                             {/* Checkbox sélection */}
                             <Box sx={{ position: 'absolute', top: 8, left: 8 }}
@@ -438,22 +443,22 @@ export default function EmployeesPage() {
                           </Box>
 
                           {/* ── Corps de la carte ── */}
-                          <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', mt: -4.5, px: 2, pb: 2 }}>
+                          <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', mt: -3.5, px: 1.5, pb: 1.5 }}>
 
                             {/* Avatar */}
                             <Avatar
                               src={emp.photo_url ?? undefined}
                               sx={{
-                                width: 74, height: 74,
-                                fontSize: 26, fontWeight: 800,
+                                width: 60, height: 60,
+                                fontSize: 20, fontWeight: 800,
                                 backgroundImage: isActive
                                   ? 'linear-gradient(135deg, #1D4ED8, #7C3AED)'
                                   : 'linear-gradient(135deg, #94A3B8, #475569)',
                                 backgroundColor: isActive ? '#1D4ED8' : '#94A3B8',
-                                border: '3.5px solid #1E293B',
+                                border: '3px solid #1E293B',
                                 boxShadow: isActive
-                                  ? '0 6px 18px rgba(37,99,235,0.4)'
-                                  : '0 6px 18px rgba(0,0,0,0.3)',
+                                  ? '0 4px 14px rgba(37,99,235,0.4)'
+                                  : '0 4px 14px rgba(0,0,0,0.3)',
                               }}
                             >
                               {initials}
@@ -462,12 +467,12 @@ export default function EmployeesPage() {
                             {/* Statut */}
                             <Chip size="small"
                               icon={isActive
-                                ? <CheckCircle sx={{ fontSize: '11px !important', color: '#34D399 !important' }} />
-                                : <Block sx={{ fontSize: '11px !important', color: '#F87171 !important' }} />
+                                ? <CheckCircle sx={{ fontSize: '10px !important', color: '#34D399 !important' }} />
+                                : <Block sx={{ fontSize: '10px !important', color: '#F87171 !important' }} />
                               }
                               label={isActive ? 'Actif' : 'Inactif'}
                               sx={{
-                                mt: 0.875, height: 21, fontSize: 10, fontWeight: 700,
+                                mt: 0.6, height: 18, fontSize: 9.5, fontWeight: 700,
                                 bgcolor: isActive ? 'rgba(52,211,153,0.12)' : 'rgba(248,113,113,0.12)',
                                 color: isActive ? '#34D399' : '#F87171',
                                 border: `1px solid ${isActive ? 'rgba(52,211,153,0.3)' : 'rgba(248,113,113,0.3)'}`,
@@ -475,21 +480,21 @@ export default function EmployeesPage() {
                             />
 
                             {/* Nom complet */}
-                            <Typography fontWeight={800} fontSize={14.5} color="#F1F5F9"
-                              textAlign="center" lineHeight={1.25} mt={0.875} noWrap sx={{ maxWidth: 170 }}>
+                            <Typography fontWeight={800} fontSize={12.5} color="#F1F5F9"
+                              textAlign="center" lineHeight={1.25} mt={0.6} noWrap sx={{ maxWidth: 150 }}>
                               {emp.first_name} {emp.last_name}
                             </Typography>
 
                             {/* Poste */}
                             {emp.position?.title && (
                               <Typography variant="caption" textAlign="center" noWrap
-                                sx={{ fontSize: 10.5, color: '#64748B', maxWidth: 165, mt: 0.3 }}>
+                                sx={{ fontSize: 9.5, color: '#64748B', maxWidth: 145, mt: 0.2 }}>
                                 {emp.position.title}
                               </Typography>
                             )}
 
                             {/* Badges matricule + département */}
-                            <Stack direction="row" spacing={0.5} mt={0.875} mb={1.5}
+                            <Stack direction="row" spacing={0.4} mt={0.6} mb={1}
                               flexWrap="wrap" justifyContent="center" useFlexGap>
                               {emp.employee_number && (
                                 <Box component="span" sx={{
@@ -516,68 +521,62 @@ export default function EmployeesPage() {
                               )}
                             </Stack>
 
-                            <Divider sx={{ width: '100%', borderColor: 'rgba(255,255,255,0.07)', mb: 1.25 }} />
+                            <Divider sx={{ width: '100%', borderColor: 'rgba(255,255,255,0.07)', mb: 0.8 }} />
 
                             {/* Informations clés */}
-                            <Stack spacing={0.8} width="100%">
-                              <Stack direction="row" spacing={1} alignItems="center">
-                                <Email sx={{ fontSize: 12, color: '#475569', flexShrink: 0 }} />
-                                <Typography noWrap sx={{ fontSize: 11, flex: 1, color: '#94A3B8' }}>
+                            <Stack spacing={0.5} width="100%">
+                              <Stack direction="row" spacing={0.75} alignItems="center">
+                                <Email sx={{ fontSize: 11, color: '#475569', flexShrink: 0 }} />
+                                <Typography noWrap sx={{ fontSize: 10, flex: 1, color: '#94A3B8' }}>
                                   {emp.professional_email}
                                 </Typography>
                               </Stack>
-                              <Stack direction="row" spacing={1} alignItems="center">
-                                <Phone sx={{ fontSize: 12, color: '#475569', flexShrink: 0 }} />
-                                <Typography sx={{ fontSize: 11, color: '#94A3B8' }}>
-                                  {emp.phone || '—'}
-                                </Typography>
-                              </Stack>
-                              <Stack direction="row" spacing={1} alignItems="center">
-                                <Event sx={{ fontSize: 12, color: '#475569', flexShrink: 0 }} />
-                                <Typography sx={{ fontSize: 11, color: '#94A3B8' }}>
-                                  Recruté le {formatDate(emp.hire_date)}
+                              <Stack direction="row" spacing={0.75} alignItems="center">
+                                <Event sx={{ fontSize: 11, color: '#475569', flexShrink: 0 }} />
+                                <Typography sx={{ fontSize: 10, color: '#94A3B8' }}>
+                                  {formatDate(emp.hire_date)}
                                 </Typography>
                               </Stack>
                             </Stack>
 
-                            <Divider sx={{ width: '100%', borderColor: 'rgba(255,255,255,0.07)', mt: 1.25, mb: 1.1 }} />
+                            <Divider sx={{ width: '100%', borderColor: 'rgba(255,255,255,0.07)', mt: 0.8, mb: 0.8 }} />
 
                             {/* Boutons d'action */}
-                            <Stack direction="row" spacing={0.6} justifyContent="center" flexWrap="wrap" useFlexGap>
+                            <Stack direction="row" spacing={0.4} justifyContent="center" flexWrap="wrap" useFlexGap>
                               <Tooltip title="Voir le dossier" arrow>
                                 <IconButton size="small" onClick={e => { e.stopPropagation(); openModal('view', emp); }}
-                                  sx={{ width: 32, height: 32, borderRadius: '9px', bgcolor: 'rgba(59,130,246,0.12)', color: '#93C5FD', '&:hover': { bgcolor: 'rgba(59,130,246,0.22)', transform: 'scale(1.1)' }, transition: 'all .15s' }}>
-                                  <Visibility sx={{ fontSize: 15 }} />
+                                  sx={{ width: 26, height: 26, borderRadius: '7px', bgcolor: 'rgba(59,130,246,0.12)', color: '#93C5FD', '&:hover': { bgcolor: 'rgba(59,130,246,0.22)', transform: 'scale(1.1)' }, transition: 'all .15s' }}>
+                                  <Visibility sx={{ fontSize: 13 }} />
                                 </IconButton>
                               </Tooltip>
                               <Tooltip title="Modifier" arrow>
                                 <IconButton size="small" onClick={e => { e.stopPropagation(); openModal('edit', emp); }}
-                                  sx={{ width: 32, height: 32, borderRadius: '9px', bgcolor: 'rgba(249,115,22,0.12)', color: '#FB923C', '&:hover': { bgcolor: 'rgba(249,115,22,0.22)', transform: 'scale(1.1)' }, transition: 'all .15s' }}>
-                                  <Edit sx={{ fontSize: 15 }} />
+                                  sx={{ width: 26, height: 26, borderRadius: '7px', bgcolor: 'rgba(249,115,22,0.12)', color: '#FB923C', '&:hover': { bgcolor: 'rgba(249,115,22,0.22)', transform: 'scale(1.1)' }, transition: 'all .15s' }}>
+                                  <Edit sx={{ fontSize: 13 }} />
                                 </IconButton>
                               </Tooltip>
                               <Tooltip title="Envoyer un mail" arrow>
                                 <IconButton size="small" onClick={e => { e.stopPropagation(); setEmailEmp(emp); }}
-                                  sx={{ width: 32, height: 32, borderRadius: '9px', bgcolor: 'rgba(34,197,94,0.12)', color: '#4ADE80', '&:hover': { bgcolor: 'rgba(34,197,94,0.22)', transform: 'scale(1.1)' }, transition: 'all .15s' }}>
-                                  <Email sx={{ fontSize: 15 }} />
+                                  sx={{ width: 26, height: 26, borderRadius: '7px', bgcolor: 'rgba(34,197,94,0.12)', color: '#4ADE80', '&:hover': { bgcolor: 'rgba(34,197,94,0.22)', transform: 'scale(1.1)' }, transition: 'all .15s' }}>
+                                  <Email sx={{ fontSize: 13 }} />
                                 </IconButton>
                               </Tooltip>
                               <Tooltip title="Carte professionnelle & Badge" arrow>
                                 <IconButton size="small" onClick={e => { e.stopPropagation(); setBadgeEmployee(emp); }}
-                                  sx={{ width: 32, height: 32, borderRadius: '9px', bgcolor: 'rgba(168,85,247,0.12)', color: '#C084FC', '&:hover': { bgcolor: 'rgba(168,85,247,0.22)', transform: 'scale(1.1)' }, transition: 'all .15s' }}>
-                                  <BadgeIcon sx={{ fontSize: 15 }} />
+                                  sx={{ width: 26, height: 26, borderRadius: '7px', bgcolor: 'rgba(168,85,247,0.12)', color: '#C084FC', '&:hover': { bgcolor: 'rgba(168,85,247,0.22)', transform: 'scale(1.1)' }, transition: 'all .15s' }}>
+                                  <BadgeIcon sx={{ fontSize: 13 }} />
                                 </IconButton>
                               </Tooltip>
                               <Tooltip title="Assigner une tâche" arrow>
                                 <IconButton size="small" onClick={e => { e.stopPropagation(); setTaskEmp(emp); }}
-                                  sx={{ width: 32, height: 32, borderRadius: '9px', bgcolor: 'rgba(234,179,8,0.12)', color: '#EAB308', '&:hover': { bgcolor: 'rgba(234,179,8,0.22)', transform: 'scale(1.1)' }, transition: 'all .15s' }}>
-                                  <AssignmentTurnedIn sx={{ fontSize: 15 }} />
+                                  sx={{ width: 26, height: 26, borderRadius: '7px', bgcolor: 'rgba(234,179,8,0.12)', color: '#EAB308', '&:hover': { bgcolor: 'rgba(234,179,8,0.22)', transform: 'scale(1.1)' }, transition: 'all .15s' }}>
+                                  <AssignmentTurnedIn sx={{ fontSize: 13 }} />
                                 </IconButton>
                               </Tooltip>
                               <Tooltip title="Supprimer" arrow>
                                 <IconButton size="small" onClick={e => e.stopPropagation()}
-                                  sx={{ width: 32, height: 32, borderRadius: '9px', bgcolor: 'rgba(225,29,72,0.12)', color: '#FB7185', '&:hover': { bgcolor: 'rgba(225,29,72,0.22)', transform: 'scale(1.1)' }, transition: 'all .15s' }}>
-                                  <Delete sx={{ fontSize: 15 }} />
+                                  sx={{ width: 26, height: 26, borderRadius: '7px', bgcolor: 'rgba(225,29,72,0.12)', color: '#FB7185', '&:hover': { bgcolor: 'rgba(225,29,72,0.22)', transform: 'scale(1.1)' }, transition: 'all .15s' }}>
+                                  <Delete sx={{ fontSize: 13 }} />
                                 </IconButton>
                               </Tooltip>
                             </Stack>
@@ -1282,6 +1281,7 @@ export default function EmployeesPage() {
           </Button>
         </DialogActions>
       </Dialog>
+      </Box>
     </Box>
   );
 }
