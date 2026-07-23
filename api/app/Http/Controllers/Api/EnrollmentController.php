@@ -18,18 +18,20 @@ class EnrollmentController extends Controller
     public function submit(Request $request)
     {
         $data = $request->validate([
-            'matricule'       => 'required|string|max:50',
-            'first_name'      => 'required|string|max:100',
-            'last_name'       => 'required|string|max:100',
-            'date_naissance'  => 'required|date',
-            'lieu_naissance'  => 'required|string|max:150',
-            'date_embauche'   => 'required|date',
-            'fonction'        => 'required|string|max:150',
-            'telephone'       => 'required|string|max:30',
-            'email'           => 'required|email|max:150',
-            'categorie_emploi'=> 'nullable|string|max:50',
-            'qualification'   => 'nullable|string|max:100',
-            'photo'           => 'nullable|image|mimes:jpeg,png,jpg,webp|max:3072',
+            'matricule'          => 'required|string|max:50',
+            'first_name'         => 'required|string|max:100',
+            'last_name'          => 'required|string|max:100',
+            'date_naissance'     => 'required|date',
+            'lieu_naissance'     => 'required|string|max:150',
+            'date_embauche'      => 'required|date',
+            'fonction'           => 'required|string|max:150',
+            'telephone'          => 'required|string|max:30',
+            'email'              => 'required|email|max:150',
+            'categorie_emploi'   => 'nullable|string|max:50',
+            'qualification'      => 'nullable|string|max:100',
+            'adresse'            => 'nullable|string|max:255',
+            'organisation_unit_id' => 'nullable|exists:organisation_units,id',
+            'photo'              => 'nullable|image|mimes:jpeg,png,jpg,webp|max:3072',
         ]);
 
         // Block duplicate pending requests for same email
@@ -110,10 +112,12 @@ class EnrollmentController extends Controller
             'fonction'        => $enrollment->fonction,
             'phone_personal'  => $enrollment->telephone,
             'personal_email'  => $enrollment->email,
-            'categorie_emploi'=> $enrollment->categorie_emploi,
-            'qualification'   => $enrollment->qualification,
-            'status'          => 'active',
-            'photo'           => $enrollment->photo_path,
+            'categorie_emploi'    => $enrollment->categorie_emploi,
+            'qualification'       => $enrollment->qualification,
+            'address'             => $enrollment->adresse,
+            'organisation_unit_id'=> $enrollment->organisation_unit_id,
+            'status'              => 'active',
+            'photo'               => $enrollment->photo_path,
         ];
 
         if ($employee) {

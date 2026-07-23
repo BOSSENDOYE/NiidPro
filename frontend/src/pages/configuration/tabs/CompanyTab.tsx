@@ -27,10 +27,13 @@ const EMPTY: FormState = {
 
 export default function CompanyTab() {
   const qc = useQueryClient();
-  const logoInputRef = useRef<HTMLInputElement>(null);
+  const logoInputRef  = useRef<HTMLInputElement>(null);
+  const stampInputRef = useRef<HTMLInputElement>(null);
   const [form, setForm] = useState<FormState>(EMPTY);
-  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [logoFile,    setLogoFile]    = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [stampFile,    setStampFile]    = useState<File | null>(null);
+  const [stampPreview, setStampPreview] = useState<string | null>(null);
   const [savedToast, setSavedToast] = useState(false);
   const [geoLoading, setGeoLoading] = useState(false);
   const [geoError, setGeoError] = useState<string | null>(null);
@@ -92,13 +95,14 @@ export default function CompanyTab() {
     mutationFn: () => {
       const fd = new FormData();
       Object.entries(form).forEach(([k, v]) => fd.append(k, v ?? ''));
-      if (logoFile) fd.append('logo', logoFile);
+      if (logoFile)  fd.append('logo',  logoFile);
+      if (stampFile) fd.append('stamp', stampFile);
       return settingsApi.update(fd).then((r) => r.data);
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['settings'] });
-      setLogoFile(null);
-      setLogoPreview(null);
+      setLogoFile(null);  setLogoPreview(null);
+      setStampFile(null); setStampPreview(null);
       setSavedToast(true);
     },
   });
@@ -107,12 +111,20 @@ export default function CompanyTab() {
     mutationFn: () => settingsApi.deleteLogo().then((r) => r.data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['settings'] });
-      setLogoFile(null);
-      setLogoPreview(null);
+      setLogoFile(null); setLogoPreview(null);
     },
   });
 
-  const currentLogo = logoPreview ?? data?.logo_url ?? null;
+  const removeStampMut = useMutation({
+    mutationFn: () => settingsApi.deleteStamp().then((r) => r.data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['settings'] });
+      setStampFile(null); setStampPreview(null);
+    },
+  });
+
+  const currentLogo  = logoPreview  ?? data?.logo_url  ?? null;
+  const currentStamp = stampPreview ?? data?.stamp_url ?? null;
 
   if (isLoading) {
     return <Box sx={{ display: 'flex', justifyContent: 'center', mt: 8 }}><CircularProgress /></Box>;
@@ -174,6 +186,51 @@ export default function CompanyTab() {
                   style={{ width: 42, height: 36, border: 'none', borderRadius: 8, background: 'none', cursor: 'pointer' }} />
                 <TextField size="small" value={form.primary_color ?? ''} onChange={set('primary_color')}
                   sx={{ width: 130 }} InputProps={{ sx: { fontSize: 13 } }} />
+              </Stack>
+            </Box>
+
+            <Divider sx={{ my: 2.5 }} />
+
+            {/* Cachet du Directeur */}
+            <Box>
+              <Typography sx={{ fontSize: 11.5, fontWeight: 700, color: 'text.secondary', mb: 1.5, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                <ImageIcon sx={{ fontSize: 15 }} /> Cachet du Directeur Général
+              </Typography>
+              <Stack alignItems="center" spacing={1.5}>
+                <Avatar src={currentStamp ?? undefined} variant="rounded"
+                  sx={{ width: 120, height: 120, borderRadius: '12px', bgcolor: 'action.hover', border: '2px dashed', borderColor: 'divider', '& img': { objectFit: 'contain' } }}>
+                  <ImageIcon sx={{ fontSize: 36, color: 'text.disabled' }} />
+                </Avatar>
+
+                <input ref={stampInputRef} type="file" accept="image/*" hidden
+                  onChange={(e) => {
+                    if (e.target.files?.[0]) {
+                      setStampFile(e.target.files[0]);
+                      setStampPreview(URL.createObjectURL(e.target.files[0]));
+                    }
+                  }} />
+
+                <Stack direction="row" spacing={1}>
+                  <Button variant="contained" size="small" startIcon={<CloudUpload />}
+                    onClick={() => stampInputRef.current?.click()}
+                    sx={{ textTransform: 'none', borderRadius: '9px', fontWeight: 700 }}>
+                    Choisir
+                  </Button>
+                  {currentStamp && (
+                    <Tooltip title="Retirer le cachet">
+                      <IconButton size="small"
+                        onClick={() => { stampFile ? (setStampFile(null), setStampPreview(null)) : removeStampMut.mutate(); }}
+                        sx={{ border: '1px solid #FECACA', color: '#DC2626', borderRadius: '9px' }}>
+                        <Delete fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                  )}
+                </Stack>
+                {stampFile && (
+                  <Typography sx={{ fontSize: 11, color: 'primary.main', textAlign: 'center' }}>
+                    Nouveau cachet prêt — cliquez sur « Enregistrer »
+                  </Typography>
+                )}
               </Stack>
             </Box>
           </SectionCard>

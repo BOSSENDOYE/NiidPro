@@ -12,7 +12,7 @@ class EnrollmentRequest extends Model
     protected $fillable = [
         'matricule', 'first_name', 'last_name', 'date_naissance',
         'lieu_naissance', 'date_embauche', 'fonction', 'telephone', 'email',
-        'categorie_emploi', 'qualification', 'photo_path',
+        'categorie_emploi', 'qualification', 'adresse', 'organisation_unit_id', 'photo_path',
         'status', 'rejection_reason', 'matched_employee_id', 'reviewed_by', 'reviewed_at',
     ];
 

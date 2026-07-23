@@ -26,7 +26,7 @@ function qrPayload(emp: Employee): string {
 /* ════════════════════════════ RECTO ════════════════════════════ */
 function Recto({ emp, cardRef }: { emp: Employee; cardRef?: React.RefObject<HTMLDivElement | null> }) {
   const initials = `${emp.first_name?.[0] ?? ''}${emp.last_name?.[0] ?? ''}`.toUpperCase();
-  const { name: companyName, legalName, logoUrl } = useCompany();
+  const { name: companyName, legalName, logoUrl, stampUrl } = useCompany();
 
   return (
     <Box ref={cardRef} id="badge-recto" sx={{
@@ -128,7 +128,7 @@ function Recto({ emp, cardRef }: { emp: Employee; cardRef?: React.RefObject<HTML
           { label: 'N°',        value: String(emp.id ?? '').padStart(4, '0') },
           { label: 'Nom',       value: (emp.last_name ?? '').toUpperCase() },
           { label: 'Prénom',    value: emp.first_name ?? '' },
-          { label: 'Fonctions', value: emp.position?.title ?? '—' },
+          { label: 'Service',   value: emp.organisation_unit?.name ?? emp.department?.name ?? '—' },
           { label: 'Matricule', value: fmtMatricule(emp.employee_number) },
         ].map(({ label, value }) => (
           <Box key={label} sx={{ display: 'flex', alignItems: 'flex-start', mb: 0.35 }}>
@@ -141,6 +141,28 @@ function Recto({ emp, cardRef }: { emp: Employee; cardRef?: React.RefObject<HTML
           </Box>
         ))}
       </Box>
+
+      {/* ── FILIGRANE logo centré ── */}
+      {logoUrl ? (
+        <Box sx={{
+          position: 'absolute', top: '50%', left: '50%',
+          transform: 'translate(-50%, -50%)',
+          width: 210, height: 210,
+          zIndex: 2, opacity: 0.18, pointerEvents: 'none',
+        }}>
+          <img src={logoUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+        </Box>
+      ) : (
+        <Typography sx={{
+          position: 'absolute', top: '50%', left: '50%',
+          transform: 'translate(-50%, -50%) rotate(-30deg)',
+          fontSize: 52, fontWeight: 900, color: '#002f59',
+          opacity: 0.10, zIndex: 2, pointerEvents: 'none',
+          whiteSpace: 'nowrap', userSelect: 'none',
+        }}>
+          {companyName}
+        </Typography>
+      )}
 
       {/* ── BANDE DIAGONALE (drapeau sénégal) ── */}
       <Box sx={{
@@ -156,48 +178,44 @@ function Recto({ emp, cardRef }: { emp: Employee; cardRef?: React.RefObject<HTML
         <Box sx={{ height: 22, bgcolor: '#E31937' }} />
       </Box>
 
-      {/* ── PHOTO (bas droite) ── */}
+      {/* ── PHOTO + CACHET (colonne droite, sous la bande rouge) ── */}
       <Box sx={{
         position: 'absolute',
-        bottom: 14, right: 18,
+        top: 185, right: 6,
         zIndex: 6,
-        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.4,
+        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5,
       }}>
+        {/* Photo */}
         <Box sx={{
-          width: 80, height: 96,
+          width: 82, height: 78,
           border: '1.5px solid #999',
           borderRadius: '3px', overflow: 'hidden', bgcolor: '#e8e8e8',
+          flexShrink: 0,
         }}>
           {emp.photo_url ? (
             <Box component="img" src={emp.photo_url} sx={{ width: '100%', height: '100%', objectFit: 'cover' }} />
           ) : (
-            <Avatar sx={{ width: 80, height: 96, borderRadius: 0, fontSize: 26, bgcolor: '#1D4ED8', color: '#fff' }}>
+            <Avatar sx={{ width: 82, height: 78, borderRadius: 0, fontSize: 24, bgcolor: '#1D4ED8', color: '#fff' }}>
               {initials}
             </Avatar>
           )}
         </Box>
-        <Typography sx={{ fontSize: 7.5, color: '#333', fontStyle: 'italic', textAlign: 'center' }}>
-          Le Directeur Général
-        </Typography>
-        <Box sx={{ width: 78, height: 0.75, bgcolor: '#888' }} />
-      </Box>
 
-      {/* ── LOGO ANASER bas gauche ── */}
-      <Box sx={{
-        position: 'absolute',
-        bottom: 14, left: 18,
-        zIndex: 6,
-        display: 'flex', alignItems: 'center', gap: 0.5,
-      }}>
-        <Box sx={{ position: 'relative', width: 38, height: 32 }}>
-          <Box sx={{ position: 'absolute', width: 2.5, height: 30, bgcolor: '#F97316', top: 1, left: 18, transform: 'rotate(-20deg)', borderRadius: 1 }} />
-          <Typography sx={{ position: 'absolute', bottom: 0, left: 0, right: 0, fontSize: 12, fontWeight: 900, color: '#1D4ED8', fontStyle: 'italic', textAlign: 'center', lineHeight: 1 }}>
-            {companyName}
-          </Typography>
+        {/* Zone cachet directeur */}
+        <Box sx={{
+          width: 100, height: 64,
+          border: stampUrl ? 'none' : '1px dashed #bbb',
+          borderRadius: '4px',
+          overflow: 'hidden',
+          bgcolor: 'rgba(0,0,0,0.01)',
+          flexShrink: 0,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          {stampUrl && (
+            <Box component="img" src={stampUrl}
+              sx={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+          )}
         </Box>
-        <Typography sx={{ fontSize: 5.5, color: '#666', lineHeight: 1.3 }}>
-          Sénégal<br /><strong>AGENCE NATIONALE</strong><br />DE SÉCURITÉ ROUTIÈRE
-        </Typography>
       </Box>
     </Box>
   );

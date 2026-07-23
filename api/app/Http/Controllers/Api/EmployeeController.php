@@ -26,7 +26,7 @@ class EmployeeController extends Controller
     {
         $authUser = $request->user();
 
-        $query = Employee::with(['department', 'position', 'manager', 'activeContract', 'indice.hierarchy'])
+        $query = Employee::with(['department', 'position', 'manager', 'activeContract', 'indice.hierarchy', 'organisationUnit'])
             // Scope département : les non-admins ne voient que leur département
             ->when(
                 $authUser && !$authUser->hasAnyRole(['super_admin', 'admin_rh']) && $authUser->department_id,

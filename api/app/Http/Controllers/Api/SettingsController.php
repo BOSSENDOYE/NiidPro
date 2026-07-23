@@ -34,20 +34,27 @@ class SettingsController extends Controller
             'ninea'         => ['nullable', 'string', 'max:255'],
             'primary_color' => ['nullable', 'string', 'max:20'],
             'description'   => ['nullable', 'string', 'max:2000'],
-            'logo'          => ['nullable', 'image', 'max:4096'], // 4 Mo
+            'logo'          => ['nullable', 'image', 'max:4096'],
+            'stamp'         => ['nullable', 'image', 'max:4096'],
         ]);
 
         $settings = CompanySetting::current();
 
         if ($request->hasFile('logo')) {
-            // Supprime l'ancien logo
             if ($settings->logo_path && Storage::disk('public')->exists($settings->logo_path)) {
                 Storage::disk('public')->delete($settings->logo_path);
             }
             $data['logo_path'] = $request->file('logo')->store('company', 'public');
         }
 
-        unset($data['logo']);
+        if ($request->hasFile('stamp')) {
+            if ($settings->stamp_path && Storage::disk('public')->exists($settings->stamp_path)) {
+                Storage::disk('public')->delete($settings->stamp_path);
+            }
+            $data['stamp_path'] = $request->file('stamp')->store('company', 'public');
+        }
+
+        unset($data['logo'], $data['stamp']);
         $settings->update($data);
 
         return response()->json($this->format($settings->fresh()));
@@ -65,12 +72,25 @@ class SettingsController extends Controller
         return response()->json($this->format($settings->fresh()));
     }
 
+    /** Supprime le cachet de l'entreprise. */
+    public function deleteStamp()
+    {
+        $settings = CompanySetting::current();
+        if ($settings->stamp_path && Storage::disk('public')->exists($settings->stamp_path)) {
+            Storage::disk('public')->delete($settings->stamp_path);
+        }
+        $settings->update(['stamp_path' => null]);
+
+        return response()->json($this->format($settings->fresh()));
+    }
+
     private function format(CompanySetting $s): array
     {
         return [
             'name'          => $s->name,
             'legal_name'    => $s->legal_name,
-            'logo_url'      => $s->logo_path ? Storage::disk('public')->url($s->logo_path) : null,
+            'logo_url'      => $s->logo_path  ? Storage::disk('public')->url($s->logo_path)  : null,
+            'stamp_url'     => $s->stamp_path ? Storage::disk('public')->url($s->stamp_path) : null,
             'email'         => $s->email,
             'phone'         => $s->phone,
             'website'       => $s->website,

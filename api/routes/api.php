@@ -49,6 +49,7 @@ Route::prefix('auth')->group(function () {
 
 // Enrôlement agent (public — sans authentification)
 Route::post('/enroll/submit', [EnrollmentController::class, 'submit']);
+Route::get('/enroll/organisation-units', [OrganisationUnitController::class, 'index']);
 
 // Protected routes
 Route::middleware('auth:sanctum')->group(function () {
@@ -68,7 +69,8 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Paramètres de l'entreprise (configuration)
     Route::post('/settings', [SettingsController::class, 'update']);
-    Route::delete('/settings/logo', [SettingsController::class, 'deleteLogo']);
+    Route::delete('/settings/logo',  [SettingsController::class, 'deleteLogo']);
+    Route::delete('/settings/stamp', [SettingsController::class, 'deleteStamp']);
 
     // ── Portail Agent (données de l'employé connecté uniquement) ──
     Route::prefix('me')->group(function () {

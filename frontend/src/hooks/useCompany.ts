@@ -18,6 +18,7 @@ export function useCompany() {
     company,
     name: company.name || 'RH+PAIE',
     legalName: company.legal_name || '',
-    logoUrl: company.logo_url || null,
+    logoUrl:  company.logo_url  || null,
+    stampUrl: company.stamp_url || null,
   };
 }

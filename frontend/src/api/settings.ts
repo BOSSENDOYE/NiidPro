@@ -4,6 +4,7 @@ export interface CompanySettings {
   name: string;
   legal_name: string | null;
   logo_url: string | null;
+  stamp_url: string | null;
   email: string | null;
   phone: string | null;
   website: string | null;
@@ -29,5 +30,6 @@ export const settingsApi = {
       headers: { 'Content-Type': 'multipart/form-data' },
     }),
 
-  deleteLogo: () => client.delete<CompanySettings>('/settings/logo'),
+  deleteLogo:  () => client.delete<CompanySettings>('/settings/logo'),
+  deleteStamp: () => client.delete<CompanySettings>('/settings/stamp'),
 };
