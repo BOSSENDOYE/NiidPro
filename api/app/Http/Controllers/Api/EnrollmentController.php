@@ -89,6 +89,34 @@ class EnrollmentController extends Controller
         ]);
     }
 
+    /** PATCH /api/enrollments/{id} — modification avant validation */
+    public function update(Request $request, EnrollmentRequest $enrollment)
+    {
+        if ($enrollment->status !== 'pending') {
+            return response()->json(['message' => 'Seules les demandes en attente peuvent être modifiées.'], 422);
+        }
+
+        $data = $request->validate([
+            'matricule'            => 'sometimes|required|string|max:50',
+            'first_name'           => 'sometimes|required|string|max:100',
+            'last_name'            => 'sometimes|required|string|max:100',
+            'date_naissance'       => 'sometimes|required|date',
+            'lieu_naissance'       => 'sometimes|required|string|max:150',
+            'date_embauche'        => 'sometimes|required|date',
+            'fonction'             => 'sometimes|required|string|max:150',
+            'telephone'            => 'sometimes|required|string|max:30',
+            'email'                => 'sometimes|required|email|max:150',
+            'categorie_emploi'     => 'nullable|string|max:50',
+            'qualification'        => 'nullable|string|max:100',
+            'adresse'              => 'nullable|string|max:255',
+            'organisation_unit_id' => 'nullable|exists:organisation_units,id',
+        ]);
+
+        $enrollment->update($data);
+
+        return response()->json($enrollment->fresh()->load('reviewer'));
+    }
+
     /** POST /api/enrollments/{id}/validate — protected */
     public function validate(Request $request, EnrollmentRequest $enrollment)
     {
@@ -121,11 +149,15 @@ class EnrollmentController extends Controller
         ];
 
         if ($employee) {
-            // Update only null/empty fields
+            // Mettre à jour les champs vides de l'employé
             foreach ($fields as $key => $val) {
                 if ($val !== null && $val !== '' && empty($employee->$key)) {
                     $employee->$key = $val;
                 }
+            }
+            // Toujours appliquer le service si l'enrôlement en fournit un
+            if ($enrollment->organisation_unit_id !== null) {
+                $employee->organisation_unit_id = $enrollment->organisation_unit_id;
             }
             $employee->save();
         } else {

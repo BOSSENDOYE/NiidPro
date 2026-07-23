@@ -69,6 +69,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Paramètres de l'entreprise (configuration)
     Route::post('/settings', [SettingsController::class, 'update']);
+    Route::patch('/enrollments/{enrollment}',          [EnrollmentController::class, 'update']);
     Route::delete('/settings/logo',  [SettingsController::class, 'deleteLogo']);
     Route::delete('/settings/stamp', [SettingsController::class, 'deleteStamp']);
 

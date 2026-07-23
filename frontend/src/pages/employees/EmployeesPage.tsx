@@ -1,9 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Box, Card, CardContent, Avatar, Typography, IconButton, Tooltip, TextField,
   Skeleton, Stack, Tabs, Tab, Button, CircularProgress,
-  Chip, Select, FormControl, Grid, Divider, Checkbox, Menu, ListItemIcon, ListItemText,
+  Chip, Select, FormControl, InputLabel, Grid, Divider, Checkbox, Menu, ListItemIcon, ListItemText,
   MenuItem, Dialog, DialogTitle, DialogContent, DialogActions,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
   Alert,
@@ -13,13 +13,14 @@ import {
   Print, PersonAdd, Groups, CheckCircle, Block,
   Gavel, Assignment, Assessment, ViewModule, ViewList,
   Phone, Event, Refresh, AccessTime, EmojiEvents, Search, AssignmentTurnedIn,
-  FileUpload, HowToReg, QrCode2, VerifiedUser, DoNotDisturb,
+  FileUpload, HowToReg, QrCode2, VerifiedUser, DoNotDisturb, EditNote,
 } from '@mui/icons-material';
 import { QRCodeSVG } from 'qrcode.react';
 import { useNavigate } from 'react-router-dom';
 import { employeesApi } from '../../api/employees';
 import { tasksApi } from '../../api/tasks';
 import client from '../../api/client';
+import { organisationUnitApi, type OrgUnit } from '../../api/organisationUnits';
 import { formatDate, fmtMatricule } from '../../utils/format';
 import EmployeeCreateModal from '../../components/employees/EmployeeCreateModal';
 import ContractTab from '../../components/employees/ContractTab';
@@ -76,8 +77,74 @@ export default function EmployeesPage() {
   const [enrollRejectOpen, setEnrollRejectOpen] = useState(false);
   const [rejectReasonText, setRejectReasonText] = useState('');
   const [enrollActionLoading, setEnrollActionLoading] = useState(false);
+  // ── Mode édition de l'enrôlement ─────────────────────────────────────────
+  const [enrollEditMode, setEnrollEditMode]   = useState(false);
+  const [enrollSaveLoading, setEnrollSaveLoading] = useState(false);
+  type EnrollForm = {
+    matricule: string; first_name: string; last_name: string;
+    date_naissance: string; lieu_naissance: string; date_embauche: string;
+    fonction: string; telephone: string; email: string;
+    categorie_emploi: string; qualification: string; adresse: string;
+    directionId: number | ''; divisionId: number | '';
+  };
+  const ENROLL_FORM_EMPTY: EnrollForm = {
+    matricule: '', first_name: '', last_name: '',
+    date_naissance: '', lieu_naissance: '', date_embauche: '',
+    fonction: '', telephone: '', email: '',
+    categorie_emploi: '', qualification: '', adresse: '',
+    directionId: '', divisionId: '',
+  };
+  const [enrollEditForm, setEnrollEditForm]   = useState<EnrollForm>(ENROLL_FORM_EMPTY);
 
   const qcPage = useQueryClient();
+
+  const { data: orgUnits = [] } = useQuery<OrgUnit[]>({
+    queryKey: ['org-units'],
+    queryFn: () => organisationUnitApi.list().then(r => r.data),
+    staleTime: 10 * 60_000,
+    enabled: enrollDetailOpen,
+  });
+
+  const govIds    = new Set(orgUnits.filter(u => u.type === 'gouvernance').map(u => u.id));
+  const directions = orgUnits.filter(u => u.parent_id === null || govIds.has(u.parent_id ?? -1));
+  const divisionsByDirection = (dirId: number | '') =>
+    dirId ? orgUnits.filter(u => u.parent_id === dirId && !directions.find(d => d.id === u.id)) : [];
+
+  // Initialise le formulaire d'édition quand on ouvre une demande
+  useEffect(() => {
+    if (!enrollDetail || orgUnits.length === 0) return;
+    const e = enrollDetail.enrollment;
+    let dirId: number | '' = '';
+    let divId: number | '' = '';
+    if (e.organisation_unit_id) {
+      const unit = orgUnits.find(u => u.id === e.organisation_unit_id);
+      if (unit) {
+        if (directions.some(d => d.id === unit.id)) {
+          dirId = unit.id;
+        } else {
+          divId = unit.id;
+          dirId = unit.parent_id ?? '';
+        }
+      }
+    }
+    setEnrollEditForm({
+      matricule:       e.matricule ?? '',
+      first_name:      e.first_name ?? '',
+      last_name:       e.last_name ?? '',
+      date_naissance:  e.date_naissance?.substring(0, 10) ?? '',
+      lieu_naissance:  e.lieu_naissance ?? '',
+      date_embauche:   e.date_embauche?.substring(0, 10) ?? '',
+      fonction:        e.fonction ?? '',
+      telephone:       e.telephone ?? '',
+      email:           e.email ?? '',
+      categorie_emploi: e.categorie_emploi ?? '',
+      qualification:   e.qualification ?? '',
+      adresse:         e.adresse ?? '',
+      directionId:     dirId,
+      divisionId:      divId,
+    });
+  }, [enrollDetail, orgUnits.length]);
+
   const taskMut = useMutation({
     mutationFn: (data: Record<string, unknown>) => tasksApi.create(data),
     onSuccess: () => { qcPage.invalidateQueries({ queryKey: ['tasks'] }); setTaskEmp(null); setTaskForm({ title: '', description: '', priority: 'medium', due_date: '' }); },
@@ -1104,7 +1171,7 @@ export default function EmployeesPage() {
       </Card>
 
       {/* ── Dialog : Détail enrôlement ── */}
-      <Dialog open={enrollDetailOpen} onClose={() => { setEnrollDetailOpen(false); setEnrollDetail(null); }}
+      <Dialog open={enrollDetailOpen} onClose={() => { setEnrollDetailOpen(false); setEnrollDetail(null); setEnrollEditMode(false); }}
         maxWidth="md" fullWidth PaperProps={{ sx: { borderRadius: 3 } }}>
         <DialogTitle sx={{ fontWeight: 800, pb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
           <HowToReg sx={{ color: '#002f59' }} />
@@ -1157,27 +1224,130 @@ export default function EmployeesPage() {
 
             <Grid container spacing={3}>
               <Grid item xs={12} md={enrollDetail.matched_employee ? 6 : 12}>
-                <Typography sx={{ fontWeight: 700, fontSize: 13, color: '#002f59', mb: 1.5 }}>Informations soumises</Typography>
-                <Box sx={{ bgcolor: '#F8FAFC', borderRadius: 2, p: 2 }}>
-                  {([
-                    ['Matricule', enrollDetail.enrollment.matricule],
-                    ['Prénom(s)', enrollDetail.enrollment.first_name],
-                    ['Nom', enrollDetail.enrollment.last_name],
-                    ['Date de naissance', enrollDetail.enrollment.date_naissance ? new Date(enrollDetail.enrollment.date_naissance).toLocaleDateString('fr-FR') : '—'],
-                    ['Lieu de naissance', enrollDetail.enrollment.lieu_naissance],
-                    ["Date d'embauche", enrollDetail.enrollment.date_embauche ? new Date(enrollDetail.enrollment.date_embauche).toLocaleDateString('fr-FR') : '—'],
-                    ['Fonction', enrollDetail.enrollment.fonction],
-                    ['Téléphone', enrollDetail.enrollment.telephone],
-                    ['Email', enrollDetail.enrollment.email],
-                    ['Catégorie', enrollDetail.enrollment.categorie_emploi || '—'],
-                    ['Qualification', enrollDetail.enrollment.qualification || '—'],
-                  ] as [string, string][]).map(([label, val]) => (
-                    <Box key={label} sx={{ display: 'flex', py: 0.75, borderBottom: '1px solid #E2E8F0', '&:last-child': { borderBottom: 'none' } }}>
-                      <Typography sx={{ width: 160, fontSize: 12, color: '#64748B', fontWeight: 600, flexShrink: 0 }}>{label}</Typography>
-                      <Typography sx={{ fontSize: 12, color: '#0F172A', fontWeight: 500 }}>{val || '—'}</Typography>
-                    </Box>
-                  ))}
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
+                  <Typography sx={{ fontWeight: 700, fontSize: 13, color: '#002f59' }}>Informations soumises</Typography>
+                  {enrollDetail.enrollment.status === 'pending' && !enrollEditMode && (
+                    <Button size="small" startIcon={<EditNote />} variant="outlined"
+                      onClick={() => setEnrollEditMode(true)}
+                      sx={{ borderRadius: 2, textTransform: 'none', fontSize: 12, fontWeight: 700 }}>
+                      Modifier
+                    </Button>
+                  )}
+                  {enrollEditMode && (
+                    <Button size="small" variant="text" color="inherit"
+                      onClick={() => setEnrollEditMode(false)}
+                      sx={{ borderRadius: 2, textTransform: 'none', fontSize: 12 }}>
+                      Annuler
+                    </Button>
+                  )}
                 </Box>
+
+                {!enrollEditMode ? (
+                  <Box sx={{ bgcolor: '#F8FAFC', borderRadius: 2, p: 2 }}>
+                    {([
+                      ['Matricule', enrollDetail.enrollment.matricule],
+                      ['Prénom(s)', enrollDetail.enrollment.first_name],
+                      ['Nom', enrollDetail.enrollment.last_name],
+                      ['Date de naissance', enrollDetail.enrollment.date_naissance ? new Date(enrollDetail.enrollment.date_naissance).toLocaleDateString('fr-FR') : '—'],
+                      ['Lieu de naissance', enrollDetail.enrollment.lieu_naissance],
+                      ["Date d'embauche", enrollDetail.enrollment.date_embauche ? new Date(enrollDetail.enrollment.date_embauche).toLocaleDateString('fr-FR') : '—'],
+                      ['Fonction', enrollDetail.enrollment.fonction],
+                      ['Téléphone', enrollDetail.enrollment.telephone],
+                      ['Email', enrollDetail.enrollment.email],
+                      ['Catégorie', enrollDetail.enrollment.categorie_emploi || '—'],
+                      ['Qualification', enrollDetail.enrollment.qualification || '—'],
+                      ['Adresse', enrollDetail.enrollment.adresse || '—'],
+                    ] as [string, string][]).map(([label, val]) => (
+                      <Box key={label} sx={{ display: 'flex', py: 0.75, borderBottom: '1px solid #E2E8F0', '&:last-child': { borderBottom: 'none' } }}>
+                        <Typography sx={{ width: 160, fontSize: 12, color: '#64748B', fontWeight: 600, flexShrink: 0 }}>{label}</Typography>
+                        <Typography sx={{ fontSize: 12, color: '#0F172A', fontWeight: 500 }}>{val || '—'}</Typography>
+                      </Box>
+                    ))}
+                  </Box>
+                ) : (
+                  /* ── Formulaire d'édition ── */
+                  <Box sx={{ bgcolor: '#F8FAFC', borderRadius: 2, p: 2 }}>
+                    <Grid container spacing={1.5}>
+                      {([
+                        { key: 'matricule',      label: 'Matricule',        xs: 4 },
+                        { key: 'first_name',     label: 'Prénom(s)',        xs: 4 },
+                        { key: 'last_name',      label: 'Nom',              xs: 4 },
+                        { key: 'date_naissance', label: 'Date naissance',   xs: 4, type: 'date' },
+                        { key: 'lieu_naissance', label: 'Lieu naissance',   xs: 4 },
+                        { key: 'date_embauche',  label: "Date d'embauche",  xs: 4, type: 'date' },
+                        { key: 'fonction',       label: 'Fonction',         xs: 6 },
+                        { key: 'telephone',      label: 'Téléphone',        xs: 6 },
+                        { key: 'email',          label: 'Email',            xs: 12 },
+                        { key: 'categorie_emploi', label: 'Catégorie',      xs: 6 },
+                        { key: 'qualification',  label: 'Qualification',    xs: 6 },
+                        { key: 'adresse',        label: 'Adresse',          xs: 12 },
+                      ] as { key: keyof typeof enrollEditForm; label: string; xs: number; type?: string }[]).map(({ key, label, xs, type }) => (
+                        <Grid item xs={xs} key={key}>
+                          <TextField fullWidth size="small" label={label} type={type ?? 'text'}
+                            value={enrollEditForm[key]} InputLabelProps={type === 'date' ? { shrink: true } : undefined}
+                            onChange={e => setEnrollEditForm(f => ({ ...f, [key]: e.target.value }))}
+                          />
+                        </Grid>
+                      ))}
+                      {/* Direction */}
+                      <Grid item xs={6}>
+                        <FormControl fullWidth size="small">
+                          <InputLabel>Direction / Entité</InputLabel>
+                          <Select label="Direction / Entité"
+                            value={enrollEditForm.directionId}
+                            onChange={e => setEnrollEditForm(f => ({ ...f, directionId: e.target.value as number | '', divisionId: '' }))}>
+                            <MenuItem value=""><em>— Aucune —</em></MenuItem>
+                            {directions.map(d => <MenuItem key={d.id} value={d.id}>{d.libelle}</MenuItem>)}
+                          </Select>
+                        </FormControl>
+                      </Grid>
+                      {/* Division */}
+                      <Grid item xs={6}>
+                        <FormControl fullWidth size="small" disabled={!enrollEditForm.directionId}>
+                          <InputLabel>Division / Service</InputLabel>
+                          <Select label="Division / Service"
+                            value={enrollEditForm.divisionId}
+                            onChange={e => setEnrollEditForm(f => ({ ...f, divisionId: e.target.value as number | '' }))}>
+                            <MenuItem value=""><em>— Aucune —</em></MenuItem>
+                            {divisionsByDirection(enrollEditForm.directionId).map(d => <MenuItem key={d.id} value={d.id}>{d.libelle}</MenuItem>)}
+                          </Select>
+                        </FormControl>
+                      </Grid>
+                    </Grid>
+                    <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
+                      <Button variant="contained" size="small" disabled={enrollSaveLoading}
+                        startIcon={enrollSaveLoading ? <CircularProgress size={14} color="inherit" /> : <EditNote />}
+                        onClick={async () => {
+                          if (!enrollDetail) return;
+                          setEnrollSaveLoading(true);
+                          try {
+                            const payload = {
+                              matricule:       enrollEditForm.matricule,
+                              first_name:      enrollEditForm.first_name,
+                              last_name:       enrollEditForm.last_name,
+                              date_naissance:  enrollEditForm.date_naissance,
+                              lieu_naissance:  enrollEditForm.lieu_naissance,
+                              date_embauche:   enrollEditForm.date_embauche,
+                              fonction:        enrollEditForm.fonction,
+                              telephone:       enrollEditForm.telephone,
+                              email:           enrollEditForm.email,
+                              categorie_emploi:   enrollEditForm.categorie_emploi || null,
+                              qualification:      enrollEditForm.qualification    || null,
+                              adresse:            enrollEditForm.adresse           || null,
+                              organisation_unit_id: enrollEditForm.divisionId || enrollEditForm.directionId || null,
+                            };
+                            const res = await client.patch(`/enrollments/${enrollDetail.enrollment.id}`, payload);
+                            setEnrollDetail(d => d ? { ...d, enrollment: res.data } : d);
+                            setEnrollEditMode(false);
+                            refetchEnrollments();
+                          } finally { setEnrollSaveLoading(false); }
+                        }}
+                        sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 700, bgcolor: '#002f59', '&:hover': { bgcolor: '#003f7a' } }}>
+                        Sauvegarder les modifications
+                      </Button>
+                    </Box>
+                  </Box>
+                )}
               </Grid>
               {enrollDetail.matched_employee && (
                 <Grid item xs={12} md={6}>

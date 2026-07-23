@@ -95,6 +95,8 @@ export interface EnrollmentRequest {
   email: string;
   categorie_emploi?: string;
   qualification?: string;
+  adresse?: string;
+  organisation_unit_id?: number | null;
   photo_path?: string;
   photo_url?: string;
   status: 'pending' | 'validated' | 'rejected';
