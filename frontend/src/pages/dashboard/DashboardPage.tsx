@@ -7,11 +7,12 @@ import {
 import {
   AssignmentLate, BeachAccess, Business, CheckCircle,
   EventAvailable, Groups, PersonAdd, Print, QueryStats, Schedule, TrendingUp,
-  WarningAmber, WorkHistory, Gavel, Work, Category,
+  WarningAmber, WorkHistory, Gavel, Work, Category, HowToReg,
 } from '@mui/icons-material';
 import type { ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { dashboardApi } from '../../api/dashboard';
+import client from '../../api/client';
 import { formatDate } from '../../utils/format';
 import { useAuthStore } from '../../store/auth.store';
 import type { DashboardStats, ExpiringContract } from '../../types';
@@ -292,6 +293,13 @@ export default function DashboardPage() {
     refetchInterval: 60_000,
   });
 
+  const { data: pendingEnrollData } = useQuery({
+    queryKey: ['enrollments-pending-count'],
+    queryFn: () => client.get('/enrollments', { params: { status: 'pending' } }).then(r => r.data),
+    refetchInterval: 60_000,
+  });
+  const pendingEnrollCount: number = pendingEnrollData?.total ?? 0;
+
   const now = new Date();
   const hour = now.getHours();
   const greeting = hour < 12 ? 'Bonjour' : hour < 18 ? 'Bon apres-midi' : 'Bonsoir';
@@ -457,6 +465,19 @@ export default function DashboardPage() {
                 <KpiCard {...item} />
               </Grid>
             ))}
+
+        {/* ── Enrôlements en attente ── */}
+        <Grid item xs={12} sm={6} md={3}>
+          <KpiCard
+            label="Enrôlements en attente"
+            value={isLoading ? '…' : pendingEnrollCount}
+            helper={pendingEnrollCount > 0 ? 'Demandes à traiter' : 'Aucune demande en attente'}
+            color="#002f59"
+            bg="#EEF4FF"
+            icon={<HowToReg />}
+            to="/employees"
+          />
+        </Grid>
       </Grid>
 
       <Grid container spacing={2}>
