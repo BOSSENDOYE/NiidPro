@@ -96,6 +96,7 @@ export interface EnrollmentRequest {
   categorie_emploi?: string;
   qualification?: string;
   photo_path?: string;
+  photo_url?: string;
   status: 'pending' | 'validated' | 'rejected';
   rejection_reason?: string;
   matched_employee_id?: number;

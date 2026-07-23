@@ -1037,7 +1037,7 @@ export default function EmployeesPage() {
                             <TableRow key={enr.id} hover>
                               <TableCell sx={{ py: 0.5 }}>
                                 <Avatar
-                                  src={enr.photo_path ? `${(import.meta.env.VITE_API_URL ?? 'http://localhost:8000/api').replace('/api', '')}/storage/${enr.photo_path}` : undefined}
+                                  src={enr.photo_url ?? undefined}
                                   sx={{ width: 36, height: 36, fontSize: 13, fontWeight: 700, bgcolor: '#E2E8F0', color: '#475569' }}
                                 >
                                   {`${enr.first_name?.[0] ?? ''}${enr.last_name?.[0] ?? ''}`.toUpperCase()}
@@ -1127,9 +1127,7 @@ export default function EmployeesPage() {
               background: 'linear-gradient(135deg, #002f59 0%, #004080 100%)',
             }}>
               <Avatar
-                src={enrollDetail.enrollment.photo_path
-                  ? `${(import.meta.env.VITE_API_URL ?? 'http://localhost:8000/api').replace('/api', '')}/storage/${enrollDetail.enrollment.photo_path}`
-                  : undefined}
+                src={enrollDetail.enrollment.photo_url ?? undefined}
                 sx={{
                   width: 96, height: 96, flexShrink: 0,
                   border: '3px solid rgba(255,255,255,0.4)',

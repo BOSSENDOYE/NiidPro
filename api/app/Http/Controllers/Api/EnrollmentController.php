@@ -113,6 +113,7 @@ class EnrollmentController extends Controller
             'categorie_emploi'=> $enrollment->categorie_emploi,
             'qualification'   => $enrollment->qualification,
             'status'          => 'active',
+            'photo'           => $enrollment->photo_path,
         ];
 
         if ($employee) {
