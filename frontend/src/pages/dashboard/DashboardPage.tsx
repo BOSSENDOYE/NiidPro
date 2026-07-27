@@ -75,9 +75,9 @@ function kpiData(data: DashboardStats) {
       to: '/attendances',
     },
     {
-      label: 'Demandes de conges',
+      label: 'Congés & Absences',
       value: data.pending_leaves,
-      helper: 'Demandes en attente',
+      helper: 'Congés et absences en attente',
       color: '#D97706',
       bg: '#FFFBEB',
       icon: <BeachAccess />,
@@ -993,7 +993,7 @@ export default function DashboardPage() {
               ) : data ? (
                 <Stack spacing={1.25}>
                   {[
-                    { label: 'Demandes de conges', value: data.pending_leaves, color: '#D97706', bg: '#FFFBEB' },
+                    { label: 'Congés & Absences', value: data.pending_leaves, color: '#D97706', bg: '#FFFBEB' },
                     { label: 'Justifications ouvertes', value: data.pending_justifications, color: '#7C3AED', bg: '#F5F3FF' },
                     { label: 'Contrats a renouveler', value: data.expiring_contracts, color: '#DC2626', bg: '#FEF2F2' },
                     { label: 'Retards aujourd hui', value: data.today_attendance.late, color: '#0E7490', bg: '#ECFEFF' },

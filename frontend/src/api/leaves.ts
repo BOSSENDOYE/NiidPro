@@ -228,3 +228,71 @@ export const leaveTypesApi = {
   delete: (id: number) =>
     client.delete(`/leave-types/${id}`),
 };
+
+// ── Demande de report de date de jouissance ──────────────────────────────────
+
+export type PostponementStepStatus = 'pending' | 'approved' | 'rejected';
+
+export interface PostponementStep {
+  status:  PostponementStepStatus;
+  user_id: number | null;
+  at:      string | null;
+  comment: string | null;
+  user?:   { id: number; name: string } | null;
+}
+
+export interface LeavePostponement {
+  id:                    number;
+  employee_id:           number;
+  leave_id:              number | null;
+  submitted_by:          number | null;
+  submitted_at:          string | null;
+  date_depart_initial:   string;
+  date_retour_initial:   string;
+  date_depart_effectif:  string;
+  date_retour_effectif:  string;
+  jours_report:          number;
+  motif:                 string;
+  status:                'pending' | 'approved' | 'rejected';
+  current_step:          number | null;
+  // Niveaux
+  n1_status: PostponementStepStatus; n1_user_id: number | null; n1_at: string | null; n1_comment: string | null;
+  n2_status: PostponementStepStatus; n2_user_id: number | null; n2_at: string | null; n2_comment: string | null;
+  n3_status: PostponementStepStatus; n3_user_id: number | null; n3_at: string | null; n3_comment: string | null;
+  n4_status: PostponementStepStatus; n4_user_id: number | null; n4_at: string | null; n4_comment: string | null;
+  n5_status: PostponementStepStatus; n5_user_id: number | null; n5_at: string | null; n5_comment: string | null;
+  // Relations
+  employee?:    { id: number; first_name: string; last_name: string; employee_number: string; department?: { name: string } };
+  leave?:       { id: number; start_date: string; end_date: string } | null;
+  submitted_by_user?: { id: number; name: string } | null;
+  n1_user?: { name: string } | null; n2_user?: { name: string } | null;
+  n3_user?: { name: string } | null; n4_user?: { name: string } | null;
+  n5_user?: { name: string } | null;
+  created_at:   string;
+}
+
+export const postponementApi = {
+  list: (params?: Record<string, unknown>) =>
+    client.get<{ data: LeavePostponement[]; total: number; last_page: number }>(
+      '/leave-postponements', { params }
+    ).then(r => r.data),
+
+  create: (data: {
+    employee_id: number;
+    leave_id?: number | null;
+    date_depart_initial: string;
+    date_retour_initial: string;
+    date_depart_effectif: string;
+    date_retour_effectif: string;
+    motif: string;
+  }) => client.post<LeavePostponement>('/leave-postponements', data).then(r => r.data),
+
+  show: (id: number) =>
+    client.get<LeavePostponement>(`/leave-postponements/${id}`).then(r => r.data),
+
+  approve: (id: number, data: { step: number; status: 'approved' | 'rejected'; comment?: string }) =>
+    client.post<LeavePostponement>(`/leave-postponements/${id}/approve`, data).then(r => r.data),
+
+  delete: (id: number) =>
+    client.delete(`/leave-postponements/${id}`),
+};

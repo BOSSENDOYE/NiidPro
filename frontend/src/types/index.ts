@@ -191,6 +191,7 @@ export interface Leave {
   created_at: string;
   abs_approval_level?: number;
   abs_approvals?: AbsApprovalEntry[] | null;
+  abs_imputation?: 'absence_quota' | 'conge_quota' | 'none' | null;
 }
 
 export interface ExpiringContract {

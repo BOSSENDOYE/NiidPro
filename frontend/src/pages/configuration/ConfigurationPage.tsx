@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Box, Tabs, Tab, Typography } from '@mui/material';
 import {
-  Business, Group, Security, Email, Tune, AccountTree,
+  Business, Group, Security, Email, Tune, AccountTree, Psychology,
 } from '@mui/icons-material';
 import CompanyTab from './tabs/CompanyTab';
 import UsersTab from './tabs/UsersTab';
@@ -9,6 +9,7 @@ import RolesTab from './tabs/RolesTab';
 import MailingTab from './tabs/MailingTab';
 import PreferencesTab from './tabs/PreferencesTab';
 import WorkflowConfigTab from './tabs/WorkflowConfigTab';
+import AssistantConfigTab from './tabs/AssistantConfigTab';
 
 const TABS = [
   { label: 'Entreprise',              icon: <Business sx={{ fontSize: 18 }} />,    comp: <CompanyTab /> },
@@ -17,6 +18,7 @@ const TABS = [
   { label: 'Circuits de validation',  icon: <AccountTree sx={{ fontSize: 18 }} />, comp: <WorkflowConfigTab /> },
   { label: 'Paramètre mailing',       icon: <Email sx={{ fontSize: 18 }} />,       comp: <MailingTab /> },
   { label: 'Préférences',             icon: <Tune sx={{ fontSize: 18 }} />,        comp: <PreferencesTab /> },
+  { label: 'Assistant IA',            icon: <Psychology sx={{ fontSize: 18 }} />,  comp: <AssistantConfigTab /> },
 ];
 
 export default function ConfigurationPage() {

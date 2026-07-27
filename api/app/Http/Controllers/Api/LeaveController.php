@@ -81,6 +81,7 @@ class LeaveController extends Controller
             'reason'                => ['nullable', 'string'],
             'leave_decision_ref'    => ['nullable', 'string', 'max:100'],
             'leave_decision_avenir' => ['nullable', 'boolean'],
+            'abs_imputation'        => ['nullable', 'string', 'in:absence_quota,conge_quota,none'],
         ]);
 
         $employee  = Employee::findOrFail($data['employee_id']);
@@ -105,21 +106,43 @@ class LeaveController extends Controller
         );
 
         if ($isAbsence) {
-            // Limite annuelle absences : 15 jours ouvrées
-            $year            = now()->year;
-            $usedAbsenceDays = Leave::where('employee_id', $data['employee_id'])
-                ->whereNotIn('status', ['rejected', 'cancelled'])
-                ->whereHas('leaveType', fn($q) => $q->where('category', 'absence'))
-                ->whereYear('start_date', $year)
-                ->sum('days_count');
+            $isAutreType = ($leaveType->code === 'ABS_AUTRE');
+            $imputation  = $data['abs_imputation'] ?? null;
 
-            if ($usedAbsenceDays + $daysCount > 15) {
-                $remaining = max(0, 15 - (int) $usedAbsenceDays);
-                return response()->json([
-                    'message' => "Quota d'absences annuel dépassé. Jours restants : {$remaining}/15.",
-                    'errors'  => ['days' => ["Quota d'absences annuel de 15 jours dépassé."]],
-                ], 422);
+            if (! $isAutreType || $imputation === 'absence_quota') {
+                // Limite annuelle absences : 15 jours ouvrées
+                $year            = now()->year;
+                $usedAbsenceDays = Leave::where('employee_id', $data['employee_id'])
+                    ->whereNotIn('status', ['rejected', 'cancelled'])
+                    ->whereHas('leaveType', fn($q) => $q->where('category', 'absence'))
+                    ->whereYear('start_date', $year)
+                    ->sum('days_count');
+
+                if ($usedAbsenceDays + $daysCount > 15) {
+                    $remaining = max(0, 15 - (int) $usedAbsenceDays);
+                    return response()->json([
+                        'message' => "Quota d'absences annuel dépassé. Jours restants : {$remaining}/15.",
+                        'errors'  => ['days' => ["Quota d'absences annuel de 15 jours dépassé."]],
+                    ], 422);
+                }
+            } elseif ($imputation === 'conge_quota') {
+                // ABS_AUTRE imputé sur le solde de congés : vérifier le solde
+                $validation = $this->calculator->validateLeaveRequest(
+                    $employee,
+                    $data['start_date'],
+                    $data['end_date'],
+                    $daysCount
+                );
+
+                if (! $validation['valid']) {
+                    return response()->json([
+                        'message' => implode(' ', $validation['errors']),
+                        'errors'  => ['days' => $validation['errors']],
+                        'balance' => $validation['balance'],
+                    ], 422);
+                }
             }
+            // ABS_AUTRE sans imputation configurée → aucune vérification (appréciation RH)
         } else {
             // ── Validation règles métier congés ──
             $validation = $this->calculator->validateLeaveRequest(
@@ -164,6 +187,7 @@ class LeaveController extends Controller
             'reason'                => $data['reason'] ?? null,
             'leave_decision_ref'    => $data['leave_decision_ref'] ?? null,
             'leave_decision_avenir' => $data['leave_decision_avenir'] ?? false,
+            'abs_imputation'        => $data['abs_imputation'] ?? null,
             'friday_rule_applied'   => $fridayRule,
             'original_start_date'   => $fridayRule ? $originalStart : null,
         ]);

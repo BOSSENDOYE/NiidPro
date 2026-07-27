@@ -22,9 +22,11 @@ import {
   Payments, BarChart, PhoneAndroid, KeyboardArrowDown,
   Article, QrCodeScanner, School, PersonSearch,
   WorkspacePremium, Close, ArrowForward, EventBusy, AssignmentReturn, FlightTakeoff,
+  Psychology,
 } from '@mui/icons-material';
 import { useAuthStore } from '../../store/auth.store';
 import { authApi } from '../../api/auth';
+import ChatbotWidget from '../assistant/ChatbotWidget';
 
 const DRAWER_WIDTH   = 260;
 const COLLAPSED_WIDTH = 66;
@@ -40,6 +42,7 @@ interface NavItem {
 interface NavSection {
   label: string;
   items: NavItem[];
+  roles?: string[];   // si présent, section visible uniquement pour ces rôles
 }
 
 const NAV: NavSection[] = [
@@ -88,6 +91,13 @@ const NAV: NavSection[] = [
     label: 'ESPACE AGENT',
     items: [
       { path: '/agent-portal', label: 'Portail Agent', icon: <PhoneAndroid />, color: '#FB7185' },
+    ],
+  },
+  {
+    label: 'ASSISTANT',
+    roles: ['super_admin', 'admin_rh'],
+    items: [
+      { path: '/assistant', label: 'Assistant IA', icon: <Psychology />, color: '#A78BFA' },
     ],
   },
   {
@@ -140,7 +150,7 @@ export default function AppLayout() {
   const [anchorEl, setAnchorEl]     = useState<null | HTMLElement>(null);
   const [notifAnchorEl, setNotifAnchorEl] = useState<null | HTMLElement>(null);
   const notifOpen = Boolean(notifAnchorEl);
-  const { user, logout }        = useAuthStore();
+  const { user, logout, hasRole } = useAuthStore();
   const navigate                = useNavigate();
   const location                = useLocation();
 
@@ -355,7 +365,9 @@ export default function AppLayout() {
               '&::-webkit-scrollbar-thumb': { bgcolor: 'rgba(255,255,255,0.08)', borderRadius: 4 },
             }}
           >
-            {NAV.map((section, si) => (
+            {NAV.filter(section =>
+                !section.roles || section.roles.some(r => hasRole(r))
+              ).map((section, si) => (
               <Box key={section.label} sx={{ mb: 0.5 }}>
                 {open ? (
                   <Typography sx={{
@@ -1194,6 +1206,9 @@ export default function AppLayout() {
           </Box>
         )}
       </Popover>
+
+      {/* ══════════════════════ CHATBOT FLOTTANT ══════════════════════ */}
+      <ChatbotWidget />
 
       {/* ══════════════════════ TOAST NOUVELLE NOTIFICATION ══════════════════════ */}
       <Snackbar

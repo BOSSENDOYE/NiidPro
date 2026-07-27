@@ -4,13 +4,14 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Box, Typography, Button, Stack, Chip, TextField,
   Divider, Alert, InputAdornment, Tooltip, Paper,
-  CircularProgress, Collapse,
+  CircularProgress, Collapse, Dialog, DialogTitle,
+  DialogContent, DialogActions,
 } from '@mui/material';
 import {
   ArrowBack, Save, CheckCircle, Add,
-  ExpandMore, ExpandLess,
+  ExpandMore, ExpandLess, Close,
 } from '@mui/icons-material';
-import { documentsApi } from '../../api/documents';
+import { documentsApi, type DocumentTypeConfig } from '../../api/documents';
 import type { DocumentTemplate } from '../../types';
 import RichTextEditor, { type RichTextEditorHandle } from '../../components/common/RichTextEditor';
 import { useCompany } from '../../hooks/useCompany';
@@ -32,6 +33,43 @@ export type DocTypeDef = typeof DOC_TYPES[number];
 
 export function getDocType(key: string): DocTypeDef {
   return (DOC_TYPES.find(t => t.key === key) ?? DOC_TYPES[0]) as DocTypeDef;
+}
+
+export const TYPE_PALETTE = [
+  { color: '#2563EB', bg: '#EFF6FF', border: '#BFDBFE' },
+  { color: '#0891B2', bg: '#ECFEFF', border: '#A5F3FC' },
+  { color: '#0369A1', bg: '#F0F9FF', border: '#BAE6FD' },
+  { color: '#7C3AED', bg: '#F5F3FF', border: '#DDD6FE' },
+  { color: '#9333EA', bg: '#FAF5FF', border: '#E9D5FF' },
+  { color: '#059669', bg: '#F0FDF4', border: '#BBF7D0' },
+  { color: '#16A34A', bg: '#F0FDF4', border: '#BBF7D0' },
+  { color: '#0F766E', bg: '#F0FDFA', border: '#99F6E4' },
+  { color: '#D97706', bg: '#FFFBEB', border: '#FDE68A' },
+  { color: '#C2410C', bg: '#FFF7ED', border: '#FED7AA' },
+  { color: '#DC2626', bg: '#FEF2F2', border: '#FECACA' },
+  { color: '#374151', bg: '#F9FAFB', border: '#D1D5DB' },
+] as const;
+
+export function customTypeToDocType(cfg: DocumentTypeConfig): DocTypeDef {
+  return {
+    key:    cfg.key,
+    label:  cfg.label,
+    cat:    cfg.cat,
+    color:  cfg.color,
+    bg:     cfg.bg,
+    border: cfg.border,
+    prefix: cfg.prefix,
+    multi:  false,
+    title:  cfg.label.toUpperCase(),
+  } as unknown as DocTypeDef;
+}
+
+export function resolveDocType(key: string, customTypes: DocumentTypeConfig[]): DocTypeDef {
+  const predefined = DOC_TYPES.find(t => t.key === key);
+  if (predefined) return predefined as unknown as DocTypeDef;
+  const custom = customTypes.find(t => t.key === key);
+  if (custom) return customTypeToDocType(custom);
+  return DOC_TYPES[0] as unknown as DocTypeDef;
 }
 
 // ── Variable groups ───────────────────────────────────────────────────────────
@@ -147,11 +185,11 @@ function buildPreviewHtml(p: {
   .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; }
   .header-left { flex: 0 0 52%; }
   .header-right { flex: 0 0 44%; text-align: right; }
-  .republic { font-weight: bold; font-size: 10pt; }
+  .republic { font-weight: bold; font-size: 11pt; }
   .motto { font-size: 9pt; margin-top: 1px; }
   .sep { margin: 2px 0; font-size: 9pt; }
-  .ministry { font-size: 9.5pt; font-weight: bold; margin: 4px 0; }
-  .logo-block { margin: 5px 0 0 8px; display: inline-block; }
+  .ministry { font-size: 10pt; font-weight: bold; font-style: italic; text-decoration: underline; margin: 4px 0; }
+  .logo-block { margin: 8px 0 0 0; display: block; }
   .ref { font-size: 11pt; margin-bottom: 3px; }
   .date { font-size: 11pt; }
   .signataire { font-weight: bold; font-size: 12pt; margin: 10px 0; }
@@ -173,7 +211,7 @@ function buildPreviewHtml(p: {
   .ampliations ul { list-style: none; padding-left: 12px; margin-top: 2px; }
   .ampliations li::before { content: "- "; }
   .ampliations li { margin: 1px 0; font-size: 10.5pt; }
-  .footer { margin-top: 14px; text-align: center; font-size: 7.5pt; color: #333; border-top: 2px solid #003399; padding-top: 4px; }
+  .footer { margin-top: 14px; text-align: center; font-size: 7.5pt; color: #333; border-bottom: 2px solid #003399; padding-bottom: 4px; }
   .empty-hint { color: #94A3B8; font-style: italic; }
 </style>
 </head>
@@ -185,7 +223,7 @@ function buildPreviewHtml(p: {
       <p class="sep">------</p>
       <p class="ministry">${p.ministry || 'Ministère des Transports terrestres et aériens'}</p>
       <div class="logo-block">
-        <img src="${p.logoUrl}" width="60" height="60" style="display:block;object-fit:contain;" alt="${p.companyName}" onerror="this.style.display='none'" />
+        <img src="${p.logoUrl}" width="90" height="90" style="display:block;object-fit:contain;" alt="${p.companyName}" onerror="this.style.display='none'" />
       </div>
     </div>
     <div class="header-right">
@@ -194,7 +232,6 @@ function buildPreviewHtml(p: {
       <p class="date">Dakar, le ${dateDoc}</p>
     </div>
   </div>
-  <p class="signataire"><strong>${p.sigTitle || 'Le Directeur Général'},</strong></p>
   ${bodyHeader}
   ${p.type.key === 'note_service' && !letterFormat
     ? `<div class="content-box"><div class="doc-body">${previewContent || '<p class="empty-hint">Le corps de la note apparaîtra ici…</p>'}</div></div>`
@@ -224,8 +261,48 @@ export default function DocumentStudio() {
   const editorRef    = useRef<RichTextEditorHandle>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
+  // ── Custom types ─────────────────────────────────────────────────────────────
+  const { data: customTypes = [], isLoading: ctLoading } = useQuery({
+    queryKey: ['doc-type-configs'],
+    queryFn: () => documentsApi.listTypeConfigs().then(r => Array.isArray(r.data) ? r.data : []),
+    staleTime: 60_000,
+  });
+
+  const deleteCTypeMut = useMutation({
+    mutationFn: (id: number) => documentsApi.deleteTypeConfig(id),
+    onSuccess: (_, deletedId) => {
+      qc.setQueryData<DocumentTypeConfig[]>(['doc-type-configs'], (old) =>
+        (old ?? []).filter(t => t.id !== deletedId)
+      );
+      if (docType === customTypes.find(t => t.id === deletedId)?.key) {
+        setDocType('attestation');
+      }
+    },
+  });
+
+  const createCTypeMut = useMutation({
+    mutationFn: (d: Omit<DocumentTypeConfig, 'id' | 'created_at'>) => documentsApi.createTypeConfig(d),
+    onSuccess: (res) => {
+      // Mise à jour immédiate du cache sans attendre le refetch
+      qc.setQueryData<DocumentTypeConfig[]>(['doc-type-configs'], (old) => [
+        ...(old ?? []),
+        res.data,
+      ]);
+      setDocType(res.data.key);
+      setNewTypeOpen(false);
+      setNewTypeLabel(''); setNewTypeCat(''); setNewTypePrefix(''); setNewTypeColorIdx(0);
+    },
+  });
+
+  // ── New-type dialog state ────────────────────────────────────────────────────
+  const [newTypeOpen,     setNewTypeOpen]     = useState(false);
+  const [newTypeLabel,    setNewTypeLabel]    = useState('');
+  const [newTypeCat,      setNewTypeCat]      = useState('');
+  const [newTypePrefix,   setNewTypePrefix]   = useState('');
+  const [newTypeColorIdx, setNewTypeColorIdx] = useState(0);
+
   // ── Form state ───────────────────────────────────────────────────────────────
-  const [docType,        setDocType]        = useState<DocTypeKey>('attestation');
+  const [docType,        setDocType]        = useState<string>('attestation');
   const [name,           setName]           = useState('');
   const [description,    setDescription]    = useState('');
   const [content,        setContent]        = useState('');
@@ -243,7 +320,7 @@ export default function DocumentStudio() {
   const [varPanelOpen,   setVarPanelOpen]   = useState(true);
   const [initialLoad,    setInitialLoad]    = useState(false);
 
-  const currentType = getDocType(docType);
+  const currentType = resolveDocType(docType, customTypes);
 
   // ── Scale preview to container ────────────────────────────────────────────────
   useEffect(() => {
@@ -268,7 +345,7 @@ export default function DocumentStudio() {
   useEffect(() => {
     if (!tplData || initialLoad) return;
     const s = tplData.settings ?? {};
-    setDocType((tplData.type as DocTypeKey) ?? 'attestation');
+    setDocType(tplData.type ?? 'attestation');
     setName(tplData.name);
     setDescription(tplData.description ?? '');
     setContent(tplData.content);
@@ -412,7 +489,7 @@ export default function DocumentStudio() {
             <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
               {DOC_TYPES.map(t => (
                 <Chip key={t.key} label={t.label}
-                  onClick={() => setDocType(t.key as DocTypeKey)}
+                  onClick={() => setDocType(t.key)}
                   sx={{
                     fontWeight: docType === t.key ? 700 : 500, fontSize: 12, cursor: 'pointer',
                     bgcolor: docType === t.key ? t.color : t.bg,
@@ -423,6 +500,35 @@ export default function DocumentStudio() {
                   }}
                 />
               ))}
+              {/* Types personnalisés */}
+              {customTypes.map(t => (
+                <Chip key={t.key} label={t.label}
+                  onClick={() => setDocType(t.key)}
+                  onDelete={() => deleteCTypeMut.mutate(t.id)}
+                  deleteIcon={<Close sx={{ fontSize: '13px !important' }} />}
+                  sx={{
+                    fontWeight: docType === t.key ? 700 : 500, fontSize: 12, cursor: 'pointer',
+                    bgcolor: docType === t.key ? t.color : t.bg,
+                    color:   docType === t.key ? '#fff' : t.color,
+                    border:  `1.5px solid ${docType === t.key ? t.color : t.border}`,
+                    transition: 'all 0.15s',
+                    '&:hover': { bgcolor: t.color, color: '#fff' },
+                    '& .MuiChip-deleteIcon': { color: docType === t.key ? 'rgba(255,255,255,0.7)' : t.color },
+                  }}
+                />
+              ))}
+              {/* Bouton nouveau type */}
+              <Chip
+                icon={ctLoading ? <CircularProgress size={11} color="inherit" /> : <Add sx={{ fontSize: '14px !important' }} />}
+                label="Nouveau type"
+                onClick={() => setNewTypeOpen(true)}
+                variant="outlined"
+                sx={{
+                  fontSize: 12, cursor: 'pointer', fontWeight: 600,
+                  borderStyle: 'dashed', borderColor: '#94A3B8', color: '#64748B',
+                  '&:hover': { bgcolor: '#F1F5F9', borderColor: '#64748B' },
+                }}
+              />
             </Box>
           </Paper>
 
@@ -675,6 +781,111 @@ export default function DocumentStudio() {
           </Alert>
         </Box>
       </Box>
+
+      {/* ── Dialog : Nouveau type de document ── */}
+      <Dialog open={newTypeOpen} onClose={() => setNewTypeOpen(false)} maxWidth="xs" fullWidth
+        PaperProps={{ sx: { borderRadius: '14px' } }}>
+        <DialogTitle sx={{ bgcolor: '#0F172A', color: '#F1F5F9', fontWeight: 700, fontSize: 15, py: 1.75,
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          Nouveau type de document
+          <Close sx={{ fontSize: 18, cursor: 'pointer', opacity: 0.7, '&:hover': { opacity: 1 } }}
+            onClick={() => setNewTypeOpen(false)} />
+        </DialogTitle>
+        <DialogContent sx={{ pt: '20px !important' }}>
+          <Stack spacing={2}>
+            <TextField label="Libellé *" size="small" fullWidth
+              value={newTypeLabel}
+              onChange={e => {
+                setNewTypeLabel(e.target.value);
+                if (!newTypeCat) setNewTypeCat(e.target.value);
+                if (!newTypePrefix) setNewTypePrefix(e.target.value.replace(/[^A-Za-z]/g, '').toUpperCase().slice(0, 4));
+              }}
+              placeholder="Ex : Décision de mutation"
+              InputLabelProps={{ shrink: true }}
+            />
+            <TextField label="Catégorie *" size="small" fullWidth
+              value={newTypeCat}
+              onChange={e => setNewTypeCat(e.target.value)}
+              placeholder="Ex : Décision"
+              InputLabelProps={{ shrink: true }}
+            />
+            <TextField label="Préfixe (référence) *" size="small" fullWidth
+              value={newTypePrefix}
+              onChange={e => setNewTypePrefix(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6))}
+              placeholder="Ex : DM"
+              helperText="2–6 caractères, utilisé dans la référence du document"
+              InputLabelProps={{ shrink: true }}
+            />
+            {/* Palette de couleurs */}
+            <Box>
+              <Typography sx={{ fontSize: 11, fontWeight: 700, color: '#64748B', mb: 1, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                Couleur
+              </Typography>
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                {TYPE_PALETTE.map((p, idx) => (
+                  <Box key={idx}
+                    onClick={() => setNewTypeColorIdx(idx)}
+                    sx={{
+                      width: 28, height: 28, borderRadius: '7px', bgcolor: p.color, cursor: 'pointer',
+                      border: `3px solid ${newTypeColorIdx === idx ? '#0F172A' : 'transparent'}`,
+                      outline: `2px solid ${newTypeColorIdx === idx ? p.color : 'transparent'}`,
+                      outlineOffset: '2px',
+                      transition: 'all 0.12s',
+                      '&:hover': { transform: 'scale(1.15)' },
+                    }}
+                  />
+                ))}
+              </Box>
+            </Box>
+            {/* Aperçu du chip */}
+            {newTypeLabel && (
+              <Box>
+                <Typography sx={{ fontSize: 11, fontWeight: 700, color: '#64748B', mb: 1, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                  Aperçu
+                </Typography>
+                <Chip
+                  label={newTypeLabel}
+                  sx={{
+                    bgcolor: TYPE_PALETTE[newTypeColorIdx].color,
+                    color: '#fff', fontWeight: 700, fontSize: 12,
+                    border: `1.5px solid ${TYPE_PALETTE[newTypeColorIdx].color}`,
+                  }}
+                />
+              </Box>
+            )}
+            {createCTypeMut.isError && (
+              <Alert severity="error" sx={{ borderRadius: '8px', fontSize: 12 }}>
+                {(createCTypeMut.error as { response?: { data?: { message?: string } } })
+                  ?.response?.data?.message ?? 'Une erreur est survenue. Vérifiez que la migration a bien été exécutée (php artisan migrate).'}
+              </Alert>
+            )}
+          </Stack>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2.5, gap: 1 }}>
+          <Button onClick={() => setNewTypeOpen(false)} sx={{ color: '#64748B', textTransform: 'none' }}>
+            Annuler
+          </Button>
+          <Button variant="contained"
+            disabled={!newTypeLabel.trim() || !newTypeCat.trim() || !newTypePrefix.trim() || createCTypeMut.isPending}
+            onClick={() => {
+              const key = (newTypeLabel.trim().toLowerCase()
+                .normalize('NFD').replace(/[̀-ͯ]/g, '')
+                .replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, ''))
+                || `custom_${Date.now()}`;
+              const pal = TYPE_PALETTE[newTypeColorIdx];
+              createCTypeMut.mutate({
+                key, label: newTypeLabel.trim(), cat: newTypeCat.trim(),
+                prefix: newTypePrefix, color: pal.color, bg: pal.bg, border: pal.border,
+              });
+            }}
+            startIcon={createCTypeMut.isPending ? <CircularProgress size={14} color="inherit" /> : <Add />}
+            sx={{ textTransform: 'none', fontWeight: 700, borderRadius: '8px',
+              bgcolor: TYPE_PALETTE[newTypeColorIdx].color,
+              '&:hover': { bgcolor: TYPE_PALETTE[newTypeColorIdx].color, filter: 'brightness(0.9)' } }}>
+            Créer le type
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

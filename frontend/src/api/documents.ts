@@ -1,6 +1,18 @@
 import client from './client';
 import type { DocumentTemplate, GeneratedDocument, PaginatedResponse } from '../types';
 
+export interface DocumentTypeConfig {
+  id: number;
+  key: string;
+  label: string;
+  cat: string;
+  color: string;
+  bg: string;
+  border: string;
+  prefix: string;
+  created_at: string;
+}
+
 function normalizeArray<T>(data: unknown): T[] {
   if (Array.isArray(data)) return data as T[];
   if (data && typeof data === 'object' && Array.isArray((data as { data?: unknown }).data)) {
@@ -46,4 +58,13 @@ export const documentsApi = {
 
   deleteGenerated: (id: number) =>
     client.delete(`/documents/generated/${id}`),
+
+  listTypeConfigs: () =>
+    client.get<DocumentTypeConfig[]>('/documents/type-configs'),
+
+  createTypeConfig: (data: Omit<DocumentTypeConfig, 'id' | 'created_at'>) =>
+    client.post<DocumentTypeConfig>('/documents/type-configs', data),
+
+  deleteTypeConfig: (id: number) =>
+    client.delete(`/documents/type-configs/${id}`),
 };

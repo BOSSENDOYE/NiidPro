@@ -16,6 +16,7 @@ class Leave extends Model
         'comment', 'justification_deadline', 'justification_submitted_at',
         'friday_rule_applied', 'original_start_date',
         'abs_approval_level', 'abs_approvals',
+        'abs_imputation',
     ];
 
     protected function casts(): array

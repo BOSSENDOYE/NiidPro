@@ -1,188 +1,214 @@
 import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useForm, Controller } from 'react-hook-form';
 import {
-  Box, Typography, IconButton, Tooltip, Dialog, DialogTitle,
-  DialogContent, DialogActions, TextField, Button, Skeleton,
-  Chip, Collapse, InputAdornment,
+  Box, Typography, IconButton, Tooltip, Button, Skeleton,
+  Chip, Collapse, InputAdornment, TextField,
+  Dialog, DialogTitle, DialogContent, DialogActions,
+  MenuItem, FormControl, InputLabel, Select,
 } from '@mui/material';
 import {
   Add, Edit, Delete, People, ExpandMore, ChevronRight,
-  Search, AccountTree, ViewList, Hub,
+  Search, AccountTree, Hub, UnfoldMore, UnfoldLess,
 } from '@mui/icons-material';
-import { useForm } from 'react-hook-form';
-import { departmentsApi } from '../../api/departments';
+import { organisationUnitApi, type OrgUnit } from '../../api/organisationUnits';
 import PageHeader from '../../components/common/PageHeader';
 import OrganigrammePage from '../organigramme/OrganigrammePage';
-import type { Department } from '../../types';
 
-// ─── helpers ─────────────────────────────────────────────────────────────────
+// ── Types ─────────────────────────────────────────────────────────────────────
 
-/** Build a tree from a flat list */
-function buildTree(flat: Department[]): Department[] {
-  const byId = new Map(flat.map((d) => [d.id, { ...d, children: [] as Department[] }]));
-  const roots: Department[] = [];
-  byId.forEach((node) => {
+type OrgNode = OrgUnit & { children: OrgNode[] };
+
+// ── Palette par type d'entité ─────────────────────────────────────────────────
+
+const TYPE_CFG: Record<OrgUnit['type'], { label: string; color: string; bg: string; border: string }> = {
+  gouvernance: { label: 'Gouvernance', color: '#fff',    bg: '#002f59', border: '#002f59' },
+  direction:   { label: 'Direction',   color: '#1B4B8A', bg: '#EFF6FF', border: '#BFDBFE' },
+  appui:       { label: 'Appui',       color: '#0284C7', bg: '#F0F9FF', border: '#BAE6FD' },
+  cellule:     { label: 'Cellule',     color: '#7C3AED', bg: '#F5F3FF', border: '#DDD6FE' },
+  division:    { label: 'Division',    color: '#059669', bg: '#F0FDF4', border: '#A7F3D0' },
+};
+
+// ── Construction de l'arbre ───────────────────────────────────────────────────
+
+function buildOrgTree(flat: OrgUnit[]): OrgNode[] {
+  const byId = new Map<number, OrgNode>(
+    flat.map(u => [u.id, { ...u, children: [] }])
+  );
+  const roots: OrgNode[] = [];
+  byId.forEach(node => {
     if (!node.parent_id) {
       roots.push(node);
     } else {
       const parent = byId.get(node.parent_id);
-      if (parent) parent.children!.push(node);
+      if (parent) parent.children.push(node);
     }
   });
-  return roots;
+  const sort = (arr: OrgNode[]) => {
+    arr.sort((a, b) => a.ordre - b.ordre);
+    arr.forEach(n => sort(n.children));
+    return arr;
+  };
+  return sort(roots);
 }
 
-function typeLabel(dept: Department): { label: string; color: string; bg: string } {
-  const d = (dept.description ?? '').toLowerCase();
-  if (d.includes('division')) return { label: 'Division', color: '#0284C7', bg: '#EFF6FF' };
-  if (dept.parent_id === null || dept.parent_id === undefined) {
-    if (dept.code === 'CS') return { label: 'Conseil', color: '#6366F1', bg: '#F5F3FF' };
-    return { label: 'Direction', color: '#1B4B8A', bg: '#EEF2FF' };
-  }
-  return { label: 'Direction', color: dept.color ?? '#64748B', bg: `${dept.color ?? '#64748B'}14` };
-}
+// ── Ligne de l'arbre ──────────────────────────────────────────────────────────
 
-// ─── Row component ────────────────────────────────────────────────────────────
-
-interface RowProps {
-  node: Department;
+interface OrgRowProps {
+  node: OrgNode;
   level: number;
   expanded: Set<number>;
   toggle: (id: number) => void;
-  onEdit: (d: Department) => void;
+  onEdit: (u: OrgUnit) => void;
   onDelete: (id: number) => void;
 }
 
-function DeptRow({ node, level, expanded, toggle, onEdit, onDelete }: RowProps) {
-  const hasChildren = (node.children?.length ?? 0) > 0;
+function OrgRow({ node, level, expanded, toggle, onEdit, onDelete }: OrgRowProps) {
+  const hasChildren = node.children.length > 0;
   const isOpen = expanded.has(node.id);
-  const indent = level * 28;
-  const type = typeLabel(node);
+  const cfg = TYPE_CFG[node.type] ?? TYPE_CFG.division;
+
+  // Niveau 0 = ligne de rupture principale (bandeau plein)
+  const isRupturePrinc = node.niveau === 0;
+  // Niveau 1 = ligne de rupture secondaire (fond clair + bordure gauche colorée)
+  const isRuptureSecond = node.niveau === 1;
 
   return (
     <>
       <Box
+        onClick={() => hasChildren && toggle(node.id)}
         sx={{
           display: 'flex',
           alignItems: 'center',
           px: 2,
-          py: 1.25,
-          borderBottom: '1px solid #F1F5F9',
-          '&:hover': { bgcolor: '#F8FAFC' },
-          '&:hover .dept-actions': { opacity: 1 },
-          transition: 'background 0.12s',
+          py: isRupturePrinc ? 1.5 : 1.25,
           gap: 1,
+          cursor: hasChildren ? 'pointer' : 'default',
+          borderBottom: '1px solid',
+          borderBottomColor: isRupturePrinc ? '#001a35' : '#F1F5F9',
+          bgcolor: isRupturePrinc ? '#002f59' : isRuptureSecond ? cfg.bg : '#fff',
+          borderLeft: isRuptureSecond
+            ? `4px solid ${cfg.border}`
+            : isRupturePrinc
+              ? 'none'
+              : '4px solid transparent',
+          '&:hover': {
+            bgcolor: isRupturePrinc
+              ? '#00336e'
+              : isRuptureSecond
+                ? `${cfg.bg}`
+                : '#F8FAFC',
+          },
+          '&:hover .org-actions': { opacity: 1 },
+          transition: 'background 0.12s',
         }}
       >
-        {/* Indent + expand toggle */}
-        <Box sx={{ width: indent, flexShrink: 0 }} />
+        {/* Indentation */}
+        <Box sx={{ width: level * 20, flexShrink: 0 }} />
 
-        <Box sx={{ width: 24, flexShrink: 0, display: 'flex', justifyContent: 'center' }}>
+        {/* Icône expand/dot */}
+        <Box sx={{ width: 22, flexShrink: 0, display: 'flex', justifyContent: 'center' }}>
           {hasChildren ? (
-            <IconButton size="small" onClick={() => toggle(node.id)} sx={{ p: 0.25, borderRadius: '6px' }}>
-              {isOpen
-                ? <ExpandMore sx={{ fontSize: 16, color: '#64748B' }} />
-                : <ChevronRight sx={{ fontSize: 16, color: '#64748B' }} />
-              }
-            </IconButton>
+            isOpen
+              ? <ExpandMore sx={{ fontSize: 17, color: isRupturePrinc ? '#93C5FD' : '#64748B' }} />
+              : <ChevronRight sx={{ fontSize: 17, color: isRupturePrinc ? '#93C5FD' : '#64748B' }} />
           ) : (
-            <Box sx={{ width: 16, height: 16, borderRadius: '50%', bgcolor: `${node.color ?? '#94A3B8'}40`, mt: '3px', mx: 'auto', flexShrink: 0, transform: 'scale(0.65)' }} />
+            <Box sx={{
+              width: 7, height: 7, borderRadius: '50%',
+              bgcolor: isRupturePrinc ? 'rgba(255,255,255,0.35)' : cfg.border,
+              mx: 'auto',
+            }} />
           )}
         </Box>
 
-        {/* Color dot */}
-        <Box sx={{ width: 10, height: 10, borderRadius: '3px', bgcolor: node.color ?? '#94A3B8', flexShrink: 0 }} />
-
-        {/* Name + code */}
-        <Box sx={{ flexGrow: 1, minWidth: 0 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Typography sx={{
-              fontSize: level === 0 ? 14 : level === 1 ? 13.5 : 12.5,
-              fontWeight: level <= 1 ? 700 : 500,
-              color: '#0F172A',
-              letterSpacing: '-0.1px',
-            }} noWrap>
-              {node.name}
-            </Typography>
-            {node.code && (
-              <Chip
-                label={node.code}
-                size="small"
-                sx={{
-                  height: 18,
-                  fontSize: 9.5,
-                  fontWeight: 700,
-                  letterSpacing: '0.06em',
-                  bgcolor: type.bg,
-                  color: type.color,
-                  border: `1px solid ${type.color}30`,
-                  flexShrink: 0,
-                }}
-              />
-            )}
-          </Box>
-          {node.description && node.description.toLowerCase() !== 'division' && (
-            <Typography sx={{ fontSize: 11, color: '#94A3B8', lineHeight: 1.3 }} noWrap>
-              {node.description}
-            </Typography>
-          )}
-        </Box>
-
-        {/* Type badge */}
+        {/* Badge code */}
         <Chip
-          label={type.label}
+          label={node.code}
+          size="small"
+          sx={{
+            height: isRupturePrinc ? 22 : 18,
+            fontSize: isRupturePrinc ? 11 : 9.5,
+            fontWeight: 700,
+            letterSpacing: '0.06em',
+            bgcolor: isRupturePrinc ? 'rgba(255,255,255,0.12)' : '#fff',
+            color: isRupturePrinc ? '#fff' : cfg.color,
+            border: `1px solid ${isRupturePrinc ? 'rgba(255,255,255,0.25)' : cfg.border}`,
+            flexShrink: 0,
+          }}
+        />
+
+        {/* Libellé */}
+        <Typography sx={{
+          flexGrow: 1,
+          fontSize: isRupturePrinc ? 14 : isRuptureSecond ? 13.5 : 12.5,
+          fontWeight: isRupturePrinc ? 800 : isRuptureSecond ? 700 : 500,
+          color: isRupturePrinc ? '#fff' : '#0F172A',
+          letterSpacing: isRupturePrinc ? '0.02em' : '-0.1px',
+        }} noWrap>
+          {node.libelle}
+        </Typography>
+
+        {/* Badge type */}
+        <Chip
+          label={cfg.label}
           size="small"
           sx={{
             height: 20,
             fontSize: 10,
             fontWeight: 600,
-            bgcolor: type.bg,
-            color: type.color,
-            border: `1px solid ${type.color}25`,
+            bgcolor: isRupturePrinc ? 'rgba(255,255,255,0.15)' : cfg.bg,
+            color: isRupturePrinc ? '#fff' : cfg.color,
+            border: `1px solid ${isRupturePrinc ? 'rgba(255,255,255,0.25)' : cfg.border}`,
             flexShrink: 0,
-            display: { xs: 'none', md: 'flex' },
+            display: { xs: 'none', sm: 'flex' },
           }}
         />
 
-        {/* Employees count */}
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, minWidth: 56, justifyContent: 'flex-end', flexShrink: 0 }}>
-          <People sx={{ fontSize: 13, color: '#94A3B8' }} />
-          <Typography sx={{ fontSize: 12, color: '#64748B', fontWeight: 600 }}>
-            {node.employees_count ?? 0}
+        {/* Compteur agents */}
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, minWidth: 48, justifyContent: 'flex-end', flexShrink: 0 }}>
+          <People sx={{ fontSize: 12, color: isRupturePrinc ? '#93C5FD' : '#94A3B8' }} />
+          <Typography sx={{ fontSize: 12, fontWeight: 600, color: isRupturePrinc ? '#93C5FD' : '#64748B' }}>
+            {node.nb_agents ?? 0}
           </Typography>
         </Box>
 
-        {/* Actions */}
+        {/* Actions (hover) */}
         <Box
-          className="dept-actions"
+          className="org-actions"
           sx={{ display: 'flex', gap: 0.25, opacity: 0, transition: 'opacity 0.12s', flexShrink: 0 }}
+          onClick={e => e.stopPropagation()}
         >
           <Tooltip title="Modifier">
             <IconButton size="small" onClick={() => onEdit(node)} sx={{ p: 0.5 }}>
-              <Edit sx={{ fontSize: 14, color: '#64748B' }} />
+              <Edit sx={{ fontSize: 14, color: isRupturePrinc ? '#93C5FD' : '#64748B' }} />
             </IconButton>
           </Tooltip>
           <Tooltip title="Supprimer">
             <IconButton size="small" onClick={() => onDelete(node.id)} sx={{ p: 0.5 }}>
-              <Delete sx={{ fontSize: 14, color: '#EF4444' }} />
+              <Delete sx={{ fontSize: 14, color: isRupturePrinc ? '#FCA5A5' : '#EF4444' }} />
             </IconButton>
           </Tooltip>
         </Box>
       </Box>
 
-      {/* Children */}
+      {/* Enfants pliables */}
       {hasChildren && (
         <Collapse in={isOpen} unmountOnExit>
-          {node.children!.map((child) => (
-            <DeptRow
-              key={child.id}
-              node={child}
-              level={level + 1}
-              expanded={expanded}
-              toggle={toggle}
-              onEdit={onEdit}
-              onDelete={onDelete}
-            />
+          {/* Trait séparateur avant chaque bloc niveau 1 */}
+          {node.children.map((child, idx) => (
+            <Box key={child.id}>
+              {isRupturePrinc && idx > 0 && (
+                <Box sx={{ height: 1, bgcolor: '#E2E8F0', mx: 0 }} />
+              )}
+              <OrgRow
+                node={child}
+                level={level + 1}
+                expanded={expanded}
+                toggle={toggle}
+                onEdit={onEdit}
+                onDelete={onDelete}
+              />
+            </Box>
           ))}
         </Collapse>
       )}
@@ -190,138 +216,146 @@ function DeptRow({ node, level, expanded, toggle, onEdit, onDelete }: RowProps) 
   );
 }
 
-// ─── Main page ────────────────────────────────────────────────────────────────
+// ── Page principale ───────────────────────────────────────────────────────────
 
-type FormData = { name: string; code: string; description: string; color: string; parent_id: string };
+const NAV = '#0D2137';
+const ACT = '#818CF8';
 
-const NAV_DEPT = '#0D2137';
-const ACT_DEPT = '#818CF8';
+type FormData = {
+  code: string;
+  libelle: string;
+  type: OrgUnit['type'];
+  niveau: number;
+  parent_id: string;
+  ordre: number;
+};
 
 export default function DepartmentsPage() {
   const qc = useQueryClient();
-  const [activeTab, setActiveTab] = useState(0);
+  const [activeTab, setActiveTab]   = useState(0);
+  const [search, setSearch]         = useState('');
+  const [expanded, setExpanded]     = useState<Set<number>>(new Set());
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [editTarget, setEditTarget] = useState<Department | null>(null);
-  const [expanded, setExpanded] = useState<Set<number>>(new Set());
-  const [search, setSearch] = useState('');
+  const [editTarget, setEditTarget] = useState<OrgUnit | null>(null);
 
-  const { data: flatList = [], isLoading } = useQuery<Department[]>({
-    queryKey: ['departments'],
-    queryFn: () => departmentsApi.list().then((r) => {
-      const d = r.data as unknown;
-      const list = (Array.isArray(d) ? d : ((d as { data?: unknown[] }).data ?? [])) as Department[];
-      // Auto-expand root nodes on first load
-      setExpanded((prev) => prev.size === 0
-        ? new Set(list.filter((x) => !x.parent_id).map((x) => x.id))
-        : prev
-      );
-      return list;
-    }),
+  const { data: flatList = [], isLoading } = useQuery<OrgUnit[]>({
+    queryKey: ['org-units'],
+    queryFn: () =>
+      organisationUnitApi.list().then(r => {
+        const raw = r.data as unknown;
+        const list = (Array.isArray(raw)
+          ? raw
+          : ((raw as { data?: OrgUnit[] }).data ?? [])
+        ) as OrgUnit[];
+        setExpanded(prev =>
+          prev.size === 0
+            ? new Set(list.filter(u => u.niveau === 0).map(u => u.id))
+            : prev
+        );
+        return list;
+      }),
   });
 
   const tree = useMemo(() => {
-    if (!search.trim()) return buildTree(flatList);
+    if (!search.trim()) return buildOrgTree(flatList);
     const q = search.toLowerCase();
     const filtered = flatList.filter(
-      (d) =>
-        d.name.toLowerCase().includes(q) ||
-        (d.code ?? '').toLowerCase().includes(q) ||
-        (d.description ?? '').toLowerCase().includes(q)
+      u => u.libelle.toLowerCase().includes(q) || u.code.toLowerCase().includes(q)
     );
-    return buildTree(filtered);
+    return buildOrgTree(filtered);
   }, [flatList, search]);
 
-  const { register, handleSubmit, reset } = useForm<FormData>();
+  const toggleExpand = (id: number) =>
+    setExpanded(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
 
-  const createMutation = useMutation({
-    mutationFn: (data: Partial<Department>) => departmentsApi.create(data),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['departments'] }); closeDialog(); },
+  const expandAll  = () => setExpanded(new Set(flatList.map(u => u.id)));
+  const collapseAll = () => setExpanded(new Set());
+
+  // CRUD
+  const createMut = useMutation({
+    mutationFn: (data: Partial<OrgUnit>) => organisationUnitApi.create(data),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['org-units'] }); closeDialog(); },
+  });
+  const updateMut = useMutation({
+    mutationFn: ({ id, data }: { id: number; data: Partial<OrgUnit> }) =>
+      organisationUnitApi.update(id, data),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['org-units'] }); closeDialog(); },
+  });
+  const deleteMut = useMutation({
+    mutationFn: (id: number) => organisationUnitApi.destroy(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['org-units'] }),
   });
 
-  const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: number; data: Partial<Department> }) => departmentsApi.update(id, data),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['departments'] }); closeDialog(); },
-  });
-
-  const deleteMutation = useMutation({
-    mutationFn: (id: number) => departmentsApi.delete(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['departments'] }),
-  });
+  const { register, handleSubmit, reset, control } = useForm<FormData>();
 
   const openCreate = () => {
-    reset({ name: '', code: '', description: '', color: '#0284C7', parent_id: '' });
+    reset({ code: '', libelle: '', type: 'division', niveau: 2, parent_id: '', ordre: 100 });
     setEditTarget(null);
     setDialogOpen(true);
   };
-
-  const openEdit = (dept: Department) => {
-    setEditTarget(dept);
+  const openEdit = (u: OrgUnit) => {
+    setEditTarget(u);
     reset({
-      name: dept.name,
-      code: dept.code ?? '',
-      description: dept.description ?? '',
-      color: dept.color ?? '#0284C7',
-      parent_id: dept.parent_id ? String(dept.parent_id) : '',
+      code:      u.code,
+      libelle:   u.libelle,
+      type:      u.type,
+      niveau:    u.niveau,
+      parent_id: u.parent_id ? String(u.parent_id) : '',
+      ordre:     u.ordre,
     });
     setDialogOpen(true);
   };
-
   const closeDialog = () => { setDialogOpen(false); setEditTarget(null); };
 
   const onSubmit = (form: FormData) => {
-    const payload: Partial<Department> = {
-      name: form.name,
-      code: form.code || undefined,
-      description: form.description || undefined,
-      color: form.color,
-      parent_id: form.parent_id ? Number(form.parent_id) : undefined,
+    const payload: Partial<OrgUnit> = {
+      code:      form.code.toUpperCase(),
+      libelle:   form.libelle,
+      type:      form.type,
+      niveau:    Number(form.niveau),
+      parent_id: form.parent_id ? Number(form.parent_id) : null,
+      ordre:     Number(form.ordre),
     };
-    if (editTarget) updateMutation.mutate({ id: editTarget.id, data: payload });
-    else createMutation.mutate(payload);
+    if (editTarget) updateMut.mutate({ id: editTarget.id, data: payload });
+    else createMut.mutate(payload);
   };
 
-  const toggleExpand = (id: number) => {
-    setExpanded((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
-
-  const expandAll = () => setExpanded(new Set(flatList.map((d) => d.id)));
-  const collapseAll = () => setExpanded(new Set());
-
-  const totalActive = flatList.reduce((s, d) => s + (d.employees_count ?? 0), 0);
-  const roots = flatList.filter((d) => !d.parent_id);
+  // Stats
+  const nbDirections = flatList.filter(u => u.type === 'direction').length;
+  const nbDivisions  = flatList.filter(u => u.type === 'division').length;
+  const nbAgents     = flatList.reduce((s, u) => s + (u.nb_agents ?? 0), 0);
 
   return (
     <Box>
       <PageHeader
         title="Directions & Services"
-        subtitle={`${flatList.length} entités · ${roots.length} directions principales · ${totalActive} agents actifs`}
+        subtitle={`${flatList.length} entités · ${nbDirections} directions · ${nbDivisions} divisions · ${nbAgents} agents`}
         action={activeTab === 0 ? { label: 'Nouvelle entité', icon: <Add />, onClick: openCreate } : undefined}
       />
 
       {/* ── Onglets ── */}
-      <Box sx={{ bgcolor: '#F1F5F9', px: 2, pt: 1.5, pb: 0, display: 'flex', gap: 1, borderBottom: `2px solid ${NAV_DEPT}`, mb: 2 }}>
+      <Box sx={{ bgcolor: '#F1F5F9', px: 2, pt: 1.5, pb: 0, display: 'flex', gap: 1, borderBottom: `2px solid ${NAV}`, mb: 2 }}>
         {[
-          { label: 'Directions & Services', icon: <AccountTree sx={{ fontSize: 15 }} /> },
-          { label: 'Organigramme',          icon: <Hub sx={{ fontSize: 15 }} /> },
+          { label: 'Structure organisationnelle', icon: <AccountTree sx={{ fontSize: 15 }} /> },
+          { label: 'Organigramme',                icon: <Hub         sx={{ fontSize: 15 }} /> },
         ].map((cfg, i) => {
-          const isActive = i === activeTab;
+          const active = i === activeTab;
           return (
             <Box key={i} onClick={() => setActiveTab(i)} sx={{
               px: 2, py: 1, cursor: 'pointer', borderRadius: '8px 8px 0 0',
               fontWeight: 700, fontSize: 13, userSelect: 'none',
               display: 'flex', alignItems: 'center', gap: '6px',
-              bgcolor: isActive ? ACT_DEPT : '#fff',
-              color:   isActive ? '#fff' : NAV_DEPT,
-              border:  `1.5px solid ${isActive ? ACT_DEPT : '#C7D2FE'}`,
+              bgcolor: active ? ACT : '#fff',
+              color:   active ? '#fff' : NAV,
+              border:  `1.5px solid ${active ? ACT : '#C7D2FE'}`,
               borderBottom: 'none',
-              boxShadow: isActive ? '0 -2px 8px rgba(129,140,248,0.30)' : 'none',
+              boxShadow: active ? '0 -2px 8px rgba(129,140,248,0.30)' : 'none',
               transition: 'all 0.15s',
-              '&:hover': { bgcolor: isActive ? ACT_DEPT : '#EEF2FF' },
+              '&:hover': { bgcolor: active ? ACT : '#EEF2FF' },
             }}>
               {cfg.icon}{cfg.label}
             </Box>
@@ -329,194 +363,239 @@ export default function DepartmentsPage() {
         })}
       </Box>
 
-      {/* ── Contenu onglet Organigramme ── */}
+      {/* ── Organigramme ── */}
       {activeTab === 1 && <OrganigrammePage embeddedMode />}
 
-      {/* ── Contenu onglet Directions & Services ── */}
+      {/* ── Structure organisationnelle ── */}
       {activeTab === 0 && (<>
 
-      {/* Toolbar */}
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2, flexWrap: 'wrap' }}>
-        <TextField
-          placeholder="Rechercher une direction, un service…"
-          size="small"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          sx={{ flexGrow: 1, maxWidth: 360 }}
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <Search sx={{ fontSize: 18, color: '#94A3B8' }} />
-              </InputAdornment>
-            ),
-          }}
-        />
-        <Tooltip title="Tout développer">
-          <Button size="small" variant="outlined" startIcon={<AccountTree />} onClick={expandAll}
+        {/* Barre d'outils */}
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2, flexWrap: 'wrap' }}>
+          <TextField
+            placeholder="Rechercher une direction, division…"
+            size="small"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            sx={{ flexGrow: 1, maxWidth: 360 }}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <Search sx={{ fontSize: 18, color: '#94A3B8' }} />
+                </InputAdornment>
+              ),
+            }}
+          />
+          <Button size="small" variant="outlined" startIcon={<UnfoldMore />} onClick={expandAll}
             sx={{ borderRadius: '8px', fontSize: 12, textTransform: 'none', display: { xs: 'none', sm: 'flex' } }}>
             Tout ouvrir
           </Button>
-        </Tooltip>
-        <Tooltip title="Tout réduire">
-          <Button size="small" variant="outlined" startIcon={<ViewList />} onClick={collapseAll}
+          <Button size="small" variant="outlined" startIcon={<UnfoldLess />} onClick={collapseAll}
             sx={{ borderRadius: '8px', fontSize: 12, textTransform: 'none', display: { xs: 'none', sm: 'flex' } }}>
             Tout réduire
           </Button>
-        </Tooltip>
-      </Box>
-
-      {/* Legend */}
-      <Box sx={{ display: 'flex', gap: 2, mb: 2, flexWrap: 'wrap' }}>
-        {[
-          { label: 'Conseil / DG', color: '#1B4B8A' },
-          { label: 'DEP', color: '#0284C7' },
-          { label: 'DAC', color: '#7C3AED' },
-          { label: 'DPSRC', color: '#059669' },
-          { label: 'DDC', color: '#D97706' },
-          { label: 'DAF', color: '#DC2626' },
-        ].map((item) => (
-          <Box key={item.label} sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-            <Box sx={{ width: 8, height: 8, borderRadius: '2px', bgcolor: item.color }} />
-            <Typography sx={{ fontSize: 11, color: '#64748B' }}>{item.label}</Typography>
-          </Box>
-        ))}
-      </Box>
-
-      {/* Tree table */}
-      <Box sx={{
-        bgcolor: '#fff',
-        border: '1px solid #E2E8F0',
-        borderRadius: '12px',
-        overflow: 'hidden',
-        boxShadow: '0 1px 6px rgba(0,0,0,0.04)',
-      }}>
-        {/* Header */}
-        <Box sx={{
-          display: 'flex',
-          alignItems: 'center',
-          px: 2,
-          py: 1,
-          bgcolor: '#F8FAFC',
-          borderBottom: '2px solid #E2E8F0',
-          gap: 1,
-        }}>
-          <Box sx={{ width: 50, flexShrink: 0 }} />
-          <Typography sx={{ flexGrow: 1, fontSize: 11, fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-            Intitulé
-          </Typography>
-          <Typography sx={{ fontSize: 11, fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.06em', minWidth: 90, display: { xs: 'none', md: 'block' } }}>
-            Type
-          </Typography>
-          <Typography sx={{ fontSize: 11, fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.06em', minWidth: 56, textAlign: 'right' }}>
-            Agents
-          </Typography>
-          <Box sx={{ width: 64, flexShrink: 0 }} />
         </Box>
 
-        {/* Rows */}
-        {isLoading
-          ? Array.from({ length: 8 }).map((_, i) => (
-              <Box key={i} sx={{ px: 2, py: 1.5, borderBottom: '1px solid #F1F5F9' }}>
-                <Skeleton height={24} width={`${60 + i * 5}%`} />
-              </Box>
-            ))
-          : tree.length === 0
-            ? (
-              <Box sx={{ py: 6, textAlign: 'center' }}>
-                <Typography sx={{ color: '#94A3B8', fontSize: 13 }}>
-                  {search ? 'Aucun résultat pour cette recherche' : 'Aucune entité'}
-                </Typography>
-              </Box>
-            )
-            : tree.map((root) => (
-              <DeptRow
-                key={root.id}
-                node={root}
-                level={0}
-                expanded={expanded}
-                toggle={toggleExpand}
-                onEdit={openEdit}
-                onDelete={(id) => deleteMutation.mutate(id)}
-              />
-            ))
-        }
-      </Box>
+        {/* Statistiques */}
+        <Box sx={{ display: 'flex', gap: 1.5, mb: 2, flexWrap: 'wrap' }}>
+          {[
+            { label: 'Total entités',       value: flatList.length, color: '#002f59' },
+            { label: 'Directions',          value: nbDirections,    color: '#1B4B8A' },
+            { label: 'Divisions',           value: nbDivisions,     color: '#059669' },
+            { label: 'Agents référencés',   value: nbAgents,        color: '#ff7631' },
+          ].map(s => (
+            <Box key={s.label} sx={{
+              display: 'flex', alignItems: 'center', gap: 1,
+              px: 1.5, py: 0.75,
+              bgcolor: `${s.color}10`,
+              border: `1px solid ${s.color}28`,
+              borderRadius: '8px',
+            }}>
+              <Typography sx={{ fontSize: 20, fontWeight: 800, color: s.color, lineHeight: 1 }}>
+                {s.value}
+              </Typography>
+              <Typography sx={{ fontSize: 11, color: '#64748B' }}>{s.label}</Typography>
+            </Box>
+          ))}
+        </Box>
 
-      {/* ─── Create / Edit dialog ─── */}
-      <Dialog open={dialogOpen} onClose={closeDialog} maxWidth="sm" fullWidth
-        PaperProps={{ sx: { borderRadius: '14px' } }}>
-        <DialogTitle sx={{ fontSize: 15, fontWeight: 700, pb: 1 }}>
-          {editTarget ? 'Modifier l\'entité' : 'Nouvelle entité'}
-        </DialogTitle>
-        <DialogContent>
-          <Box component="form" id="dept-form" onSubmit={handleSubmit(onSubmit)} sx={{ pt: 1, display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <TextField
-              {...register('name', { required: true })}
-              label="Intitulé *"
-              fullWidth
-              size="small"
-              autoFocus
-            />
-            <Box sx={{ display: 'flex', gap: 2 }}>
-              <TextField
-                {...register('code')}
-                label="Code / Sigle"
-                fullWidth
-                size="small"
-                inputProps={{ style: { textTransform: 'uppercase' } }}
-              />
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexShrink: 0 }}>
-                <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: 'nowrap', fontSize: 13 }}>
-                  Couleur
-                </Typography>
-                <input
-                  type="color"
-                  {...register('color')}
-                  style={{ width: 48, height: 36, cursor: 'pointer', border: 'none', borderRadius: 6 }}
+        {/* Légende types */}
+        <Box sx={{ display: 'flex', gap: 2, mb: 2, flexWrap: 'wrap' }}>
+          {Object.entries(TYPE_CFG).map(([key, cfg]) => (
+            <Box key={key} sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+              <Box sx={{ width: 8, height: 8, borderRadius: '2px', bgcolor: key === 'gouvernance' ? cfg.bg : cfg.color }} />
+              <Typography sx={{ fontSize: 11, color: '#64748B' }}>{cfg.label}</Typography>
+            </Box>
+          ))}
+        </Box>
+
+        {/* Tableau de rupture */}
+        <Box sx={{
+          bgcolor: '#fff',
+          border: '1px solid #E2E8F0',
+          borderRadius: '12px',
+          overflow: 'hidden',
+          boxShadow: '0 1px 6px rgba(0,0,0,0.04)',
+        }}>
+          {/* En-tête colonnes */}
+          <Box sx={{
+            display: 'flex', alignItems: 'center',
+            px: 2, py: 1,
+            bgcolor: '#F8FAFC',
+            borderBottom: '2px solid #E2E8F0',
+            gap: 1,
+          }}>
+            <Box sx={{ width: 50, flexShrink: 0 }} />
+            <Typography sx={{ flexGrow: 1, fontSize: 11, fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+              Intitulé
+            </Typography>
+            <Typography sx={{ fontSize: 11, fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.06em', minWidth: 90, display: { xs: 'none', sm: 'block' } }}>
+              Type
+            </Typography>
+            <Typography sx={{ fontSize: 11, fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.06em', minWidth: 56, textAlign: 'right' }}>
+              Agents
+            </Typography>
+            <Box sx={{ width: 64, flexShrink: 0 }} />
+          </Box>
+
+          {/* Lignes */}
+          {isLoading
+            ? Array.from({ length: 10 }).map((_, i) => (
+                <Box key={i} sx={{ px: 2, py: 1.5, borderBottom: '1px solid #F1F5F9' }}>
+                  <Skeleton height={22} width={`${55 + (i % 4) * 10}%`} />
+                </Box>
+              ))
+            : tree.length === 0
+              ? (
+                <Box sx={{ py: 7, textAlign: 'center' }}>
+                  <AccountTree sx={{ fontSize: 36, color: '#CBD5E1', mb: 1 }} />
+                  <Typography sx={{ color: '#94A3B8', fontSize: 13 }}>
+                    {search
+                      ? 'Aucun résultat pour cette recherche'
+                      : 'Aucune entité — initialisez l\'organigramme dans Configuration'}
+                  </Typography>
+                </Box>
+              )
+              : tree.map((root, idx) => (
+                  <Box key={root.id}>
+                    {/* Séparateur entre blocs racine */}
+                    {idx > 0 && (
+                      <Box sx={{ height: 3, bgcolor: '#E2E8F0' }} />
+                    )}
+                    <OrgRow
+                      node={root}
+                      level={0}
+                      expanded={expanded}
+                      toggle={toggleExpand}
+                      onEdit={openEdit}
+                      onDelete={id => deleteMut.mutate(id)}
+                    />
+                  </Box>
+                ))
+          }
+        </Box>
+
+        {/* ── Dialog Créer / Modifier ── */}
+        <Dialog open={dialogOpen} onClose={closeDialog} maxWidth="sm" fullWidth
+          PaperProps={{ sx: { borderRadius: '14px' } }}>
+          <DialogTitle sx={{ fontSize: 15, fontWeight: 700, pb: 1 }}>
+            {editTarget ? 'Modifier l\'entité' : 'Nouvelle entité'}
+          </DialogTitle>
+          <DialogContent>
+            <Box
+              component="form"
+              id="org-form"
+              onSubmit={handleSubmit(onSubmit)}
+              sx={{ pt: 1, display: 'flex', flexDirection: 'column', gap: 2 }}
+            >
+              <Box sx={{ display: 'flex', gap: 2 }}>
+                <TextField
+                  {...register('code', { required: true })}
+                  label="Code / Sigle *"
+                  sx={{ flexGrow: 1 }}
+                  size="small"
+                  autoFocus
+                  inputProps={{ style: { textTransform: 'uppercase' } }}
+                />
+                <TextField
+                  {...register('ordre', { valueAsNumber: true })}
+                  label="Ordre"
+                  type="number"
+                  sx={{ width: 100 }}
+                  size="small"
                 />
               </Box>
+
+              <TextField
+                {...register('libelle', { required: true })}
+                label="Intitulé complet *"
+                fullWidth
+                size="small"
+              />
+
+              <Box sx={{ display: 'flex', gap: 2 }}>
+                <FormControl size="small" fullWidth>
+                  <InputLabel>Type</InputLabel>
+                  <Controller
+                    name="type"
+                    control={control}
+                    render={({ field }) => (
+                      <Select {...field} label="Type">
+                        {Object.entries(TYPE_CFG).map(([key, cfg]) => (
+                          <MenuItem key={key} value={key}>{cfg.label}</MenuItem>
+                        ))}
+                      </Select>
+                    )}
+                  />
+                </FormControl>
+                <TextField
+                  {...register('niveau', { valueAsNumber: true })}
+                  label="Niveau"
+                  type="number"
+                  sx={{ width: 110 }}
+                  size="small"
+                  inputProps={{ min: 0, max: 5 }}
+                  helperText="0 = racine"
+                />
+              </Box>
+
+              <FormControl size="small" fullWidth>
+                <InputLabel>Entité parente</InputLabel>
+                <Controller
+                  name="parent_id"
+                  control={control}
+                  render={({ field }) => (
+                    <Select {...field} label="Entité parente">
+                      <MenuItem value="">— Aucune (entité racine) —</MenuItem>
+                      {flatList
+                        .filter(u => !editTarget || u.id !== editTarget.id)
+                        .sort((a, b) => a.niveau - b.niveau || a.ordre - b.ordre)
+                        .map(u => (
+                          <MenuItem key={u.id} value={String(u.id)}>
+                            {'· '.repeat(u.niveau)}[{u.code}] {u.libelle}
+                          </MenuItem>
+                        ))}
+                    </Select>
+                  )}
+                />
+              </FormControl>
             </Box>
-            <TextField
-              {...register('description')}
-              label="Description"
-              fullWidth
+          </DialogContent>
+          <DialogActions sx={{ px: 2.5, pb: 2, gap: 1 }}>
+            <Button size="small" onClick={closeDialog} sx={{ borderRadius: '8px' }}>
+              Annuler
+            </Button>
+            <Button
+              form="org-form"
+              type="submit"
+              variant="contained"
               size="small"
-              multiline
-              rows={2}
-            />
-            <TextField
-              select
-              {...register('parent_id')}
-              label="Direction parente"
-              fullWidth
-              size="small"
-              SelectProps={{ native: true }}
+              disabled={createMut.isPending || updateMut.isPending}
+              sx={{ borderRadius: '8px', px: 2.5 }}
             >
-              <option value="">— Aucune (entité racine) —</option>
-              {flatList
-                .filter((d) => !editTarget || d.id !== editTarget.id)
-                .map((d) => (
-                  <option key={d.id} value={d.id}>
-                    {d.code ? `[${d.code}] ` : ''}{d.name}
-                  </option>
-                ))}
-            </TextField>
-          </Box>
-        </DialogContent>
-        <DialogActions sx={{ px: 2.5, pb: 2, gap: 1 }}>
-          <Button size="small" onClick={closeDialog} sx={{ borderRadius: '8px' }}>Annuler</Button>
-          <Button
-            form="dept-form"
-            type="submit"
-            variant="contained"
-            size="small"
-            disabled={createMutation.isPending || updateMutation.isPending}
-            sx={{ borderRadius: '8px', px: 2.5 }}
-          >
-            {editTarget ? 'Enregistrer' : 'Créer'}
-          </Button>
-        </DialogActions>
-      </Dialog>
+              {editTarget ? 'Enregistrer' : 'Créer'}
+            </Button>
+          </DialogActions>
+        </Dialog>
       </>)}
     </Box>
   );

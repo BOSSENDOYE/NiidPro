@@ -70,6 +70,9 @@ import ProfilePage from './pages/profile/ProfilePage';
 // Configuration
 import ConfigurationPage from './pages/configuration/ConfigurationPage';
 
+// Assistant IA
+import AssistantPage from './pages/assistant/AssistantPage';
+
 // Portail Agent
 import PortalLayout from './pages/portal/PortalLayout';
 import PortalHome from './pages/portal/PortalHome';
@@ -162,6 +165,9 @@ export default function App() {
               <Route path="documents" element={<DocumentsPage />} />
               <Route path="documents/studio" element={<DocumentStudio />} />
               <Route path="documents/studio/:id" element={<DocumentStudio />} />
+
+              {/* Assistant IA */}
+              <Route path="assistant" element={<AssistantPage />} />
 
               {/* Configuration */}
               <Route path="configuration" element={<ConfigurationPage />} />

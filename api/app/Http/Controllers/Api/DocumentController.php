@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\DocumentTemplate;
+use App\Models\DocumentTypeConfig;
 use App\Models\Employee;
 use App\Models\GeneratedDocument;
 use Illuminate\Http\Request;
@@ -194,5 +195,32 @@ class DocumentController extends Controller
         }
 
         return str_replace(array_keys($map), array_values($map), $content);
+    }
+
+    // ─── Types personnalisés ──────────────────────────────────────
+    public function typeConfigs()
+    {
+        return response()->json(DocumentTypeConfig::orderBy('created_at')->get());
+    }
+
+    public function storeTypeConfig(Request $request)
+    {
+        $data = $request->validate([
+            'key'    => ['required', 'string', 'max:50', 'unique:document_type_configs,key'],
+            'label'  => ['required', 'string', 'max:100'],
+            'cat'    => ['required', 'string', 'max:50'],
+            'color'  => ['required', 'string', 'max:20'],
+            'bg'     => ['required', 'string', 'max:20'],
+            'border' => ['required', 'string', 'max:20'],
+            'prefix' => ['required', 'string', 'max:10'],
+        ]);
+
+        return response()->json(DocumentTypeConfig::create($data), 201);
+    }
+
+    public function destroyTypeConfig(DocumentTypeConfig $typeConfig)
+    {
+        $typeConfig->delete();
+        return response()->json(['message' => 'Type supprimé.']);
     }
 }

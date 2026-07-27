@@ -17,7 +17,7 @@ import { documentsApi } from '../../api/documents';
 import { employeesApi } from '../../api/employees';
 import { useCompany } from '../../hooks/useCompany';
 import type { DocumentTemplate, DocumentTemplateSettings, Employee, GeneratedDocument } from '../../types';
-import { DOC_TYPES, getDocType } from './DocumentStudio';
+import { DOC_TYPES, getDocType, customTypeToDocType, resolveDocType } from './DocumentStudio';
 
 // ── Org footer ────────────────────────────────────────────────────────────────
 const ORG_FOOTER = 'Sacré-cœur Cité Keur Gorgui Lot n° 06 – BP 25545 – contact@anaser.sn – Tél : +221 33 856 40 46';
@@ -74,14 +74,13 @@ function buildAnaserPrintHtml(docs: GeneratedDocument[], template: DocumentTempl
           <p class="motto"><em>Un Peuple – Un But – Une Foi</em></p>
           <p class="sep">------</p>
           <p class="ministry">${ministry}</p>
-          <div class="logo-block"><img src="${logoUrl}" width="70" height="70" style="display:block;object-fit:contain;" alt="${companyName}"/></div>
+          <div class="logo-block"><img src="${logoUrl}" width="90" height="90" style="display:block;object-fit:contain;" alt="${companyName}"/></div>
         </div>
         <div class="header-right">
           <p class="ref">N° <strong>${doc.reference}</strong>/${companyName}/DG/SG/DAF/RH</p>
           <br><p class="date">Dakar, le ${dateDoc}</p>
         </div>
       </div>
-      <p class="signataire"><strong>${sigTitle},</strong></p>
       ${bodyHeader}
       ${isNoteService
         ? `<div class="content-box"><div class="doc-body">${doc.content_final.replace(/<script[^>]*>.*?<\/script>/gi, '')}</div></div>`
@@ -105,9 +104,9 @@ function buildAnaserPrintHtml(docs: GeneratedDocument[], template: DocumentTempl
   .page:last-child { page-break-after: avoid; }
   .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; }
   .header-left { flex: 0 0 52%; } .header-right { flex: 0 0 44%; text-align: right; }
-  .republic { font-weight: bold; font-size: 10pt; } .motto { font-size: 9pt; margin-top: 1px; }
-  .sep { margin: 2px 0; font-size: 9pt; } .ministry { font-size: 9.5pt; font-weight: bold; margin: 4px 0; }
-  .logo-block { margin: 5px 0 0 8px; display: inline-block; } .ref { font-size: 11pt; margin-bottom: 3px; }
+  .republic { font-weight: bold; font-size: 11pt; } .motto { font-size: 9pt; margin-top: 1px; }
+  .sep { margin: 2px 0; font-size: 9pt; } .ministry { font-size: 10pt; font-weight: bold; font-style: italic; text-decoration: underline; margin: 4px 0; }
+  .logo-block { margin: 8px 0 0 0; display: block; } .ref { font-size: 11pt; margin-bottom: 3px; }
   .signataire { font-weight: bold; font-size: 12pt; margin: 10px 0; }
   .objet { font-size: 11pt; margin: 0 0 12px; }
   .doc-title { text-align: center; font-size: 13pt; letter-spacing: 1.5px; text-transform: uppercase; margin: 0 auto 18px; }
@@ -121,7 +120,7 @@ function buildAnaserPrintHtml(docs: GeneratedDocument[], template: DocumentTempl
   .addr-name { font-weight: bold; font-size: 10.5pt; text-align: left; } .addr-fn, .addr-dept { font-size: 10.5pt; text-align: left; }
   .ampliations { clear: both; margin-top: 18px; } .ampliations ul { list-style: none; padding-left: 12px; margin-top: 2px; }
   .ampliations li::before { content: "- "; } .ampliations li { margin: 1px 0; font-size: 10.5pt; }
-  .footer { margin-top: 14px; text-align: center; font-size: 7.5pt; color: #333; border-top: 2px solid #003399; padding-top: 4px; }
+  .footer { margin-top: 14px; text-align: center; font-size: 7.5pt; color: #333; border-bottom: 2px solid #003399; padding-bottom: 4px; }
 </style></head><body>${pages}</body></html>`;
 }
 
@@ -139,7 +138,13 @@ function GenerateModal({ open, onClose, template }: GenerateModalProps) {
   const [customVarValues, setCustomVarValues]     = useState<Record<string, string>>({});
   const qc  = useQueryClient();
   const { company } = useCompany();
-  const cfg = template ? getDocType(template.type) : getDocType('attestation');
+  const { data: gmCustomTypes = [] } = useQuery({
+    queryKey: ['doc-type-configs'],
+    queryFn: () => documentsApi.listTypeConfigs().then(r => Array.isArray(r.data) ? r.data : []),
+    staleTime: 60_000,
+    enabled: open,
+  });
+  const cfg = template ? resolveDocType(template.type, gmCustomTypes) : resolveDocType('attestation', []);
   const detectedVars = template ? detectCustomVars(template.content) : [];
 
   const { data: employees = [], isLoading: empLoading } = useQuery({
@@ -358,11 +363,12 @@ function GenerateModal({ open, onClose, template }: GenerateModalProps) {
 }
 
 // ── History Modal ─────────────────────────────────────────────────────────────
-function HistoryModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+function HistoryModal({ open, onClose, customTypes }: { open: boolean; onClose: () => void; customTypes: import('../../api/documents').DocumentTypeConfig[] }) {
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState<string>('');
   const qc = useQueryClient();
   const { company } = useCompany();
+  const allHistoryTypes = [...DOC_TYPES, ...customTypes.map(t => customTypeToDocType(t))];
 
   const { data, isLoading } = useQuery({
     queryKey: ['doc-generated', typeFilter, search],
@@ -418,7 +424,7 @@ function HistoryModal({ open, onClose }: { open: boolean; onClose: () => void })
           sx={{ fontWeight: typeFilter === '' ? 700 : 500, fontSize: 11,
             bgcolor: typeFilter === '' ? '#374151' : '#F1F5F9',
             color:   typeFilter === '' ? '#fff' : '#475569' }} />
-        {DOC_TYPES.map(t => (
+        {allHistoryTypes.map(t => (
           <Chip key={t.key} label={t.label} size="small"
             onClick={() => setTypeFilter(typeFilter === t.key ? '' : t.key)}
             sx={{ fontWeight: typeFilter === t.key ? 700 : 500, fontSize: 11,
@@ -450,7 +456,7 @@ function HistoryModal({ open, onClose }: { open: boolean; onClose: () => void })
               </TableHead>
               <TableBody>
                 {rows.map(doc => {
-                  const docCfg = getDocType(doc.type);
+                  const docCfg = resolveDocType(doc.type, customTypes);
                   return (
                     <TableRow key={doc.id} hover sx={{ '& td': { py: 1.25 } }}>
                       <TableCell>
@@ -509,14 +515,15 @@ function HistoryModal({ open, onClose }: { open: boolean; onClose: () => void })
 
 // ── Template Card ─────────────────────────────────────────────────────────────
 function TemplateCard({
-  template, onGenerate, onDelete,
+  template, onGenerate, onDelete, customTypes,
 }: {
   template: DocumentTemplate;
   onGenerate: (t: DocumentTemplate) => void;
   onDelete: (id: number) => void;
+  customTypes: import('../../api/documents').DocumentTypeConfig[];
 }) {
   const navigate = useNavigate();
-  const cfg      = getDocType(template.type);
+  const cfg      = resolveDocType(template.type, customTypes);
   const count    = template.generated_documents_count ?? 0;
   const archived = template.status === 'archived';
 
@@ -635,6 +642,17 @@ export default function DocumentsPage() {
   const [generateModal, setGenerateModal] = useState<DocumentTemplate | null>(null);
   const [historyOpen,   setHistoryOpen]   = useState(false);
 
+  const { data: customDocTypes = [] } = useQuery({
+    queryKey: ['doc-type-configs'],
+    queryFn: () => documentsApi.listTypeConfigs().then(r => Array.isArray(r.data) ? r.data : []),
+    staleTime: 60_000,
+  });
+
+  const allDocTypes = [
+    ...DOC_TYPES.map(t => ({ ...t, isCustom: false })),
+    ...customDocTypes.map(t => ({ ...customTypeToDocType(t), isCustom: true, id: t.id })),
+  ];
+
   const { data: templates = [], isLoading } = useQuery({
     queryKey: ['doc-templates', typeFilter, search],
     queryFn: () => documentsApi.listTemplates({
@@ -707,7 +725,7 @@ export default function DocumentsPage() {
               color:   typeFilter === '' ? '#fff' : '#475569',
               cursor: 'pointer',
               '&:hover': { bgcolor: '#0F172A', color: '#fff' } }} />
-          {DOC_TYPES.map(t => (
+          {allDocTypes.map(t => (
             <Chip key={t.key} label={t.label} size="small"
               onClick={() => setTypeFilter(typeFilter === t.key ? '' : t.key)}
               sx={{ fontWeight: typeFilter === t.key ? 700 : 500, fontSize: 11,
@@ -760,7 +778,7 @@ export default function DocumentsPage() {
               <Description sx={{ fontSize: 48, color: '#E2E8F0', mb: 2 }} />
               <Typography sx={{ fontWeight: 700, color: '#475569', mb: 1 }}>
                 {typeFilter
-                  ? `Aucun modèle de type « ${getDocType(typeFilter).label} »`
+                  ? `Aucun modèle de type « ${resolveDocType(typeFilter, customDocTypes).label} »`
                   : 'Aucun modèle de document'}
               </Typography>
               <Typography sx={{ color: '#94A3B8', fontSize: 13, mb: 3 }}>
@@ -781,6 +799,7 @@ export default function DocumentsPage() {
                 <TemplateCard key={t.id} template={t}
                   onGenerate={tpl => setGenerateModal(tpl)}
                   onDelete={id => deleteMut.mutate(id)}
+                  customTypes={customDocTypes}
                 />
               ))}
             </Box>
@@ -790,7 +809,7 @@ export default function DocumentsPage() {
 
       {/* Modals */}
       <GenerateModal open={!!generateModal} onClose={() => setGenerateModal(null)} template={generateModal} />
-      <HistoryModal open={historyOpen} onClose={() => setHistoryOpen(false)} />
+      <HistoryModal open={historyOpen} onClose={() => setHistoryOpen(false)} customTypes={customDocTypes} />
     </Box>
   );
 }

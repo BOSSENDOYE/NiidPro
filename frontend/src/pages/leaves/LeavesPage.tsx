@@ -6,7 +6,7 @@ import {
   Select, FormControl, InputLabel, Stack, Paper, Dialog,
   DialogTitle, DialogContent, DialogActions, Checkbox, FormControlLabel,
   Autocomplete, Chip, Alert, CircularProgress, TablePagination, Tooltip,
-  LinearProgress, Divider,
+  LinearProgress, Divider, RadioGroup, Radio,
 } from '@mui/material';
 import {
   Add, Search, Clear, CheckCircle, Cancel, Print, Description,
@@ -22,6 +22,7 @@ import LeavePlanningTab from '../../components/employees/LeavePlanningTab';
 import LeaveBalanceTab from '../../components/employees/LeaveBalanceTab';
 import LeaveParamsTab from './LeaveParamsTab';
 import LeaveCarryoverTab from './LeaveCarryoverTab';
+import LeavePostponementTab from './LeavePostponementTab';
 import JustificationsPage from '../justifications/JustificationsPage';
 import AbsenceParamsTab from './AbsenceParamsTab';
 import AbsenceWorkflowDialog from './AbsenceWorkflowDialog';
@@ -98,6 +99,7 @@ export default function LeavesPage() {
   const [formDecisionAvenir, setFormDecisionAvenir] = useState(false);
   const [absCalcMode,        setAbsCalcMode]        = useState<'dates' | 'duration'>('dates');
   const [formTypeAutreDesc,  setFormTypeAutreDesc]  = useState('');
+  const [formAbsImputation,  setFormAbsImputation]  = useState<'absence_quota' | 'conge_quota' | 'none' | ''>('');
   const [isCreatingType,     setIsCreatingType]     = useState(false);
   const [createError,        setCreateError]        = useState<string | null>(null);
 
@@ -300,6 +302,9 @@ export default function LeavesPage() {
       ...(mainTab === 'absence' && {
         leave_decision_ref:    formDecisionRef || null,
         leave_decision_avenir: formDecisionAvenir,
+        ...(formTypeId === 'autre' && formAbsImputation && {
+          abs_imputation: formAbsImputation,
+        }),
       }),
     });
   };
@@ -338,7 +343,7 @@ export default function LeavesPage() {
   const resetForm = () => {
     setFormEmpId(null); setFormTypeId(''); setFormStart(''); setFormEnd(''); setFormReason('');
     setFormDuration(''); setFormDecisionRef(''); setFormDecisionAvenir(false); setAbsCalcMode('dates');
-    setFormTypeAutreDesc(''); setCreateError(null);
+    setFormTypeAutreDesc(''); setFormAbsImputation(''); setCreateError(null);
   };
 
   /* ── Filtrage ── */
@@ -390,7 +395,7 @@ export default function LeavesPage() {
     if (mainTab === 'conge') {
       if (congeSubTab === 3) return <LeavePlanningTab />;
       if (congeSubTab === 4) return <LeaveBalanceTab />;
-      if (congeSubTab === 5) return <LeaveCarryoverTab />;
+      if (congeSubTab === 5) return <LeavePostponementTab />;
       if (congeSubTab === 6) return <LeaveParamsTab />;
       if (congeSubTab === 7) return <JustificationsPage />;
     }
@@ -858,7 +863,7 @@ export default function LeavesPage() {
             <FormControl size="small" fullWidth required>
               <InputLabel>Type {mainTab === 'conge' ? 'de congé' : "d'absence"}</InputLabel>
               <Select value={formTypeId} label={`Type ${mainTab === 'conge' ? 'de congé' : "d'absence"}`}
-                onChange={e => { setFormTypeId(e.target.value); setFormTypeAutreDesc(''); }}>
+                onChange={e => { setFormTypeId(e.target.value); setFormTypeAutreDesc(''); setFormAbsImputation(''); }}>
                 {sectionLeaveTypes.filter(t => t.code !== 'ABS_AUTRE').map(t => (
                   <MenuItem key={t.id} value={String(t.id)}>{t.name}</MenuItem>
                 ))}
@@ -881,6 +886,57 @@ export default function LeavesPage() {
                 placeholder="Ex : Accident de travail, Maladie professionnelle…"
                 InputLabelProps={{ shrink: true }}
               />
+            )}
+
+            {/* Imputation pour "Autre" : le RH choisit sur quel quota déduire */}
+            {mainTab === 'absence' && formTypeId === 'autre' && (
+              <Box sx={{ border: '1px solid #CBD5E1', borderRadius: '10px', overflow: 'hidden' }}>
+                <Box sx={{ bgcolor: '#334155', px: 2, py: 1 }}>
+                  <Typography sx={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.85)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                    Imputer sur *
+                  </Typography>
+                </Box>
+                <Box sx={{ px: 2, py: 1.5, bgcolor: '#F8FAFC' }}>
+                  <RadioGroup
+                    row
+                    value={formAbsImputation}
+                    onChange={e => setFormAbsImputation(e.target.value as 'absence_quota' | 'conge_quota' | 'none')}
+                  >
+                    <FormControlLabel
+                      value="absence_quota"
+                      control={<Radio size="small" sx={{ color: TH, '&.Mui-checked': { color: TH } }} />}
+                      label={
+                        <Typography sx={{ fontSize: 12, fontWeight: 600, color: '#334155' }}>
+                          Absences autorisées (15 j/an)
+                        </Typography>
+                      }
+                    />
+                    <FormControlLabel
+                      value="conge_quota"
+                      control={<Radio size="small" sx={{ color: TH, '&.Mui-checked': { color: TH } }} />}
+                      label={
+                        <Typography sx={{ fontSize: 12, fontWeight: 600, color: '#334155' }}>
+                          Solde de congés
+                        </Typography>
+                      }
+                    />
+                    <FormControlLabel
+                      value="none"
+                      control={<Radio size="small" sx={{ color: TH, '&.Mui-checked': { color: TH } }} />}
+                      label={
+                        <Typography sx={{ fontSize: 12, fontWeight: 600, color: '#64748B' }}>
+                          Aucune imputation
+                        </Typography>
+                      }
+                    />
+                  </RadioGroup>
+                  {!formAbsImputation && (
+                    <Typography sx={{ fontSize: 11, color: '#EF4444', mt: 0.5 }}>
+                      Veuillez préciser le mode d'imputation
+                    </Typography>
+                  )}
+                </Box>
+              </Box>
             )}
 
             {/* ── Dates et durée ── */}
@@ -1134,6 +1190,7 @@ export default function LeavesPage() {
               return <Typography sx={{ flex: '1 1 100%', fontSize: 11, color: '#EF4444' }}>Solde insuffisant — {congeBalance.solde_disponible}j disponible(s)</Typography>;
             if (mainTab === 'absence' && !formReason.trim()) return <Typography sx={{ flex: '1 1 100%', fontSize: 11, color: '#EF4444' }}>Le motif détaillé est requis</Typography>;
             if (mainTab === 'absence' && formTypeId === 'autre' && !formTypeAutreDesc.trim()) return <Typography sx={{ flex: '1 1 100%', fontSize: 11, color: '#EF4444' }}>Précisez le type d'absence</Typography>;
+            if (mainTab === 'absence' && formTypeId === 'autre' && !formAbsImputation) return <Typography sx={{ flex: '1 1 100%', fontSize: 11, color: '#EF4444' }}>Sélectionnez le mode d'imputation</Typography>;
             return null;
           })()}
           <Button onClick={() => { setNewOpen(false); resetForm(); }} sx={{ color: '#64748B' }}>
@@ -1145,6 +1202,7 @@ export default function LeavesPage() {
               || createMutation.isPending || isCreatingType
               || (mainTab === 'absence' && !formReason.trim())
               || (mainTab === 'absence' && formTypeId === 'autre' && !formTypeAutreDesc.trim())
+              || (mainTab === 'absence' && formTypeId === 'autre' && !formAbsImputation)
               || (mainTab === 'conge' && !!congeBalance && !!formDuration && Number(formDuration) > congeBalance.solde_disponible)
             }
             startIcon={(createMutation.isPending || isCreatingType) ? <CircularProgress size={14} color="inherit" /> : undefined}

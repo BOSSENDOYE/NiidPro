@@ -1,0 +1,24 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::table('leaves', function (Blueprint $table) {
+            // Uniquement renseigné pour ABS_AUTRE : indique sur quel quota imputer
+            $table->string('abs_imputation', 20)->nullable()->after('leave_decision_avenir');
+            // Valeurs : 'absence_quota' (15j/an) | 'conge_quota' (solde congé) | null
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::table('leaves', function (Blueprint $table) {
+            $table->dropColumn('abs_imputation');
+        });
+    }
+};

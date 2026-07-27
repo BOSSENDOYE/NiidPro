@@ -32,6 +32,8 @@ use App\Http\Controllers\Api\CarriereController;
 use App\Http\Controllers\Api\PayrollTemplateController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\LeaveCarryoverController;
+use App\Http\Controllers\Api\LeavePostponementController;
+use App\Http\Controllers\Api\AssistantController;
 use App\Http\Controllers\Api\EnrollmentController;
 use App\Http\Controllers\Api\EvalCampagneController;
 use App\Http\Controllers\Api\EvalFicheController;
@@ -103,6 +105,13 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('/leave-settings',                [LeaveSettingsController::class, 'show']);
     Route::put('/leave-settings',                [LeaveSettingsController::class, 'update']);
+
+    // Assistant IA
+    Route::get('/assistant/config',  [AssistantController::class, 'config']);
+    Route::put('/assistant/config',  [AssistantController::class, 'updateConfig']);
+    Route::post('/assistant/test',   [AssistantController::class, 'test']);
+    Route::post('/assistant/chat',   [AssistantController::class, 'chat']);
+    Route::post('/assistant/upload', [AssistantController::class, 'upload']);
 
     // Paramètres de messagerie (mailing)
     Route::get('/mail-settings',       [MailSettingController::class, 'index']);
@@ -179,6 +188,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/leaves-carryover',         [LeaveCarryoverController::class, 'index']);
     Route::post('/leaves-carryover/apply',  [LeaveCarryoverController::class, 'apply']);
     Route::get('/leaves-carryover/history', [LeaveCarryoverController::class, 'history']);
+
+    // Demande de report de date de jouissance
+    Route::get('/leave-postponements',                               [LeavePostponementController::class, 'index']);
+    Route::post('/leave-postponements',                              [LeavePostponementController::class, 'store']);
+    Route::get('/leave-postponements/{postponement}',                [LeavePostponementController::class, 'show']);
+    Route::post('/leave-postponements/{postponement}/approve',       [LeavePostponementController::class, 'approve']);
+    Route::delete('/leave-postponements/{postponement}',             [LeavePostponementController::class, 'destroy']);
 
     // Justifications
     Route::get('/justifications/pending', [JustificationController::class, 'pending']);
@@ -359,6 +375,9 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/generated',               [DocumentController::class, 'generated']);
         Route::get('/generated/{document}',    [DocumentController::class, 'showGenerated']);
         Route::delete('/generated/{document}', [DocumentController::class, 'destroyGenerated']);
+        Route::get('/type-configs',                        [DocumentController::class, 'typeConfigs']);
+        Route::post('/type-configs',                       [DocumentController::class, 'storeTypeConfig']);
+        Route::delete('/type-configs/{typeConfig}',        [DocumentController::class, 'destroyTypeConfig']);
     });
 
     // ── Plan de Recrutement ──────────────────────────────────────────────────
