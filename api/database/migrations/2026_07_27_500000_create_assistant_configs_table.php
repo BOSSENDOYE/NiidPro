@@ -11,7 +11,7 @@ return new class extends Migration
         Schema::create('assistant_configs', function (Blueprint $table) {
             $table->id();
             $table->string('provider')->default('claude');          // claude | openai
-            $table->string('api_key')->nullable();                  // stockée chiffrée
+            $table->text('api_key')->nullable();                    // stockée chiffrée (TEXT car valeur chiffrée > 255 chars)
             $table->string('model')->default('claude-haiku-4-5-20251001');
             $table->text('system_prompt')->nullable();
             $table->unsignedSmallInteger('max_tokens')->default(1024);
