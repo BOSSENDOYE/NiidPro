@@ -1,20 +1,22 @@
 import { useState } from 'react';
 import { Box, Tabs, Tab, Typography } from '@mui/material';
 import {
-  Business, Group, Security, Email, Tune,
+  Business, Group, Security, Email, Tune, AccountTree,
 } from '@mui/icons-material';
 import CompanyTab from './tabs/CompanyTab';
 import UsersTab from './tabs/UsersTab';
 import RolesTab from './tabs/RolesTab';
 import MailingTab from './tabs/MailingTab';
 import PreferencesTab from './tabs/PreferencesTab';
+import WorkflowConfigTab from './tabs/WorkflowConfigTab';
 
 const TABS = [
-  { label: 'Entreprise',       icon: <Business sx={{ fontSize: 18 }} />,  comp: <CompanyTab /> },
-  { label: 'Utilisateurs',     icon: <Group sx={{ fontSize: 18 }} />,     comp: <UsersTab /> },
-  { label: 'Profils & droits', icon: <Security sx={{ fontSize: 18 }} />,  comp: <RolesTab /> },
-  { label: 'Paramètre mailing',icon: <Email sx={{ fontSize: 18 }} />,     comp: <MailingTab /> },
-  { label: 'Préférences',      icon: <Tune sx={{ fontSize: 18 }} />,      comp: <PreferencesTab /> },
+  { label: 'Entreprise',              icon: <Business sx={{ fontSize: 18 }} />,    comp: <CompanyTab /> },
+  { label: 'Utilisateurs',            icon: <Group sx={{ fontSize: 18 }} />,       comp: <UsersTab /> },
+  { label: 'Profils & droits',        icon: <Security sx={{ fontSize: 18 }} />,    comp: <RolesTab /> },
+  { label: 'Circuits de validation',  icon: <AccountTree sx={{ fontSize: 18 }} />, comp: <WorkflowConfigTab /> },
+  { label: 'Paramètre mailing',       icon: <Email sx={{ fontSize: 18 }} />,       comp: <MailingTab /> },
+  { label: 'Préférences',             icon: <Tune sx={{ fontSize: 18 }} />,        comp: <PreferencesTab /> },
 ];
 
 export default function ConfigurationPage() {
@@ -27,7 +29,7 @@ export default function ConfigurationPage() {
           Configuration
         </Typography>
         <Typography sx={{ fontSize: 13, color: 'text.secondary', mt: 0.5 }}>
-          Entreprise, utilisateurs, droits, messagerie et préférences d'affichage
+          Entreprise, utilisateurs, droits, circuits de validation, messagerie et préférences
         </Typography>
       </Box>
 

@@ -11,9 +11,11 @@ class Leave extends Model
 
     protected $fillable = [
         'employee_id', 'leave_type_id', 'start_date', 'end_date', 'days_count',
-        'status', 'reason', 'document_path', 'approved_by', 'approved_at', 'rejection_reason',
+        'status', 'reason', 'leave_decision_ref', 'leave_decision_avenir', 'document_path',
+        'approved_by', 'approved_at', 'rejection_reason',
         'comment', 'justification_deadline', 'justification_submitted_at',
         'friday_rule_applied', 'original_start_date',
+        'abs_approval_level', 'abs_approvals',
     ];
 
     protected function casts(): array
@@ -26,6 +28,8 @@ class Leave extends Model
             'justification_deadline'      => 'datetime',
             'justification_submitted_at'  => 'datetime',
             'friday_rule_applied'         => 'boolean',
+            'leave_decision_avenir'       => 'boolean',
+            'abs_approvals'              => 'array',
         ];
     }
 

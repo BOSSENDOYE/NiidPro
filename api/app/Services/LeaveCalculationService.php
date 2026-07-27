@@ -6,6 +6,7 @@ use App\Models\DetailPlanningConge;
 use App\Models\Employee;
 use App\Models\JourFerie;
 use App\Models\Leave;
+use App\Models\LeaveSettings;
 use Carbon\Carbon;
 
 class LeaveCalculationService
@@ -184,12 +185,20 @@ class LeaveCalculationService
     // ────────────────────────────────────────────────────────────────
     public function getBalance(Employee $employee, Carbon $upToDate = null): array
     {
-        $upToDate = $upToDate ?? Carbon::now();
+        $upToDate    = $upToDate ?? Carbon::now();
+        $settings    = LeaveSettings::get();
+        $annualQuota = (int) $settings->annual_quota;
+
         $lastCalc = $employee->date_dernier_calcul_conge
             ? Carbon::parse($employee->date_dernier_calcul_conge)
             : Carbon::parse($employee->hire_date);
 
-        $accrued   = $this->getMonthlyAccrual($employee, $lastCalc, $upToDate);
+        // Accrual plafonné au quota annuel configuré (évite les accumulations
+        // multi-années si date_dernier_calcul_conge n'a jamais été mis à jour)
+        $accrued   = min(
+            $this->getMonthlyAccrual($employee, $lastCalc, $upToDate),
+            (float) $annualQuota
+        );
         $seniority = $this->getSeniorityBonus($employee, $upToDate);
         $children  = $this->getChildrenBonus($employee, $upToDate);
         $medaille  = $this->getMedailleBonus($employee);
@@ -202,8 +211,14 @@ class LeaveCalculationService
             ->where('start_date', '>=', $lastCalc->format('Y-m-d'))
             ->sum('days_count');
 
-        $totalBrut  = $base + $accrued + $seniority + $children + $medaille;
-        $available  = max(0, $totalBrut - $usedSinceLastCalc);
+        $totalBrut = $base + $accrued + $seniority + $children + $medaille;
+        $available = max(0, $totalBrut - $usedSinceLastCalc);
+
+        // ── Suivi du report ────────────────────────────────────────────
+        $jReportes      = (float) ($employee->jours_reportes ?? 0);
+        $expiryYear     = $employee->annee_expiration_report;
+        $reportExpired  = $expiryYear && $expiryYear <= $upToDate->year;
+        $reportValide   = $reportExpired ? 0.0 : $jReportes;
 
         return [
             'employee_id'           => $employee->id,
@@ -220,6 +235,11 @@ class LeaveCalculationService
             'computed_at'           => $upToDate->format('Y-m-d'),
             'anciennete_years'      => Carbon::parse($employee->hire_date)->diffInYears($upToDate)
                                        + ($employee->anciennete_recrutement ?? 0),
+            'annual_quota'          => $annualQuota,
+            // ── Carry-over ──
+            'solde_reporte'         => round($reportValide, 1),
+            'expire_annee'          => $expiryYear,
+            'report_expire'         => $reportExpired,
         ];
     }
 
@@ -240,9 +260,10 @@ class LeaveCalculationService
             $errors[] = "Solde insuffisant : {$balance['solde_disponible']} jour(s) disponible(s), {$daysCount} demandé(s).";
         }
 
-        // 2. Min 12j / Max 24j consécutifs (période légale)
-        if ($daysCount > 24) {
-            $errors[] = "Durée maximale de 24 jours ouvrables consécutifs dépassée (Code du travail, art. L185).";
+        // 2. Max jours consécutifs = quota annuel configuré
+        $annualQuota = (int) LeaveSettings::get()->annual_quota;
+        if ($daysCount > $annualQuota) {
+            $errors[] = "Durée maximale de {$annualQuota} jours ouvrables consécutifs dépassée (Code du travail, art. L185).";
         }
 
         // 3. Chevauchement avec période légale si > 24j

@@ -9,6 +9,19 @@ function normalizeArray<T>(data: unknown): T[] {
   return [];
 }
 
+export interface LeaveEndingSoon {
+  id:                 number;
+  employee_id:        number;
+  employee?:          { id: number; first_name: string; last_name: string; employee_number: string; department?: { name: string } };
+  leaveType?:         { id: number; name: string; color: string; category?: string };
+  start_date:         string;
+  end_date:           string;
+  days_count:         number;
+  days_until_return:  number;
+  status:             string;
+  created_at:         string;
+}
+
 export interface LeaveBalance {
   employee_id:           number;
   employee_name:         string;
@@ -23,6 +36,11 @@ export interface LeaveBalance {
   last_calculation:      string;
   computed_at:           string;
   anciennete_years:      number;
+  annual_quota?:         number;
+  // Carry-over
+  solde_reporte?:        number;
+  expire_annee?:         number | null;
+  report_expire?:        boolean;
 }
 
 export interface PlanningGenResult {
@@ -48,6 +66,14 @@ export interface DetailPlanningConge {
   nbre_jour_total_disponible: number;
   statut:                     string;
   created_at:                 string;
+  // Dates de planification
+  date_depart_prevu?:         string | null;
+  date_retour_prevu?:         string | null;
+  nbre_jours_programme?:      number | null;
+  statut_realisation?:        'planifié' | 'confirmé' | 'réalisé' | 'non_respecté';
+  derniere_notif_at?:         string | null;
+  leave_id?:                  number | null;
+  days_until_depart?:         number; // computed by backend in planningUpcoming
 }
 
 export interface JourFerie {
@@ -72,6 +98,9 @@ export const leavesApi = {
   pending: () =>
     client.get('/leaves/pending').then((r) => ({ ...r, data: normalizeArray<Leave>(r.data) })),
 
+  endingSoon: (days = 3) =>
+    client.get<LeaveEndingSoon[]>('/leaves/ending-soon', { params: { days } }).then(r => r.data as unknown as LeaveEndingSoon[]),
+
   types: () =>
     client.get<LeaveType[]>('/leaves/types').then((r) => ({ ...r, data: normalizeArray<LeaveType>(r.data) })),
 
@@ -81,9 +110,15 @@ export const leavesApi = {
   balance: (employeeId: number) =>
     client.get<LeaveBalance>(`/leaves/balance/${employeeId}`).then((r) => r.data),
 
-  calculateDays: (startDate: string, endDate: string) =>
-    client.post<CalculateDaysResult>('/leaves/calculate-days', { start_date: startDate, end_date: endDate })
-      .then((r) => r.data),
+  calculateDays: (startDate: string, endDate: string, applyFridayRule = true) =>
+    client.post<CalculateDaysResult>('/leaves/calculate-days', {
+      start_date: startDate, end_date: endDate, apply_friday_rule: applyFridayRule,
+    }).then((r) => r.data),
+
+  calculateEndDate: (startDate: string, duration: number) =>
+    client.post<{ start_date: string; end_date: string; duration: number }>(
+      '/leaves/calculate-end-date', { start_date: startDate, duration }
+    ).then((r) => r.data),
 
   generatePlanning: (params: {
     critere: 'G' | 'E' | 'A';
@@ -97,6 +132,18 @@ export const leavesApi = {
   plannings: (params?: Record<string, unknown>) =>
     client.get('/leaves/planning', { params }).then((r) => r.data),
 
+  planningUpcoming: (days = 14) =>
+    client.get<DetailPlanningConge[]>('/leaves/planning/upcoming', { params: { days } })
+      .then(r => r.data as unknown as DetailPlanningConge[]),
+
+  planningUpdateDates: (id: number, data: {
+    date_depart_prevu?:    string | null;
+    date_retour_prevu?:    string | null;
+    nbre_jours_programme?: number | null;
+    statut_realisation?:   string;
+    leave_id?:             number | null;
+  }) => client.patch<DetailPlanningConge>(`/leaves/planning/${id}/dates`, data).then(r => r.data),
+
   get: (id: number) => client.get<Leave>(`/leaves/${id}`),
 
   create: (data: Partial<Leave>) => client.post<Leave>('/leaves', data),
@@ -107,6 +154,9 @@ export const leavesApi = {
 
   approve: (id: number, comment?: string) =>
     client.post(`/leaves/${id}/approve`, { comment }),
+
+  approveLevel: (id: number, action: 'approve' | 'reject', comment?: string) =>
+    client.post<import('../types').Leave>(`/leaves/${id}/approve-level`, { action, comment }).then(r => r.data),
 
   reject: (id: number, comment?: string) =>
     client.post(`/leaves/${id}/reject`, { rejection_reason: comment, comment }),
@@ -144,6 +194,24 @@ export const carryoverApi = {
 
   history: (params?: Record<string, unknown>) =>
     client.get('/leaves-carryover/history', { params }).then((r) => r.data),
+};
+
+// ── Paramètres congés (quota annuel, règles) ─────────────────────────────────
+export interface LeaveSettingsData {
+  id?:                       number;
+  annual_quota:              number;
+  min_jours_obligatoires:    number;
+  report_annees_max:         number;
+  samedi_ouvrable:           boolean;
+  mere_famille_age_max:      number;
+  mere_famille_jours_enfant: number;
+}
+
+export const leaveSettingsApi = {
+  get: () =>
+    client.get<LeaveSettingsData>('/leave-settings').then(r => r.data),
+  update: (data: LeaveSettingsData) =>
+    client.put<LeaveSettingsData>('/leave-settings', data).then(r => r.data),
 };
 
 // ── CRUD Types de congé ──────────────────────────────────────────────────────

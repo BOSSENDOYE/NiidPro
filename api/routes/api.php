@@ -13,6 +13,8 @@ use App\Http\Controllers\Api\EmployeeController;
 use App\Http\Controllers\Api\JustificationController;
 use App\Http\Controllers\Api\LeaveController;
 use App\Http\Controllers\Api\LeaveTypeController;
+use App\Http\Controllers\Api\WorkflowConfigController;
+use App\Http\Controllers\Api\LeaveSettingsController;
 use App\Http\Controllers\Api\MeController;
 use App\Http\Controllers\Api\SanctionController;
 use App\Http\Controllers\Api\SettingsController;
@@ -94,6 +96,14 @@ Route::middleware('auth:sanctum')->group(function () {
     // Rôles & droits
     Route::apiResource('roles', RoleController::class)->except(['show']);
 
+    // Circuits de validation (workflows)
+    Route::get('/workflow-configs',              [WorkflowConfigController::class, 'index']);
+    Route::put('/workflow-configs',              [WorkflowConfigController::class, 'update']);
+    Route::delete('/workflow-configs/{key}',     [WorkflowConfigController::class, 'destroy']);
+
+    Route::get('/leave-settings',                [LeaveSettingsController::class, 'show']);
+    Route::put('/leave-settings',                [LeaveSettingsController::class, 'update']);
+
     // Paramètres de messagerie (mailing)
     Route::get('/mail-settings',       [MailSettingController::class, 'index']);
     Route::post('/mail-settings',      [MailSettingController::class, 'update']);
@@ -148,13 +158,18 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Leaves — routes nommées avant apiResource
     Route::get('/leaves/pending',                [LeaveController::class, 'pending']);
+    Route::get('/leaves/ending-soon',            [LeaveController::class, 'endingSoon']);
     Route::get('/leaves/types',                  [LeaveController::class, 'types']);
     Route::get('/leaves/holidays',               [LeaveController::class, 'holidays']);
     Route::get('/leaves/planning',               [LeaveController::class, 'plannings']);
+    Route::get('/leaves/planning/upcoming',      [LeaveController::class, 'planningUpcoming']);
+    Route::patch('/leaves/planning/{id}/dates',  [LeaveController::class, 'planningUpdateDates']);
     Route::get('/leaves/balance/{employee}',     [LeaveController::class, 'balance']);
     Route::post('/leaves/calculate-days',        [LeaveController::class, 'calculateDays']);
+    Route::post('/leaves/calculate-end-date',    [LeaveController::class, 'calculateEndDate']);
     Route::post('/leaves/planning/generate',     [LeaveController::class, 'generatePlanning']);
     Route::post('/leaves/{leave}/approve',       [LeaveController::class, 'approve']);
+    Route::post('/leaves/{leave}/approve-level', [LeaveController::class, 'approveLevel']);
     Route::post('/leaves/{leave}/reject',        [LeaveController::class, 'reject']);
     Route::post('/leaves/{leave}/justification', [LeaveController::class, 'submitJustification']);
     Route::apiResource('leaves', LeaveController::class);

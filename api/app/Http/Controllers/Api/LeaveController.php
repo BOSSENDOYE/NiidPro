@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Employee;
 use App\Models\Leave;
 use App\Models\LeaveType;
+use App\Models\WorkflowConfig;
 use App\Services\LeaveCalculationService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -26,9 +27,14 @@ class LeaveController extends Controller
             ->when($request->to,            fn($q, $d) => $q->whereDate('end_date', '<=', $d))
             ->when($request->department_id, fn($q, $d) =>
                 $q->whereHas('employee', fn($eq) => $eq->where('department_id', $d))
+            )
+            ->when($request->category, fn($q, $cat) =>
+                $q->whereHas('leaveType', fn($tq) => $tq->where('category', $cat))
             );
 
-        return response()->json($query->orderByDesc('created_at')->paginate(15));
+        $perPage = min((int) $request->get('per_page', 15), 500);
+
+        return response()->json($query->orderByDesc('created_at')->paginate($perPage));
     }
 
     // ─── Congés en attente ──────────────────────────────────────────
@@ -42,51 +48,94 @@ class LeaveController extends Controller
         return response()->json($leaves);
     }
 
+    // ─── Congés approuvés se terminant bientôt (reprises imminentes) ──
+    public function endingSoon(Request $request)
+    {
+        $days  = max(1, min(30, (int) ($request->get('days', 3))));
+        $today = Carbon::today();
+        $limit = Carbon::today()->addDays($days);
+
+        $leaves = Leave::with(['employee.department', 'employee.organisationUnit', 'leaveType'])
+            ->where('status', 'approved')
+            ->whereDate('end_date', '>=', $today)
+            ->whereDate('end_date', '<=', $limit)
+            ->orderBy('end_date')
+            ->get()
+            ->map(function ($leave) use ($today) {
+                $endDate = Carbon::parse($leave->end_date);
+                $leave->days_until_return = $today->diffInDays($endDate, false);
+                return $leave;
+            });
+
+        return response()->json($leaves);
+    }
+
     // ─── Créer une demande ──────────────────────────────────────────
     public function store(Request $request)
     {
         $data = $request->validate([
-            'employee_id'   => ['required', 'exists:employees,id'],
-            'leave_type_id' => ['required', 'exists:leave_types,id'],
-            'start_date'    => ['required', 'date'],
-            'end_date'      => ['required', 'date', 'after_or_equal:start_date'],
-            'reason'        => ['nullable', 'string'],
+            'employee_id'           => ['required', 'exists:employees,id'],
+            'leave_type_id'         => ['required', 'exists:leave_types,id'],
+            'start_date'            => ['required', 'date'],
+            'end_date'              => ['required', 'date', 'after_or_equal:start_date'],
+            'reason'                => ['nullable', 'string'],
+            'leave_decision_ref'    => ['nullable', 'string', 'max:100'],
+            'leave_decision_avenir' => ['nullable', 'boolean'],
         ]);
 
         $employee  = Employee::findOrFail($data['employee_id']);
         $leaveType = LeaveType::findOrFail($data['leave_type_id']);
+        $isAbsence = ($leaveType->category ?? '') === 'absence';
 
-        // ── Règle vendredi : décaler la date de début ──
+        // ── Règle vendredi : s'applique aux congés uniquement ──
         $originalStart = $data['start_date'];
         $fridayRule    = false;
         $startCarbon   = Carbon::parse($data['start_date']);
 
-        if ($startCarbon->dayOfWeek === Carbon::FRIDAY) {
+        if (! $isAbsence && $startCarbon->dayOfWeek === Carbon::FRIDAY) {
             $fridayRule         = true;
             $data['start_date'] = $this->calculator->adjustStartDate($startCarbon)->format('Y-m-d');
         }
 
-        // ── Calcul des jours (exclure dimanches + fériés) ──
+        // ── Calcul des jours (exclure dimanches + fériés, samedis ouvrés) ──
         $daysCount = $this->calculator->calculateLeaveDays(
             $data['start_date'],
             $data['end_date'],
             false // déjà ajusté ci-dessus
         );
 
-        // ── Validation règles métier ──
-        $validation = $this->calculator->validateLeaveRequest(
-            $employee,
-            $data['start_date'],
-            $data['end_date'],
-            $daysCount
-        );
+        if ($isAbsence) {
+            // Limite annuelle absences : 15 jours ouvrées
+            $year            = now()->year;
+            $usedAbsenceDays = Leave::where('employee_id', $data['employee_id'])
+                ->whereNotIn('status', ['rejected', 'cancelled'])
+                ->whereHas('leaveType', fn($q) => $q->where('category', 'absence'))
+                ->whereYear('start_date', $year)
+                ->sum('days_count');
 
-        if (! $validation['valid']) {
-            return response()->json([
-                'message' => implode(' ', $validation['errors']),
-                'errors'  => ['days' => $validation['errors']],
-                'balance' => $validation['balance'],
-            ], 422);
+            if ($usedAbsenceDays + $daysCount > 15) {
+                $remaining = max(0, 15 - (int) $usedAbsenceDays);
+                return response()->json([
+                    'message' => "Quota d'absences annuel dépassé. Jours restants : {$remaining}/15.",
+                    'errors'  => ['days' => ["Quota d'absences annuel de 15 jours dépassé."]],
+                ], 422);
+            }
+        } else {
+            // ── Validation règles métier congés ──
+            $validation = $this->calculator->validateLeaveRequest(
+                $employee,
+                $data['start_date'],
+                $data['end_date'],
+                $daysCount
+            );
+
+            if (! $validation['valid']) {
+                return response()->json([
+                    'message' => implode(' ', $validation['errors']),
+                    'errors'  => ['days' => $validation['errors']],
+                    'balance' => $validation['balance'],
+                ], 422);
+            }
         }
 
         // ── Vérifier chevauchement ──
@@ -106,15 +155,17 @@ class LeaveController extends Controller
         }
 
         $leave = Leave::create([
-            'employee_id'         => $data['employee_id'],
-            'leave_type_id'       => $data['leave_type_id'],
-            'start_date'          => $data['start_date'],
-            'end_date'            => $data['end_date'],
-            'days_count'          => $daysCount,
-            'status'              => 'pending',
-            'reason'              => $data['reason'] ?? null,
-            'friday_rule_applied' => $fridayRule,
-            'original_start_date' => $fridayRule ? $originalStart : null,
+            'employee_id'           => $data['employee_id'],
+            'leave_type_id'         => $data['leave_type_id'],
+            'start_date'            => $data['start_date'],
+            'end_date'              => $data['end_date'],
+            'days_count'            => $daysCount,
+            'status'                => 'pending',
+            'reason'                => $data['reason'] ?? null,
+            'leave_decision_ref'    => $data['leave_decision_ref'] ?? null,
+            'leave_decision_avenir' => $data['leave_decision_avenir'] ?? false,
+            'friday_rule_applied'   => $fridayRule,
+            'original_start_date'   => $fridayRule ? $originalStart : null,
         ]);
 
         return response()->json($leave->load(['employee', 'leaveType']), 201);
@@ -149,10 +200,6 @@ class LeaveController extends Controller
 
         $leave->update($updates);
 
-        // ── Déduire du solde de l'agent ──
-        $employee = $leave->employee;
-        $this->calculator->deductBalance($employee, $leave->days_count);
-
         return response()->json($leave->fresh()->load(['employee', 'leaveType', 'approver']));
     }
 
@@ -174,6 +221,65 @@ class LeaveController extends Controller
         ]);
 
         return response()->json($leave->fresh()->load(['employee', 'leaveType']));
+    }
+
+    // ─── Workflow multi-niveaux (toutes catégories configurées) ───
+    public function approveLevel(Request $request, Leave $leave): \Illuminate\Http\JsonResponse
+    {
+        $validated = $request->validate([
+            'action'  => ['required', 'in:approve,reject'],
+            'comment' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        if ($leave->status !== 'pending') {
+            return response()->json(['message' => 'Cette demande ne peut plus être traitée.'], 422);
+        }
+
+        $category    = $leave->leaveType?->category ?? 'conge';
+        $activeLevels = WorkflowConfig::activeFor($category);
+
+        if ($activeLevels->isEmpty()) {
+            return response()->json(['message' => 'Aucun circuit de validation configuré pour ce type.'], 422);
+        }
+
+        $currentLevel    = (int) ($leave->abs_approval_level ?? 0);
+        $nextLevelConfig = $activeLevels->first(fn($l) => $l->level > $currentLevel);
+
+        if (! $nextLevelConfig) {
+            return response()->json(['message' => 'Tous les niveaux ont déjà été traités.'], 422);
+        }
+
+        $approvals   = $leave->abs_approvals ?? [];
+        $approvals[] = [
+            'level'   => $nextLevelConfig->level,
+            'label'   => $nextLevelConfig->label,
+            'status'  => $validated['action'] === 'approve' ? 'approved' : 'rejected',
+            'comment' => $validated['comment'] ?? null,
+            'at'      => now()->toDateTimeString(),
+            'by'      => $request->user()?->name ?? 'Administrateur',
+        ];
+
+        $updates = [
+            'abs_approvals'      => $approvals,
+            'abs_approval_level' => $nextLevelConfig->level,
+        ];
+
+        if ($validated['action'] === 'reject') {
+            $updates['status']           = 'rejected';
+            $updates['rejection_reason'] = $validated['comment'];
+            $updates['approved_by']      = $request->user()?->id;
+            $updates['approved_at']      = now();
+        } elseif ($activeLevels->last()->level === $nextLevelConfig->level) {
+            // Dernier niveau actif → approbation finale
+            $updates['status']      = 'approved';
+            $updates['approved_by'] = $request->user()?->id;
+            $updates['approved_at'] = now();
+
+        }
+
+        $leave->update($updates);
+
+        return response()->json($leave->fresh(['employee', 'leaveType']));
     }
 
     // ─── Annuler ────────────────────────────────────────────────────
@@ -208,20 +314,60 @@ class LeaveController extends Controller
     public function calculateDays(Request $request)
     {
         $request->validate([
-            'start_date' => ['required', 'date'],
-            'end_date'   => ['required', 'date', 'after_or_equal:start_date'],
+            'start_date'        => ['required', 'date'],
+            'end_date'          => ['required', 'date', 'after_or_equal:start_date'],
+            'apply_friday_rule' => ['nullable', 'boolean'],
         ]);
 
+        $applyFridayRule = $request->boolean('apply_friday_rule', true);
         $start    = Carbon::parse($request->start_date);
-        $adjusted = $this->calculator->adjustStartDate($start);
-        $days     = $this->calculator->calculateLeaveDays($request->start_date, $request->end_date);
+        $adjusted = $applyFridayRule ? $this->calculator->adjustStartDate($start) : $start;
+        $days     = $this->calculator->calculateLeaveDays($request->start_date, $request->end_date, $applyFridayRule);
 
         return response()->json([
             'original_start' => $request->start_date,
             'adjusted_start' => $adjusted->format('Y-m-d'),
             'end_date'       => $request->end_date,
             'working_days'   => $days,
-            'friday_rule'    => $start->dayOfWeek === Carbon::FRIDAY,
+            'friday_rule'    => $applyFridayRule && $start->dayOfWeek === Carbon::FRIDAY,
+        ]);
+    }
+
+    // ─── Calculer la date de fin depuis durée + date début ──────────
+    public function calculateEndDate(Request $request)
+    {
+        $request->validate([
+            'start_date' => ['required', 'date'],
+            'duration'   => ['required', 'integer', 'min:1', 'max:365'],
+        ]);
+
+        $duration       = (int) $request->duration;
+        $start          = Carbon::parse($request->start_date);
+        $upperBound     = $start->copy()->addDays($duration * 3 + 30);
+        $holidays       = $this->calculator->getHolidaysInRange($start->format('Y-m-d'), $upperBound->format('Y-m-d'));
+        $samediOuvrable = (bool) config('leaves.samedi_ouvrable', true);
+
+        $count   = 0;
+        $current = $start->copy();
+
+        while ($current->lte($upperBound)) {
+            $isSunday  = $current->dayOfWeek === Carbon::SUNDAY;
+            $isSat     = $current->dayOfWeek === Carbon::SATURDAY;
+            $isHoliday = in_array($current->format('Y-m-d'), $holidays);
+
+            if (! $isSunday && ! $isHoliday && ! ($isSat && ! $samediOuvrable)) {
+                $count++;
+                if ($count >= $duration) {
+                    break;
+                }
+            }
+            $current->addDay();
+        }
+
+        return response()->json([
+            'start_date' => $request->start_date,
+            'end_date'   => $current->format('Y-m-d'),
+            'duration'   => $duration,
         ]);
     }
 
@@ -301,9 +447,50 @@ class LeaveController extends Controller
                 $q->whereHas('employee', fn($eq) => $eq->where('department_id', $d))
             )
             ->orderByDesc('date_generation')
-            ->paginate(25);
+            ->paginate(200);
 
         return response()->json($plannings);
+    }
+
+    // ─── Plannings à départ imminent ────────────────────────────────
+    public function planningUpcoming(Request $request)
+    {
+        $days  = max(1, min(60, (int) ($request->get('days', 14))));
+        $today = Carbon::today();
+        $limit = Carbon::today()->addDays($days);
+
+        $plannings = \App\Models\DetailPlanningConge::with(['employee.department', 'employee.organisationUnit'])
+            ->whereNotNull('date_depart_prevu')
+            ->whereDate('date_depart_prevu', '>=', $today)
+            ->whereDate('date_depart_prevu', '<=', $limit)
+            ->whereNotIn('statut_realisation', ['réalisé', 'non_respecté'])
+            ->orderBy('date_depart_prevu')
+            ->get()
+            ->map(function ($planning) use ($today) {
+                $depart = Carbon::parse($planning->date_depart_prevu);
+                $planning->days_until_depart = (int) $today->diffInDays($depart, false);
+                return $planning;
+            });
+
+        return response()->json($plannings);
+    }
+
+    // ─── Mettre à jour les dates d'un planning ──────────────────────
+    public function planningUpdateDates(Request $request, int $id)
+    {
+        $planning = \App\Models\DetailPlanningConge::findOrFail($id);
+
+        $data = $request->validate([
+            'date_depart_prevu'    => ['nullable', 'date'],
+            'date_retour_prevu'    => ['nullable', 'date', 'after_or_equal:date_depart_prevu'],
+            'nbre_jours_programme' => ['nullable', 'numeric', 'min:1', 'max:90'],
+            'statut_realisation'   => ['nullable', 'in:planifié,confirmé,réalisé,non_respecté'],
+            'leave_id'             => ['nullable', 'exists:leaves,id'],
+        ]);
+
+        $planning->update($data);
+
+        return response()->json($planning->load('employee.department'));
     }
 
     // ─── Soumettre un justificatif médical ──────────────────────────

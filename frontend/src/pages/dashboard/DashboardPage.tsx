@@ -1,21 +1,31 @@
 import { useQuery } from '@tanstack/react-query';
+import { useState } from 'react';
 import {
-  Avatar, Box, Button, Card, CardActionArea, CardContent, Chip, Divider,
-  GlobalStyles, Grid, LinearProgress, List, ListItem, ListItemText,
-  Skeleton, Stack, Table, TableBody, TableCell, TableHead, TableRow, Typography,
+  Avatar, Box, Button, Card, CardActionArea, CardContent, Chip, Dialog,
+  DialogContent, DialogTitle, Divider, GlobalStyles, Grid, IconButton,
+  LinearProgress, List, ListItem, ListItemText,
+  Skeleton, Stack, Tab, Table, TableBody, TableCell, TableHead, TableRow,
+  Tabs, Typography,
 } from '@mui/material';
 import {
-  AssignmentLate, BeachAccess, Business, CheckCircle,
-  EventAvailable, Groups, PersonAdd, Print, QueryStats, Schedule, TrendingUp,
+  AssignmentLate, AssignmentReturn, BeachAccess, Business, CheckCircle, Close,
+  EventAvailable, EventBusy, Groups, PersonAdd, PersonSearch, Print,
+  QueryStats, Schedule, School, TrendingUp,
   WarningAmber, WorkHistory, Gavel, Work, Category, HowToReg,
 } from '@mui/icons-material';
 import type { ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { dashboardApi } from '../../api/dashboard';
+import { leavesApi } from '../../api/leaves';
+import type { LeaveEndingSoon } from '../../api/leaves';
+import { justificationsApi } from '../../api/justifications';
+import type { Justification } from '../../api/justifications';
+import { trainingsApi } from '../../api/trainings';
+import { recruitmentApi } from '../../api/recruitment';
 import client from '../../api/client';
 import { formatDate } from '../../utils/format';
 import { useAuthStore } from '../../store/auth.store';
-import type { DashboardStats, ExpiringContract } from '../../types';
+import type { DashboardStats, ExpiringContract, Leave, Training, RecruitmentRequest, PaginatedResponse } from '../../types';
 
 const activityIcon: Record<string, typeof PersonAdd> = {
   hire: PersonAdd,
@@ -112,7 +122,7 @@ function kpiData(data: DashboardStats) {
 }
 
 function KpiCard({
-  label, value, helper, icon, color, bg, to,
+  label, value, helper, icon, color, bg, to, onClick,
 }: {
   label: string;
   value: ReactNode;
@@ -121,8 +131,10 @@ function KpiCard({
   color: string;
   bg: string;
   to?: string;
+  onClick?: () => void;
 }) {
   const navigate = useNavigate();
+  const handleClick = onClick ?? (to ? () => navigate(to) : undefined);
   const content = (
     <CardContent sx={{ p: 2.25 }}>
       <Stack direction="row" justifyContent="space-between" alignItems="flex-start" sx={{ mb: 2 }}>
@@ -159,8 +171,8 @@ function KpiCard({
         '&:hover': { transform: 'translateY(-2px)', boxShadow: '0 14px 34px rgba(15,23,42,0.10)' },
       }}
     >
-      {to
-        ? <CardActionArea onClick={() => navigate(to)} sx={{ height: '100%', borderRadius: '14px' }}>{content}</CardActionArea>
+      {handleClick
+        ? <CardActionArea onClick={handleClick} sx={{ height: '100%', borderRadius: '14px' }}>{content}</CardActionArea>
         : content}
     </Card>
   );
@@ -285,8 +297,378 @@ function ContractAlertsPanel({
   );
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+//  Dialog "Charge RH immédiate" — toutes les demandes à traiter
+// ─────────────────────────────────────────────────────────────────────────────
+function ChargeRHDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const navigate = useNavigate();
+  const [tab, setTab] = useState(0);
+
+  const ago = (d: string) => {
+    const h = Math.floor((Date.now() - new Date(d).getTime()) / 3600000);
+    return h < 1 ? '<1h' : h < 24 ? `${h}h` : `${Math.floor(h / 24)}j`;
+  };
+
+  const { data: leaves = [], isLoading: ll } = useQuery<Leave[]>({
+    queryKey: ['leaves', 'pending'],
+    queryFn: () => leavesApi.pending().then(r => r.data as unknown as Leave[]),
+    enabled: open,
+  });
+
+  const { data: justifs = [], isLoading: lj } = useQuery<Justification[]>({
+    queryKey: ['justifications', 'pending'],
+    queryFn: () => justificationsApi.pending().then(r => r.data as unknown as Justification[]),
+    enabled: open,
+  });
+
+  const { data: trainings = [], isLoading: lt } = useQuery<Training[]>({
+    queryKey: ['trainings', 'pending'],
+    queryFn: () => trainingsApi.pending().then(r => r.data),
+    enabled: open,
+  });
+
+  const { data: recruitRaw, isLoading: lr } = useQuery<PaginatedResponse<RecruitmentRequest>>({
+    queryKey: ['recruitment', 'pending'],
+    queryFn: () => recruitmentApi.pending().then(r => r.data),
+    enabled: open,
+  });
+  const recruits = recruitRaw?.data ?? [];
+
+  const { data: enrollRaw, isLoading: le } = useQuery<{ data?: { id: number; employee?: { first_name: string; last_name: string; employee_number: string }; created_at: string }[]; total?: number }>({
+    queryKey: ['enrollments-pending', 'dialog'],
+    queryFn: () => client.get('/enrollments', { params: { status: 'pending', per_page: 50 } }).then(r => r.data),
+    enabled: open,
+  });
+  const enrolls = enrollRaw?.data ?? [];
+  const enrollCount = enrollRaw?.total ?? enrolls.length;
+
+  const { data: endingSoon = [], isLoading: les } = useQuery<LeaveEndingSoon[]>({
+    queryKey: ['leaves', 'ending-soon'],
+    queryFn:  () => leavesApi.endingSoon(3),
+    enabled:  open,
+  });
+
+  const loading = ll || lj || lt || lr || le || les;
+
+  const CATEGORIES = [
+    { id: 0, label: 'Tout',              count: leaves.length + justifs.length + enrollCount + trainings.length + recruits.length + endingSoon.length, color: '#0F766E' },
+    { id: 1, label: 'Congés',            count: leaves.length,     color: '#D97706', show: leaves.length > 0 },
+    { id: 2, label: 'Justifications',    count: justifs.length,    color: '#7C3AED', show: justifs.length > 0 },
+    { id: 3, label: 'Enrôlements',       count: enrollCount,       color: '#059669', show: enrollCount > 0 },
+    { id: 4, label: 'Formations',        count: trainings.length,  color: '#8B5CF6', show: trainings.length > 0 },
+    { id: 5, label: 'Recrutements',      count: recruits.length,   color: '#0284C7', show: recruits.length > 0 },
+    { id: 6, label: 'Reprises',          count: endingSoon.length, color: '#DC2626', show: endingSoon.length > 0 },
+  ].filter(c => c.id === 0 || c.show);
+
+  const tabIndex = Math.min(tab, CATEGORIES.length - 1);
+  const activeCategory = CATEGORIES[tabIndex];
+
+  const SectionHeader = ({ icon, label, count, color, bg, path }: { icon: ReactNode; label: string; count: number; color: string; bg: string; path: string }) => (
+    <Box sx={{ px: 2.5, pt: 2, pb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
+      <Box sx={{ width: 24, height: 24, borderRadius: '7px', bgcolor: bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{icon}</Box>
+      <Typography sx={{ fontSize: 12, fontWeight: 800, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.07em', flexGrow: 1 }}>{label}</Typography>
+      <Box sx={{ px: 0.9, py: 0.2, borderRadius: '10px', bgcolor: bg }}>
+        <Typography sx={{ fontSize: 10.5, fontWeight: 800, color, lineHeight: 1 }}>{count}</Typography>
+      </Box>
+      <Button size="small" onClick={() => { navigate(path); onClose(); }}
+        sx={{ fontSize: 10.5, fontWeight: 700, color, textTransform: 'none', py: 0.25, px: 1, borderRadius: '7px', '&:hover': { bgcolor: bg } }}>
+        Voir tout →
+      </Button>
+    </Box>
+  );
+
+  const ItemRow = ({ children, isLast = false }: { children: ReactNode; isLast?: boolean }) => (
+    <Box>
+      <Box sx={{ px: 2.5, py: 1.25, display: 'flex', gap: 1.5, alignItems: 'center', '&:hover': { bgcolor: '#F8FAFC' }, transition: 'background 130ms' }}>
+        {children}
+      </Box>
+      {!isLast && <Divider sx={{ borderColor: '#F8FAFC', mx: 2.5 }} />}
+    </Box>
+  );
+
+  const showLeaves    = activeCategory.id === 0 || activeCategory.id === 1;
+  const showJustifs   = activeCategory.id === 0 || activeCategory.id === 2;
+  const showEnrolls   = activeCategory.id === 0 || activeCategory.id === 3;
+  const showTrainings = activeCategory.id === 0 || activeCategory.id === 4;
+  const showRecruits  = activeCategory.id === 0 || activeCategory.id === 5;
+  const showReprises  = activeCategory.id === 0 || activeCategory.id === 6;
+
+  return (
+    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth
+      PaperProps={{ sx: { borderRadius: '18px', overflow: 'hidden', maxHeight: '85vh' } }}>
+
+      {/* ── En-tête ── */}
+      <DialogTitle sx={{ p: 0 }}>
+        <Box sx={{ px: 2.5, py: 2, background: 'linear-gradient(135deg,#0F172A 0%,#134E4A 60%,#0F766E 100%)', display: 'flex', alignItems: 'center', gap: 1.5 }}>
+          <Box sx={{ width: 40, height: 40, borderRadius: '11px', bgcolor: 'rgba(255,255,255,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <QueryStats sx={{ color: '#5EEAD4', fontSize: 22 }} />
+          </Box>
+          <Box sx={{ flexGrow: 1 }}>
+            <Typography sx={{ fontWeight: 800, fontSize: 15.5, color: '#F8FAFC', letterSpacing: '-0.3px' }}>
+              Actions prioritaires
+            </Typography>
+            <Typography sx={{ fontSize: 12, color: '#94A3B8' }}>
+              Toutes les demandes en attente de traitement
+            </Typography>
+          </Box>
+          {!loading && (
+            <Box sx={{ px: 1.25, py: 0.4, borderRadius: '20px', background: 'linear-gradient(135deg,#EF4444,#DC2626)', boxShadow: '0 2px 8px rgba(239,68,68,0.4)' }}>
+              <Typography sx={{ fontSize: 11, fontWeight: 800, color: '#fff', lineHeight: 1 }}>
+                {CATEGORIES[0].count}
+              </Typography>
+            </Box>
+          )}
+          <IconButton size="small" onClick={onClose} sx={{ color: '#64748B', borderRadius: '8px', '&:hover': { color: '#F8FAFC', bgcolor: 'rgba(255,255,255,0.1)' } }}>
+            <Close sx={{ fontSize: 18 }} />
+          </IconButton>
+        </Box>
+
+        {/* ── Onglets ── */}
+        <Box sx={{ bgcolor: '#fff', borderBottom: '1px solid #F1F5F9' }}>
+          <Tabs
+            value={tabIndex}
+            onChange={(_, v) => setTab(v)}
+            variant="scrollable"
+            scrollButtons="auto"
+            sx={{
+              minHeight: 40,
+              '& .MuiTab-root': { minHeight: 40, fontSize: 12, fontWeight: 700, textTransform: 'none', py: 0, px: 2 },
+              '& .Mui-selected': { color: activeCategory.color },
+              '& .MuiTabs-indicator': { bgcolor: activeCategory.color },
+            }}
+          >
+            {CATEGORIES.map((c, i) => (
+              <Tab key={c.id} value={i}
+                label={
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+                    {c.label}
+                    {c.count > 0 && (
+                      <Box sx={{ px: 0.65, py: 0.1, borderRadius: '10px', bgcolor: i === tabIndex ? `${c.color}20` : '#F1F5F9' }}>
+                        <Typography sx={{ fontSize: 10, fontWeight: 800, color: i === tabIndex ? c.color : '#94A3B8', lineHeight: 1 }}>{c.count}</Typography>
+                      </Box>
+                    )}
+                  </Box>
+                }
+              />
+            ))}
+          </Tabs>
+        </Box>
+      </DialogTitle>
+
+      {/* ── Contenu ── */}
+      <DialogContent sx={{ p: 0, overflowY: 'auto' }}>
+        {loading ? (
+          <Box sx={{ p: 3 }}><Skeleton variant="rounded" height={200} /></Box>
+        ) : CATEGORIES[0].count === 0 ? (
+          <Box sx={{ py: 6, textAlign: 'center' }}>
+            <CheckCircle sx={{ fontSize: 48, color: '#10B981', mb: 1.5 }} />
+            <Typography sx={{ fontSize: 14, fontWeight: 700, color: '#0F172A' }}>Aucune action en attente</Typography>
+            <Typography sx={{ fontSize: 12.5, color: '#94A3B8', mt: 0.5 }}>Tout est à jour !</Typography>
+          </Box>
+        ) : (
+          <Box>
+
+            {/* ── Congés & Absences ── */}
+            {showLeaves && leaves.length > 0 && (
+              <Box>
+                <SectionHeader icon={<BeachAccess sx={{ fontSize: 14, color: '#D97706' }} />} label="Congés & Absences" count={leaves.length} color="#D97706" bg="#FEF9C3" path="/leaves" />
+                {leaves.map((l, i) => {
+                  const emp = l.employee ? `${l.employee.first_name} ${l.employee.last_name}` : `#${l.employee_id}`;
+                  const typeColor = l.leaveType?.color ?? '#D97706';
+                  const isAbs = l.leaveType?.category === 'absence';
+                  const s = new Date(l.start_date).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' });
+                  const e = new Date(l.end_date).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' });
+                  return (
+                    <ItemRow key={l.id} isLast={i === leaves.length - 1}>
+                      <Box sx={{ width: 36, height: 36, borderRadius: '10px', bgcolor: `${typeColor}18`, border: `1px solid ${typeColor}28`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        {isAbs ? <EventBusy sx={{ fontSize: 17, color: typeColor }} /> : <BeachAccess sx={{ fontSize: 17, color: typeColor }} />}
+                      </Box>
+                      <Box sx={{ flexGrow: 1, minWidth: 0 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1 }}>
+                          <Typography sx={{ fontSize: 13, fontWeight: 700, color: '#0F172A' }} noWrap>{emp}</Typography>
+                          <Typography sx={{ fontSize: 10, color: '#94A3B8' }}>il y a {ago(l.created_at)}</Typography>
+                        </Box>
+                        <Typography sx={{ fontSize: 11.5, color: '#475569' }} noWrap>
+                          {l.leaveType?.name ?? 'Congé'} · {s} → {e} <Box component="span" sx={{ fontWeight: 700 }}>({l.days_count}j)</Box>
+                        </Typography>
+                      </Box>
+                      <Box sx={{ px: 0.9, py: 0.25, borderRadius: '6px', bgcolor: '#FEF3C7', border: '1px solid #FDE68A', flexShrink: 0 }}>
+                        <Typography sx={{ fontSize: 9.5, fontWeight: 700, color: '#D97706', lineHeight: 1 }}>EN ATTENTE</Typography>
+                      </Box>
+                      <Button size="small" variant="contained" onClick={() => { navigate('/leaves'); onClose(); }}
+                        sx={{ fontSize: 10.5, fontWeight: 700, py: 0.35, px: 1.5, borderRadius: '7px', minWidth: 'unset', background: 'linear-gradient(135deg,#D97706,#B45309)', boxShadow: 'none', textTransform: 'none', '&:hover': { boxShadow: '0 4px 10px rgba(217,119,6,.35)' } }}>
+                        Traiter
+                      </Button>
+                    </ItemRow>
+                  );
+                })}
+                {activeCategory.id === 0 && <Divider sx={{ borderColor: '#F1F5F9', my: 0.5 }} />}
+              </Box>
+            )}
+
+            {/* ── Justifications ── */}
+            {showJustifs && justifs.length > 0 && (
+              <Box>
+                <SectionHeader icon={<AssignmentLate sx={{ fontSize: 14, color: '#7C3AED' }} />} label="Justifications" count={justifs.length} color="#7C3AED" bg="#EDE9FE" path="/justifications" />
+                {justifs.map((j, i) => {
+                  const emp = j.employee ? `${j.employee.first_name} ${j.employee.last_name}` : `#${j.employee_id}`;
+                  const d = new Date(j.date).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' });
+                  return (
+                    <ItemRow key={j.id} isLast={i === justifs.length - 1}>
+                      <Box sx={{ width: 36, height: 36, borderRadius: '10px', bgcolor: '#EDE9FE', border: '1px solid #DDD6FE', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <AssignmentLate sx={{ fontSize: 17, color: '#7C3AED' }} />
+                      </Box>
+                      <Box sx={{ flexGrow: 1, minWidth: 0 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1 }}>
+                          <Typography sx={{ fontSize: 13, fontWeight: 700, color: '#0F172A' }} noWrap>{emp}</Typography>
+                          <Typography sx={{ fontSize: 10, color: '#94A3B8' }}>il y a {ago(j.created_at)}</Typography>
+                        </Box>
+                        <Typography sx={{ fontSize: 11.5, color: '#475569' }} noWrap>
+                          {j.absence_type ?? 'Absence'} · {d}
+                        </Typography>
+                      </Box>
+                      <Button size="small" variant="contained" onClick={() => { navigate('/justifications'); onClose(); }}
+                        sx={{ fontSize: 10.5, fontWeight: 700, py: 0.35, px: 1.5, borderRadius: '7px', minWidth: 'unset', background: 'linear-gradient(135deg,#7C3AED,#6D28D9)', boxShadow: 'none', textTransform: 'none', '&:hover': { boxShadow: '0 4px 10px rgba(124,58,237,.35)' } }}>
+                        Traiter
+                      </Button>
+                    </ItemRow>
+                  );
+                })}
+                {activeCategory.id === 0 && <Divider sx={{ borderColor: '#F1F5F9', my: 0.5 }} />}
+              </Box>
+            )}
+
+            {/* ── Enrôlements ── */}
+            {showEnrolls && enrollCount > 0 && (
+              <Box>
+                <SectionHeader icon={<HowToReg sx={{ fontSize: 14, color: '#059669' }} />} label="Enrôlements" count={enrollCount} color="#059669" bg="#ECFDF5" path="/employees" />
+                {enrolls.slice(0, 8).map((en, i) => {
+                  const emp = en.employee ? `${en.employee.first_name} ${en.employee.last_name}` : `Dossier #${en.id}`;
+                  const num = en.employee?.employee_number ?? '—';
+                  return (
+                    <ItemRow key={en.id} isLast={i === Math.min(7, enrolls.length - 1)}>
+                      <Box sx={{ width: 36, height: 36, borderRadius: '10px', bgcolor: '#ECFDF5', border: '1px solid #A7F3D0', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <HowToReg sx={{ fontSize: 17, color: '#059669' }} />
+                      </Box>
+                      <Box sx={{ flexGrow: 1, minWidth: 0 }}>
+                        <Typography sx={{ fontSize: 13, fontWeight: 700, color: '#0F172A' }} noWrap>{emp}</Typography>
+                        <Typography sx={{ fontSize: 11.5, color: '#475569' }}>Matricule : {num}</Typography>
+                      </Box>
+                      <Button size="small" variant="contained" onClick={() => { navigate('/employees'); onClose(); }}
+                        sx={{ fontSize: 10.5, fontWeight: 700, py: 0.35, px: 1.5, borderRadius: '7px', minWidth: 'unset', background: 'linear-gradient(135deg,#059669,#047857)', boxShadow: 'none', textTransform: 'none', '&:hover': { boxShadow: '0 4px 10px rgba(5,150,105,.35)' } }}>
+                        Valider
+                      </Button>
+                    </ItemRow>
+                  );
+                })}
+                {enrollCount > 8 && <Box sx={{ px: 2.5, pb: 1, textAlign: 'right' }}><Typography sx={{ fontSize: 11, color: '#059669', fontWeight: 600 }}>+{enrollCount - 8} autres</Typography></Box>}
+                {activeCategory.id === 0 && <Divider sx={{ borderColor: '#F1F5F9', my: 0.5 }} />}
+              </Box>
+            )}
+
+            {/* ── Formations ── */}
+            {showTrainings && trainings.length > 0 && (
+              <Box>
+                <SectionHeader icon={<School sx={{ fontSize: 14, color: '#8B5CF6' }} />} label="Formations" count={trainings.length} color="#8B5CF6" bg="#EDE9FE" path="/trainings" />
+                {trainings.map((tr, i) => (
+                  <ItemRow key={tr.id} isLast={i === trainings.length - 1}>
+                    <Box sx={{ width: 36, height: 36, borderRadius: '10px', bgcolor: '#EDE9FE', border: '1px solid #DDD6FE', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <School sx={{ fontSize: 17, color: '#8B5CF6' }} />
+                    </Box>
+                    <Box sx={{ flexGrow: 1, minWidth: 0 }}>
+                      <Typography sx={{ fontSize: 13, fontWeight: 700, color: '#0F172A' }} noWrap>{tr.title}</Typography>
+                      <Typography sx={{ fontSize: 11.5, color: '#475569' }} noWrap>
+                        {tr.trainingType?.name ?? 'Formation'} · {tr.duration_days}j
+                        {tr.desired_date && ` · souhaitée le ${new Date(tr.desired_date).toLocaleDateString('fr-FR')}`}
+                      </Typography>
+                    </Box>
+                    <Button size="small" variant="contained" onClick={() => { navigate('/trainings'); onClose(); }}
+                      sx={{ fontSize: 10.5, fontWeight: 700, py: 0.35, px: 1.5, borderRadius: '7px', minWidth: 'unset', background: 'linear-gradient(135deg,#8B5CF6,#7C3AED)', boxShadow: 'none', textTransform: 'none', '&:hover': { boxShadow: '0 4px 10px rgba(139,92,246,.35)' } }}>
+                      Traiter
+                    </Button>
+                  </ItemRow>
+                ))}
+                {activeCategory.id === 0 && <Divider sx={{ borderColor: '#F1F5F9', my: 0.5 }} />}
+              </Box>
+            )}
+
+            {/* ── Recrutements ── */}
+            {showRecruits && recruits.length > 0 && (
+              <Box>
+                <SectionHeader icon={<PersonSearch sx={{ fontSize: 14, color: '#0284C7' }} />} label="Recrutements" count={recruits.length} color="#0284C7" bg="#E0F2FE" path="/recruitment" />
+                {recruits.map((rq, i) => (
+                  <ItemRow key={rq.id} isLast={i === recruits.length - 1}>
+                    <Box sx={{ width: 36, height: 36, borderRadius: '10px', bgcolor: '#E0F2FE', border: '1px solid #BAE6FD', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <PersonSearch sx={{ fontSize: 17, color: '#0284C7' }} />
+                    </Box>
+                    <Box sx={{ flexGrow: 1, minWidth: 0 }}>
+                      <Typography sx={{ fontSize: 13, fontWeight: 700, color: '#0F172A' }} noWrap>{rq.position_title}</Typography>
+                      <Typography sx={{ fontSize: 11.5, color: '#475569' }} noWrap>
+                        {rq.department?.name ?? '—'} · {rq.number_of_positions} poste{rq.number_of_positions > 1 ? 's' : ''} · {rq.contract_type}
+                      </Typography>
+                    </Box>
+                    <Button size="small" variant="contained" onClick={() => { navigate('/recruitment'); onClose(); }}
+                      sx={{ fontSize: 10.5, fontWeight: 700, py: 0.35, px: 1.5, borderRadius: '7px', minWidth: 'unset', background: 'linear-gradient(135deg,#0284C7,#0369A1)', boxShadow: 'none', textTransform: 'none', '&:hover': { boxShadow: '0 4px 10px rgba(2,132,199,.35)' } }}>
+                      Traiter
+                    </Button>
+                  </ItemRow>
+                ))}
+                {activeCategory.id === 0 && endingSoon.length > 0 && <Divider sx={{ borderColor: '#F1F5F9', my: 0.5 }} />}
+              </Box>
+            )}
+
+            {/* ── Reprises imminentes ── */}
+            {showReprises && endingSoon.length > 0 && (
+              <Box>
+                <SectionHeader icon={<AssignmentReturn sx={{ fontSize: 14, color: '#DC2626' }} />} label="Reprises imminentes" count={endingSoon.length} color="#DC2626" bg="#FEF2F2" path="/leaves" />
+                {endingSoon.map((l, i) => {
+                  const emp        = l.employee ? `${l.employee.first_name} ${l.employee.last_name}` : `#${l.employee_id}`;
+                  const endFmt     = new Date(l.end_date).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' });
+                  const repriseFmt = new Date(new Date(l.end_date).getTime() + 86400000).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' });
+                  const urgency    = l.days_until_return === 0
+                    ? { label: "Aujourd'hui", bg: '#FEF2F2', color: '#DC2626' }
+                    : l.days_until_return === 1
+                    ? { label: 'Demain',      bg: '#FFF7ED', color: '#EA580C' }
+                    : { label: `J-${l.days_until_return}`,  bg: '#FFFBEB', color: '#D97706' };
+                  return (
+                    <ItemRow key={l.id} isLast={i === endingSoon.length - 1}>
+                      <Box sx={{ width: 36, height: 36, borderRadius: '10px', bgcolor: '#FEF2F2', border: '1px solid #FECACA', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <AssignmentReturn sx={{ fontSize: 17, color: '#DC2626' }} />
+                      </Box>
+                      <Box sx={{ flexGrow: 1, minWidth: 0 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.2 }}>
+                          <Typography sx={{ fontSize: 13, fontWeight: 700, color: '#0F172A' }} noWrap>{emp}</Typography>
+                          <Box sx={{ px: 0.9, py: 0.2, borderRadius: '6px', bgcolor: urgency.bg, flexShrink: 0 }}>
+                            <Typography sx={{ fontSize: 9.5, fontWeight: 800, color: urgency.color, lineHeight: 1 }}>{urgency.label}</Typography>
+                          </Box>
+                        </Box>
+                        <Typography sx={{ fontSize: 11.5, color: '#475569' }}>
+                          {l.leaveType?.name ?? 'Congé'} · fin le {endFmt}
+                        </Typography>
+                        <Typography sx={{ fontSize: 11, fontWeight: 700, color: '#DC2626' }}>
+                          Reprise prévue : {repriseFmt}
+                        </Typography>
+                      </Box>
+                      <Button size="small" variant="contained" onClick={() => { navigate('/leaves'); onClose(); }}
+                        sx={{ fontSize: 10.5, fontWeight: 700, py: 0.35, px: 1.25, borderRadius: '7px', minWidth: 'unset', background: 'linear-gradient(135deg,#DC2626,#B91C1C)', boxShadow: 'none', textTransform: 'none', '&:hover': { boxShadow: '0 4px 10px rgba(220,38,38,.35)' } }}>
+                        Préparer
+                      </Button>
+                    </ItemRow>
+                  );
+                })}
+              </Box>
+            )}
+
+          </Box>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function DashboardPage() {
   const { user } = useAuthStore();
+  const [chargeOpen, setChargeOpen] = useState(false);
   const { data, isLoading } = useQuery({
     queryKey: ['dashboard'],
     queryFn: () => dashboardApi.stats().then((r) => r.data),
@@ -408,9 +790,9 @@ export default function DashboardPage() {
 
           <Stack direction={{ xs: 'row', sm: 'row' }} spacing={1.25} sx={{ width: { xs: '100%', md: 'auto' }, flexWrap: 'wrap' }} alignItems="center">
             {[
-              { label: 'Presence', value: `${presenceRate}%`, color: '#34D399' },
+              { label: 'Présence', value: `${presenceRate}%`, color: '#34D399' },
               { label: 'A traiter', value: attentionItems, color: '#FBBF24' },
-              { label: 'Actifs', value: data?.total_employees ?? '-', color: '#93C5FD' },
+              { label: 'Présentiel', value: data?.today_attendance.present ?? '-', color: '#93C5FD' },
             ].map((item) => (
               <Box
                 key={item.label}
@@ -462,7 +844,10 @@ export default function DashboardPage() {
             ))
           : data && kpiData(data).map((item) => (
               <Grid item xs={12} sm={6} md={3} key={item.label}>
-                <KpiCard {...item} />
+                <KpiCard
+                  {...item}
+                  onClick={item.label === 'Charge RH immediate' ? () => setChargeOpen(true) : undefined}
+                />
               </Grid>
             ))}
 
@@ -855,6 +1240,8 @@ export default function DashboardPage() {
         </CardContent>
       </Card>
     </Box>
+
+    <ChargeRHDialog open={chargeOpen} onClose={() => setChargeOpen(false)} />
     </>
   );
 }

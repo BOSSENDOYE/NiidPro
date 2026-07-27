@@ -1,14 +1,15 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Box, Typography, Button, IconButton, Tooltip, Chip, Switch,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
   Dialog, DialogTitle, DialogContent, DialogActions,
-  TextField, Stack, Skeleton, Alert, Snackbar,
+  TextField, Stack, Skeleton, Alert, Snackbar, Divider, CircularProgress,
   Select, MenuItem, FormControl, InputLabel,
 } from '@mui/material';
-import { Add, Edit, Delete, Circle } from '@mui/icons-material';
-import { leaveTypesApi } from '../../api/leaves';
+import { Add, Edit, Delete, Circle, ExpandMore, ExpandLess, Save } from '@mui/icons-material';
+import { leaveTypesApi, leaveSettingsApi } from '../../api/leaves';
+import type { LeaveSettingsData } from '../../api/leaves';
 import type { LeaveType } from '../../types';
 import ConfirmDialog from '../../components/shared/ConfirmDialog';
 
@@ -58,7 +59,7 @@ const EMPTY: TypeForm = {
 };
 
 /* ─── Sous-onglets ─── */
-const SUB_TABS = ['Types de congé / Absence'];
+const SUB_TABS = ['Types de congé', 'Règles & quotas'];
 
 export default function LeaveParamsTab() {
   const qc = useQueryClient();
@@ -97,6 +98,7 @@ export default function LeaveParamsTab() {
       {/* ── Contenu sous-onglet ── */}
       <Box sx={{ p: 2.5 }}>
         {subTab === 0 && <LeaveTypesPanel qc={qc} />}
+        {subTab === 1 && <LeaveRulesPanel qc={qc} />}
       </Box>
     </Box>
   );
@@ -180,10 +182,20 @@ function LeaveTypesPanel({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
 
   const isPending = createMut.isPending || updateMut.isPending;
 
-  /* ── Regroupement par catégorie ── */
+  /* ── Catégories repliées ── */
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  const toggleCollapse = (cat: string) =>
+    setCollapsed(prev => {
+      const next = new Set(prev);
+      next.has(cat) ? next.delete(cat) : next.add(cat);
+      return next;
+    });
+
+  /* ── Regroupement par catégorie (absences gérées dans leur propre onglet) ── */
+  const congeTypes = types.filter(t => t.category !== 'absence');
   const grouped: Record<string, LeaveType[]> = {};
   for (const cat of CATEGORIES) grouped[cat] = [];
-  for (const t of types) {
+  for (const t of congeTypes) {
     const cat = t.category || 'Autres';
     if (!grouped[cat]) grouped[cat] = [];
     grouped[cat].push(t);
@@ -194,9 +206,9 @@ function LeaveTypesPanel({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
       {/* ── Header ── */}
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
         <Box>
-          <Typography sx={{ fontSize: 15, fontWeight: 700, color: NAV }}>Types de congé / Absence</Typography>
+          <Typography sx={{ fontSize: 15, fontWeight: 700, color: NAV }}>Types de congé</Typography>
           <Typography sx={{ fontSize: 12, color: '#64748B', mt: 0.25 }}>
-            {types.length} type{types.length !== 1 ? 's' : ''} dans {CATEGORIES.filter((c) => (grouped[c]?.length ?? 0) > 0).length} catégorie{CATEGORIES.filter((c) => (grouped[c]?.length ?? 0) > 0).length > 1 ? 's' : ''}
+            {congeTypes.length} type{congeTypes.length !== 1 ? 's' : ''} dans {CATEGORIES.filter((c) => (grouped[c]?.length ?? 0) > 0).length} catégorie{CATEGORIES.filter((c) => (grouped[c]?.length ?? 0) > 0).length > 1 ? 's' : ''}
           </Typography>
         </Box>
         <Button
@@ -243,19 +255,22 @@ function LeaveTypesPanel({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
                       const rows = grouped[cat] ?? [];
                       if (rows.length === 0) return null;
                       const { bg, color } = CAT_COLOR[cat] ?? CAT_COLOR['Autres'];
+                      const isCollapsed = collapsed.has(cat);
                       return (
                         <>
-                          {/* Ligne de séparation catégorie */}
-                          <TableRow key={`cat-${cat}`}>
+                          {/* En-tête catégorie cliquable (plier/déplier) */}
+                          <TableRow
+                            key={`cat-${cat}`}
+                            onClick={() => toggleCollapse(cat)}
+                            sx={{ cursor: 'pointer', '&:hover': { bgcolor: `${color}12` } }}
+                          >
                             <TableCell
                               colSpan={8}
-                              sx={{ bgcolor: bg, py: 0.75, px: 2, borderBottom: `2px solid ${color}30` }}
+                              sx={{ bgcolor: bg, py: 0.75, px: 2, borderBottom: `2px solid ${color}30`, userSelect: 'none' }}
                             >
                               <Stack direction="row" alignItems="center" spacing={1}>
-                                <Box sx={{
-                                  width: 8, height: 8, borderRadius: '50%', bgcolor: color, flexShrink: 0,
-                                }} />
-                                <Typography sx={{ fontSize: 12, fontWeight: 800, color, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+                                <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: color, flexShrink: 0 }} />
+                                <Typography sx={{ fontSize: 12, fontWeight: 800, color, letterSpacing: '0.06em', textTransform: 'uppercase', flex: 1 }}>
                                   {cat}
                                 </Typography>
                                 <Chip
@@ -263,12 +278,16 @@ function LeaveTypesPanel({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
                                   size="small"
                                   sx={{ height: 18, fontSize: 10, fontWeight: 700, bgcolor: `${color}18`, color }}
                                 />
+                                {isCollapsed
+                                  ? <ExpandMore sx={{ fontSize: 18, color, ml: 0.5 }} />
+                                  : <ExpandLess sx={{ fontSize: 18, color, ml: 0.5 }} />
+                                }
                               </Stack>
                             </TableCell>
                           </TableRow>
 
-                          {/* Lignes de types */}
-                          {rows.map((t, idx) => (
+                          {/* Lignes de types (masquées si replié) */}
+                          {!isCollapsed && rows.map((t, idx) => (
                             <TableRow
                               key={t.id}
                               sx={{
@@ -360,7 +379,7 @@ function LeaveTypesPanel({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
         title="Supprimer ce type de congé"
         message={confirmDel ? `Voulez-vous vraiment supprimer le type « ${confirmDel.name} » ? Cette action est irréversible.` : ''}
         confirmLabel="Supprimer"
-        onConfirm={() => confirmDel && deleteMut.mutate(confirmDel.id)}
+        onConfirm={() => { if (confirmDel) deleteMut.mutate(confirmDel.id); }}
         onClose={() => setConfirmDel(null)}
       />
 
@@ -380,7 +399,7 @@ function LeaveTypesPanel({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
       <Dialog open={dialogOpen} onClose={close} maxWidth="sm" fullWidth
         PaperProps={{ sx: { borderRadius: '14px' } }}>
         <DialogTitle sx={{ bgcolor: NAV, color: '#fff', fontWeight: 700, fontSize: 15, py: 1.75 }}>
-          {editTarget ? 'Modifier le type de congé' : 'Nouveau type de congé / Absence'}
+          {editTarget ? 'Modifier le type de congé' : 'Nouveau type de congé'}
         </DialogTitle>
 
         <DialogContent sx={{ pt: 2.5 }}>
@@ -524,5 +543,237 @@ function LeaveTypesPanel({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
         </DialogActions>
       </Dialog>
     </>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   Panel Règles & quotas
+═══════════════════════════════════════════════════════════════════ */
+const EMPTY_RULES: LeaveSettingsData = {
+  annual_quota: 24,
+  min_jours_obligatoires: 6,
+  report_annees_max: 2,
+  samedi_ouvrable: true,
+  mere_famille_age_max: 14,
+  mere_famille_jours_enfant: 1,
+};
+
+function LeaveRulesPanel({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
+  const [form, setForm]       = useState<LeaveSettingsData>(EMPTY_RULES);
+  const [success, setSuccess] = useState(false);
+  const [saveErr, setSaveErr] = useState('');
+
+  const { data: settingsData, isLoading } = useQuery({
+    queryKey: ['leave-settings'],
+    queryFn: leaveSettingsApi.get,
+    staleTime: 60_000,
+  });
+
+  useEffect(() => {
+    if (settingsData) setForm(settingsData);
+  }, [settingsData]);
+
+  const saveMut = useMutation({
+    mutationFn: () => leaveSettingsApi.update(form),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['leave-settings'] });
+      qc.invalidateQueries({ queryKey: ['leaves', 'balance'] });
+      setSuccess(true);
+      setSaveErr('');
+    },
+    onError: (e: unknown) =>
+      setSaveErr((e as { response?: { data?: { message?: string } } }).response?.data?.message ?? 'Erreur lors de la sauvegarde'),
+  });
+
+  const setF = <K extends keyof LeaveSettingsData>(k: K, v: LeaveSettingsData[K]) =>
+    setForm(f => ({ ...f, [k]: v }));
+
+  if (isLoading) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}>
+        <CircularProgress size={28} />
+      </Box>
+    );
+  }
+
+  return (
+    <Box sx={{ maxWidth: 620 }}>
+      <Box sx={{ mb: 2.5 }}>
+        <Typography sx={{ fontSize: 15, fontWeight: 700, color: NAV }}>Règles & quotas</Typography>
+        <Typography sx={{ fontSize: 12, color: '#64748B', mt: 0.25 }}>
+          Paramètres généraux appliqués au calcul du solde et des droits à congé.
+        </Typography>
+      </Box>
+
+      {saveErr && (
+        <Alert severity="error" sx={{ mb: 2, borderRadius: '8px' }} onClose={() => setSaveErr('')}>
+          {saveErr}
+        </Alert>
+      )}
+      {success && (
+        <Alert severity="success" sx={{ mb: 2, borderRadius: '8px' }} onClose={() => setSuccess(false)}>
+          Paramètres enregistrés avec succès.
+        </Alert>
+      )}
+
+      <Stack spacing={0} sx={{ border: '1px solid #E2E8F0', borderRadius: '12px', overflow: 'hidden' }}>
+
+        {/* ── Quota annuel ── */}
+        <Box sx={{ px: 2.5, py: 2, bgcolor: '#fff' }}>
+          <Stack direction="row" alignItems="flex-start" justifyContent="space-between" spacing={2}>
+            <Box sx={{ flex: 1 }}>
+              <Typography sx={{ fontSize: 13, fontWeight: 700, color: '#0F172A' }}>
+                Quota annuel de congé
+              </Typography>
+              <Typography sx={{ fontSize: 11.5, color: '#64748B', mt: 0.5, lineHeight: 1.5 }}>
+                Nombre de jours ouvrables acquis par an (art. L.145 du Code du travail).
+                La valeur légale est <strong>24 jours ouvrables</strong>.
+              </Typography>
+            </Box>
+            <TextField
+              size="small"
+              type="number"
+              value={form.annual_quota}
+              onChange={e => setF('annual_quota', Math.max(1, Number(e.target.value)))}
+              inputProps={{ min: 1, max: 365, style: { textAlign: 'center', fontWeight: 700, width: 56 } }}
+              sx={{ width: 90, '& input': { fontSize: 15 } }}
+            />
+          </Stack>
+        </Box>
+
+        <Divider />
+
+        {/* ── Minimum obligatoire par an ── */}
+        <Box sx={{ px: 2.5, py: 2, bgcolor: '#FAFAFA' }}>
+          <Stack direction="row" alignItems="flex-start" justifyContent="space-between" spacing={2}>
+            <Box sx={{ flex: 1 }}>
+              <Typography sx={{ fontSize: 13, fontWeight: 700, color: '#0F172A' }}>
+                Minimum de jours à prendre par an
+              </Typography>
+              <Typography sx={{ fontSize: 11.5, color: '#64748B', mt: 0.5, lineHeight: 1.5 }}>
+                Nombre de jours obligatoirement pris dans l'année avant tout report.
+                En dessous de ce seuil, la clôture annuelle est bloquée pour l'agent.
+              </Typography>
+            </Box>
+            <TextField
+              size="small"
+              type="number"
+              value={form.min_jours_obligatoires}
+              onChange={e => setF('min_jours_obligatoires', Math.max(0, Math.min(30, Number(e.target.value))))}
+              inputProps={{ min: 0, max: 30, style: { textAlign: 'center', fontWeight: 700, width: 56 } }}
+              sx={{ width: 90, '& input': { fontSize: 15 } }}
+            />
+          </Stack>
+        </Box>
+
+        <Divider />
+
+        {/* ── Durée max de report (années) ── */}
+        <Box sx={{ px: 2.5, py: 2, bgcolor: '#fff' }}>
+          <Stack direction="row" alignItems="flex-start" justifyContent="space-between" spacing={2}>
+            <Box sx={{ flex: 1 }}>
+              <Typography sx={{ fontSize: 13, fontWeight: 700, color: '#0F172A' }}>
+                Durée maximale d'accumulation des reports
+              </Typography>
+              <Typography sx={{ fontSize: 11.5, color: '#64748B', mt: 0.5, lineHeight: 1.5 }}>
+                Nombre d'années pendant lesquelles les jours reportés peuvent s'accumuler.
+                Après <strong>{form.report_annees_max} an{form.report_annees_max > 1 ? 's' : ''}</strong> sans les prendre, ils sont définitivement perdus.
+              </Typography>
+            </Box>
+            <TextField
+              size="small"
+              type="number"
+              value={form.report_annees_max}
+              onChange={e => setF('report_annees_max', Math.max(1, Math.min(5, Number(e.target.value))))}
+              inputProps={{ min: 1, max: 5, style: { textAlign: 'center', fontWeight: 700, width: 56 } }}
+              sx={{ width: 90, '& input': { fontSize: 15 } }}
+            />
+          </Stack>
+        </Box>
+
+        <Divider />
+
+        {/* ── Samedi ouvrable ── */}
+        <Box sx={{ px: 2.5, py: 2, bgcolor: '#FAFAFA' }}>
+          <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={2}>
+            <Box>
+              <Typography sx={{ fontSize: 13, fontWeight: 700, color: '#0F172A' }}>
+                Samedi compté comme jour ouvrable
+              </Typography>
+              <Typography sx={{ fontSize: 11.5, color: '#64748B', mt: 0.5 }}>
+                Art. L.147 — le samedi est ouvrable sauf disposition contraire du règlement intérieur.
+              </Typography>
+            </Box>
+            <Switch
+              checked={form.samedi_ouvrable}
+              onChange={e => setF('samedi_ouvrable', e.target.checked)}
+            />
+          </Stack>
+        </Box>
+
+        <Divider />
+
+        {/* ── Majoration mères de famille ── */}
+        <Box sx={{ px: 2.5, py: 2, bgcolor: '#fff' }}>
+          <Typography sx={{ fontSize: 12, fontWeight: 800, color: '#7C3AED', letterSpacing: '0.05em', textTransform: 'uppercase', mb: 1.5 }}>
+            Majoration mères de famille (art. L.148)
+          </Typography>
+
+          <Stack spacing={2}>
+            <Stack direction="row" alignItems="flex-start" justifyContent="space-between" spacing={2}>
+              <Box sx={{ flex: 1 }}>
+                <Typography sx={{ fontSize: 13, fontWeight: 600, color: '#0F172A' }}>
+                  Âge maximum de l'enfant éligible
+                </Typography>
+                <Typography sx={{ fontSize: 11.5, color: '#64748B', mt: 0.5 }}>
+                  Enfants de moins de <strong>{form.mere_famille_age_max} ans</strong> enregistrés à l'état civil.
+                </Typography>
+              </Box>
+              <TextField
+                size="small"
+                type="number"
+                value={form.mere_famille_age_max}
+                onChange={e => setF('mere_famille_age_max', Math.max(1, Math.min(21, Number(e.target.value))))}
+                inputProps={{ min: 1, max: 21, style: { textAlign: 'center', fontWeight: 700, width: 56 } }}
+                sx={{ width: 90, '& input': { fontSize: 15 } }}
+              />
+            </Stack>
+
+            <Stack direction="row" alignItems="flex-start" justifyContent="space-between" spacing={2}>
+              <Box sx={{ flex: 1 }}>
+                <Typography sx={{ fontSize: 13, fontWeight: 600, color: '#0F172A' }}>
+                  Jours supplémentaires par enfant
+                </Typography>
+                <Typography sx={{ fontSize: 11.5, color: '#64748B', mt: 0.5 }}>
+                  Nombre de jours de congé supplémentaires accordés pour chaque enfant éligible.
+                </Typography>
+              </Box>
+              <TextField
+                size="small"
+                type="number"
+                value={form.mere_famille_jours_enfant}
+                onChange={e => setF('mere_famille_jours_enfant', Math.max(0, Math.min(10, Number(e.target.value))))}
+                inputProps={{ min: 0, max: 10, style: { textAlign: 'center', fontWeight: 700, width: 56 } }}
+                sx={{ width: 90, '& input': { fontSize: 15 } }}
+              />
+            </Stack>
+          </Stack>
+        </Box>
+
+      </Stack>
+
+      {/* ── Actions ── */}
+      <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2.5 }}>
+        <Button
+          variant="contained"
+          startIcon={saveMut.isPending ? <CircularProgress size={14} color="inherit" /> : <Save />}
+          onClick={() => saveMut.mutate()}
+          disabled={saveMut.isPending}
+          sx={{ bgcolor: NAV, '&:hover': { bgcolor: '#0D2A40' }, borderRadius: '8px', fontWeight: 700, px: 3 }}
+        >
+          {saveMut.isPending ? 'Enregistrement…' : 'Enregistrer'}
+        </Button>
+      </Box>
+    </Box>
   );
 }

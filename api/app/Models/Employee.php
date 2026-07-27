@@ -23,6 +23,7 @@ class Employee extends Model
         // Congés
         'nbre_jour_conge', 'nbre_jour_restant', 'date_dernier_calcul_conge',
         'anciennete_recrutement', 'nombre_enfants_charge', 'a_medaille_travail',
+        'jours_reportes', 'annee_expiration_report',
         // Carrière
         'categorie_emploi', 'echelon', 'date_entree_echelon',
         'fonction', 'qualification', 'niveau_rh', 'cadre', 'diplome',

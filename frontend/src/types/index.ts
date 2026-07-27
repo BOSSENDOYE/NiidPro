@@ -163,6 +163,15 @@ export interface LeaveType {
   is_active?: boolean;
 }
 
+export interface AbsApprovalEntry {
+  level:   number;
+  label:   string;
+  status:  'approved' | 'rejected';
+  comment: string | null;
+  at:      string;
+  by?:     string;
+}
+
 export interface Leave {
   id: number;
   employee_id: number;
@@ -174,10 +183,14 @@ export interface Leave {
   days_count: number;
   status: 'pending' | 'approved' | 'rejected' | 'cancelled';
   reason?: string;
+  leave_decision_ref?: string | null;
+  leave_decision_avenir?: boolean;
   comment?: string;
   approved_by?: number;
   approved_at?: string;
   created_at: string;
+  abs_approval_level?: number;
+  abs_approvals?: AbsApprovalEntry[] | null;
 }
 
 export interface ExpiringContract {
