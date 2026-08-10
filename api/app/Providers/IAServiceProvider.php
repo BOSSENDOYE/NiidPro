@@ -6,6 +6,7 @@ use App\Services\IA\ToolRegistry;
 use App\Services\IA\Tools\GenererDocumentTool;
 use App\Services\IA\Tools\RechercherAgentTool;
 use App\Services\IA\Tools\SoldeCongesTool;
+use App\Services\IA\Tools\StatistiquesRHTool;
 use Illuminate\Support\ServiceProvider;
 
 class IAServiceProvider extends ServiceProvider
@@ -17,6 +18,7 @@ class IAServiceProvider extends ServiceProvider
             $registry->register(new SoldeCongesTool());
             $registry->register(new RechercherAgentTool());
             $registry->register(new GenererDocumentTool());
+            $registry->register(new StatistiquesRHTool());
             return $registry;
         });
     }
