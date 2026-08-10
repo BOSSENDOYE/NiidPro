@@ -2,105 +2,59 @@ import { useState, useRef, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   Box, Typography, TextField, IconButton, Paper, Stack,
-  Avatar, CircularProgress, Alert, Chip, Tooltip, LinearProgress,
+  Avatar, CircularProgress, Alert, Chip, Tooltip,
 } from '@mui/material';
-import {
-  Send, Delete, SmartToy, Person, Lock,
-  AttachFile, PictureAsPdf, Image, Article, Close,
-} from '@mui/icons-material';
-import { assistantApi, type ChatMessage, type UploadedFile } from '../../api/assistant';
-import { useAuthStore } from '../../store/auth.store';
+import { Send, Delete, SmartToy, Person } from '@mui/icons-material';
+import { agentIAApi } from '../../api/agentIA';
+import { assistantApi } from '../../api/assistant';
 
 const NAV = '#0D2137';
 const ACT = '#E85D04';
 
-interface Message extends ChatMessage {
+interface Message {
   id:       number;
+  role:     'user' | 'assistant';
+  content:  string;
   loading?: boolean;
   error?:   boolean;
 }
 
-export default function AssistantPage() {
-  const { hasRole } = useAuthStore();
-  const canAccess   = hasRole('super_admin') || hasRole('admin_rh');
+const SUGGESTIONS = [
+  'Combien d\'agents sont en poste actuellement ?',
+  'Quels agents sont en congé ce mois ?',
+  'Donne-moi les statistiques RH globales',
+  'Qui a eu des avancements cette année ?',
+];
 
-  const [messages,     setMessages]     = useState<Message[]>([]);
-  const [input,        setInput]        = useState('');
-  const [busy,         setBusy]         = useState(false);
-  const [attachment,   setAttachment]   = useState<UploadedFile | null>(null);
-  const [uploading,    setUploading]    = useState(false);
-  const [uploadError,  setUploadError]  = useState<string | null>(null);
-  const fileInputRef                    = useRef<HTMLInputElement>(null);
-  const bottomRef                       = useRef<HTMLDivElement>(null);
-  let   nextId                          = useRef(1);
+export default function AssistantPage() {
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [input,    setInput]    = useState('');
+  const [busy,     setBusy]     = useState(false);
+  const bottomRef               = useRef<HTMLDivElement>(null);
+  const nextId                  = useRef(1);
 
   const { data: cfg, isLoading: cfgLoading } = useQuery({
     queryKey: ['assistant-config'],
     queryFn:  assistantApi.getConfig,
-    enabled:  canAccess,
   });
 
-  // Scroll automatique vers le bas
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
-
-  if (!canAccess) {
-    return (
-      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '60vh' }}>
-        <Stack alignItems="center" spacing={2}>
-          <Lock sx={{ fontSize: 48, color: '#CBD5E1' }} />
-          <Typography sx={{ color: '#64748B', fontSize: 15 }}>
-            Accès réservé aux administrateurs RH
-          </Typography>
-        </Stack>
-      </Box>
-    );
-  }
-
-  const history: ChatMessage[] = messages
-    .filter(m => !m.loading && !m.error)
-    .map(({ role, content }) => ({ role, content }));
-
-  // ── Upload fichier ──
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setUploadError(null);
-    setUploading(true);
-    try {
-      const uploaded = await assistantApi.upload(file);
-      setAttachment(uploaded);
-    } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
-        ?? 'Erreur lors de l\'upload.';
-      setUploadError(msg);
-    } finally {
-      setUploading(false);
-      if (fileInputRef.current) fileInputRef.current.value = '';
-    }
-  };
 
   const send = async () => {
     const text = input.trim();
     if (!text || busy) return;
 
-    const fileToSend = attachment;
     setInput('');
-    setAttachment(null);
     setBusy(true);
 
-    // Label du fichier pour affichage dans la bulle
-    const fileLabel = fileToSend ? ` [📎 ${fileToSend.filename}]` : '';
-    const userMsg: Message = {
-      id: nextId.current++, role: 'user',
-      content: text + fileLabel,
-    };
+    const userMsg:    Message = { id: nextId.current++, role: 'user',      content: text };
     const loadingMsg: Message = { id: nextId.current++, role: 'assistant', content: '', loading: true };
     setMessages(prev => [...prev, userMsg, loadingMsg]);
 
     try {
-      const { reply } = await assistantApi.chat(text, history, fileToSend ?? undefined);
+      const { reply } = await agentIAApi.chat(text);
       setMessages(prev =>
         prev.map(m => m.id === loadingMsg.id ? { ...m, content: reply, loading: false } : m)
       );
@@ -108,28 +62,33 @@ export default function AssistantPage() {
       const msg = (e as { response?: { data?: { message?: string } } })?.response?.data?.message
         ?? 'Une erreur est survenue.';
       setMessages(prev =>
-        prev.map(m => m.id === loadingMsg.id
-          ? { ...m, content: msg, loading: false, error: true }
-          : m
-        )
+        prev.map(m => m.id === loadingMsg.id ? { ...m, content: msg, loading: false, error: true } : m)
       );
     } finally {
       setBusy(false);
     }
   };
 
-  const clearConversation = () => { setMessages([]); setAttachment(null); };
+  const clearConversation = async () => {
+    setMessages([]);
+    try { await agentIAApi.clearHistory(); } catch { /* silencieux */ }
+  };
 
-  const fileIcon = (type?: string) => {
-    if (type === 'image')    return <Image sx={{ fontSize: 14 }} />;
-    if (type === 'document') return <PictureAsPdf sx={{ fontSize: 14 }} />;
-    return <Article sx={{ fontSize: 14 }} />;
+  const renderContent = (text: string) => {
+    const urlRegex = /(https?:\/\/[^\s]+)/g;
+    const parts = text.split(urlRegex);
+    return parts.map((part, i) =>
+      urlRegex.test(part)
+        ? <a key={i} href={part} target="_blank" rel="noopener noreferrer"
+            style={{ color: ACT, textDecoration: 'underline', wordBreak: 'break-all' }}>{part}</a>
+        : <span key={i}>{part}</span>
+    );
   };
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 100px)' }}>
 
-      {/* ── En-tête ── */}
+      {/* En-tête */}
       <Box sx={{ bgcolor: NAV, px: 3, py: 1.5, borderRadius: '12px 12px 0 0', flexShrink: 0 }}>
         <Stack direction="row" alignItems="center" justifyContent="space-between">
           <Stack direction="row" alignItems="center" spacing={1.5}>
@@ -142,7 +101,7 @@ export default function AssistantPage() {
               </Typography>
               <Typography sx={{ color: '#93C5FD', fontSize: 11.5 }}>
                 {cfgLoading ? '…' : cfg?.is_active
-                  ? `Modèle : ${cfg.model}`
+                  ? `Modèle : ${cfg.model} · Accès DB en temps réel`
                   : 'Non configuré — allez dans Paramètres → Assistant IA'
                 }
               </Typography>
@@ -155,7 +114,7 @@ export default function AssistantPage() {
                 sx={{ bgcolor: '#166534', color: '#fff', fontSize: 11, fontWeight: 700 }} />
             )}
             {messages.length > 0 && (
-              <Tooltip title="Effacer la conversation">
+              <Tooltip title="Nouvelle conversation">
                 <IconButton size="small" onClick={clearConversation} sx={{ color: '#93C5FD' }}>
                   <Delete sx={{ fontSize: 18 }} />
                 </IconButton>
@@ -165,14 +124,13 @@ export default function AssistantPage() {
         </Stack>
       </Box>
 
-      {/* ── Zone de messages ── */}
+      {/* Zone de messages */}
       <Box sx={{
         flex: 1, overflowY: 'auto', px: 3, py: 2,
         bgcolor: '#F8FAFC',
         display: 'flex', flexDirection: 'column', gap: 1.5,
       }}>
 
-        {/* Message de bienvenue */}
         {messages.length === 0 && !cfgLoading && (
           <Box sx={{ textAlign: 'center', mt: 6 }}>
             <Avatar sx={{ bgcolor: NAV, width: 56, height: 56, mx: 'auto', mb: 2 }}>
@@ -182,9 +140,10 @@ export default function AssistantPage() {
               Bonjour, comment puis-je vous aider ?
             </Typography>
             <Typography sx={{ color: '#64748B', fontSize: 13, mt: 0.5, maxWidth: 420, mx: 'auto' }}>
-              Je suis votre assistant RH. Posez-moi vos questions sur les effectifs,
-              congés, absences, formations ou la paie.
+              Je suis votre assistant RH connecté à la base de données en temps réel.
+              Posez-moi vos questions sur les effectifs, congés, paie, formations ou carrières.
             </Typography>
+
             {!cfg?.is_active && (
               <Alert severity="warning" sx={{ mt: 3, maxWidth: 420, mx: 'auto', fontSize: 12.5 }}>
                 L'assistant n'est pas encore activé. Configurez la clé API dans{' '}
@@ -192,17 +151,11 @@ export default function AssistantPage() {
               </Alert>
             )}
 
-            {/* Suggestions */}
             {cfg?.is_active && (
               <Stack direction="row" flexWrap="wrap" gap={1} justifyContent="center" sx={{ mt: 3 }}>
-                {[
-                  'Combien d\'agents sont en congé ce mois ?',
-                  'Quelles formations sont prévues ?',
-                  'Aide-moi à rédiger un rapport RH',
-                  'Qu\'est-ce qu\'un rapport de jouissance ?',
-                ].map(s => (
+                {SUGGESTIONS.map(s => (
                   <Chip key={s} label={s} size="small" clickable
-                    onClick={() => { setInput(s); }}
+                    onClick={() => setInput(s)}
                     sx={{ fontSize: 12, bgcolor: '#fff', border: '1px solid #E2E8F0',
                           '&:hover': { bgcolor: '#EFF6FF', borderColor: '#93C5FD' } }} />
                 ))}
@@ -211,7 +164,6 @@ export default function AssistantPage() {
           </Box>
         )}
 
-        {/* Messages */}
         {messages.map(msg => (
           <Stack
             key={msg.id}
@@ -243,7 +195,7 @@ export default function AssistantPage() {
                 </Stack>
               ) : (
                 <Typography sx={{ fontSize: 13.5, lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
-                  {msg.content}
+                  {renderContent(msg.content)}
                 </Typography>
               )}
             </Paper>
@@ -258,78 +210,17 @@ export default function AssistantPage() {
         <div ref={bottomRef} />
       </Box>
 
-      {/* ── Input ── */}
+      {/* Input */}
       <Box sx={{
         px: 2, py: 1.5, bgcolor: '#fff',
         borderTop: '1px solid #E2E8F0',
         borderRadius: '0 0 12px 12px',
         flexShrink: 0,
       }}>
-        {/* Input file caché */}
-        <input
-          ref={fileInputRef}
-          type="file"
-          hidden
-          accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.doc,.docx,.txt,.csv"
-          onChange={handleFileChange}
-        />
-
-        {/* Erreur upload */}
-        {uploadError && (
-          <Alert severity="error" onClose={() => setUploadError(null)} sx={{ mb: 1, py: 0.5, fontSize: 12 }}>
-            {uploadError}
-          </Alert>
-        )}
-
-        {/* Barre de progression upload */}
-        {uploading && <LinearProgress sx={{ mb: 1, borderRadius: 1 }} />}
-
-        {/* Chip fichier attaché */}
-        {attachment && (
-          <Box sx={{ mb: 1 }}>
-            <Chip
-              icon={fileIcon(attachment.type)}
-              label={`${attachment.filename} (${attachment.size_kb} Ko)`}
-              size="small"
-              onDelete={() => setAttachment(null)}
-              deleteIcon={<Close sx={{ fontSize: 14 }} />}
-              sx={{
-                bgcolor: attachment.type === 'image'    ? '#EFF6FF' :
-                         attachment.type === 'document' ? '#FEF2F2' : '#F0FDF4',
-                color:   attachment.type === 'image'    ? '#2563EB' :
-                         attachment.type === 'document' ? '#DC2626' : '#16A34A',
-                fontWeight: 600, fontSize: 12, maxWidth: '100%',
-                '& .MuiChip-deleteIcon': { color: 'inherit', opacity: 0.7 },
-              }}
-            />
-          </Box>
-        )}
-
         <Stack direction="row" spacing={1} alignItems="flex-end">
-          {/* Bouton attacher fichier */}
-          <Tooltip title="Joindre un fichier (PDF, image, Word, TXT)">
-            <span>
-              <IconButton
-                size="small"
-                disabled={!cfg?.is_active || busy || uploading}
-                onClick={() => fileInputRef.current?.click()}
-                sx={{
-                  color: attachment ? ACT : '#94A3B8',
-                  border: '1px solid #E2E8F0',
-                  borderRadius: '10px',
-                  width: 40, height: 40,
-                  flexShrink: 0,
-                  '&:hover': { bgcolor: '#F8FAFC', color: ACT },
-                }}
-              >
-                <AttachFile sx={{ fontSize: 18 }} />
-              </IconButton>
-            </span>
-          </Tooltip>
-
           <TextField
             fullWidth multiline maxRows={4} size="small"
-            placeholder={cfg?.is_active ? 'Écrivez votre message…' : 'Assistant non configuré'}
+            placeholder={cfg?.is_active ? 'Posez votre question RH…' : 'Assistant non configuré'}
             disabled={!cfg?.is_active || busy}
             value={input}
             onChange={e => setInput(e.target.value)}
@@ -355,7 +246,7 @@ export default function AssistantPage() {
           </IconButton>
         </Stack>
         <Typography sx={{ fontSize: 11, color: '#94A3B8', mt: 0.5, textAlign: 'center' }}>
-          Entrée pour envoyer · Maj+Entrée pour nouvelle ligne · PDF, image, Word, TXT supportés
+          Entrée pour envoyer · Maj+Entrée pour nouvelle ligne
         </Typography>
       </Box>
     </Box>

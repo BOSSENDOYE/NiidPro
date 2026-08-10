@@ -115,7 +115,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/assistant/upload', [AssistantController::class, 'upload']);
 
     // Agent IA (tool use — conversation persistante)
-    Route::post('/ia/chat', [AgentIAController::class, 'chat'])->middleware('throttle:20,1');
+    Route::post('/ia/chat',       [AgentIAController::class, 'chat'])->middleware('throttle:20,1');
+    Route::delete('/ia/history',  [AgentIAController::class, 'clearHistory']);
 
     // Paramètres de messagerie (mailing)
     Route::get('/mail-settings',       [MailSettingController::class, 'index']);

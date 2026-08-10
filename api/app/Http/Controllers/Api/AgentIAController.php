@@ -12,6 +12,15 @@ class AgentIAController extends Controller
 {
     public function __construct(private ClaudeAgentService $agentService) {}
 
+    public function clearHistory(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        IAConversation::where('user_id', $user->id)
+            ->get()
+            ->each(fn($c) => $c->messages()->delete());
+        return response()->json(['message' => 'Historique effacé.']);
+    }
+
     public function chat(Request $request): JsonResponse
     {
         $request->validate(['message' => 'required|string|max:1000']);
