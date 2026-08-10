@@ -7,10 +7,13 @@ use App\Mail\EnrollmentRejected;
 use App\Mail\EnrollmentValidated;
 use App\Models\Employee;
 use App\Models\EnrollmentRequest;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 class EnrollmentController extends Controller
 {
@@ -171,15 +174,38 @@ class EnrollmentController extends Controller
             'reviewed_at'         => Carbon::now(),
         ]);
 
-        // Send confirmation email
+        // Créer le compte utilisateur si inexistant
+        $plainPassword = null;
+        $user = User::where('email', $enrollment->email)->first();
+
+        if (! $user) {
+            $plainPassword = Str::password(12); // mot de passe fort aléatoire
+            $user = User::create([
+                'name'        => trim($enrollment->first_name . ' ' . $enrollment->last_name),
+                'email'       => $enrollment->email,
+                'password'    => Hash::make($plainPassword),
+                'employee_id' => $employee->id,
+                'is_active'   => true,
+            ]);
+            $user->assignRole('employe');
+        }
+
+        // Lier l'employé à son compte si pas encore fait
+        if (! $employee->user_id) {
+            $employee->update(['user_id' => $user->id]);
+        }
+
+        // Send confirmation email with credentials
         try {
-            Mail::to($enrollment->email)->send(new EnrollmentValidated($enrollment));
+            Mail::to($enrollment->email)->send(
+                new EnrollmentValidated($enrollment, $plainPassword)
+            );
         } catch (\Throwable) {
             // Mail failure must not block the validation
         }
 
         return response()->json([
-            'message'  => 'Demande validée. L\'agent a été notifié par email.',
+            'message'  => 'Demande validée. L\'agent a été notifié par email avec ses identifiants de connexion.',
             'employee' => $employee,
         ]);
     }

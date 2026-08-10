@@ -36,6 +36,20 @@
   .info-table td { padding: 9px 0; font-size: 14px; color: #374151; vertical-align: top; }
   .info-table td:first-child { font-weight: 700; color: #002f59; width: 170px; padding-right: 12px; }
 
+  /* Credentials box */
+  .creds-box { background: #FFFBEB; border: 1px solid #FDE68A; border-left: 4px solid #F59E0B; border-radius: 8px; padding: 20px 24px; margin-bottom: 24px; }
+  .creds-box h3 { font-size: 12px; font-weight: 700; color: #92400E; text-transform: uppercase; letter-spacing: .6px; margin-bottom: 14px; }
+  .creds-table { width: 100%; border-collapse: collapse; }
+  .creds-table tr + tr td { border-top: 1px solid #FDE68A; }
+  .creds-table td { padding: 9px 0; font-size: 14px; vertical-align: middle; }
+  .creds-table td:first-child { font-weight: 700; color: #92400E; width: 130px; padding-right: 12px; }
+  .creds-value { font-family: 'Courier New', monospace; background: #FEF3C7; padding: 4px 10px; border-radius: 4px; font-size: 15px; color: #1E293B; font-weight: 700; letter-spacing: .5px; }
+  .creds-warn  { font-size: 12px; color: #B45309; margin-top: 10px; }
+
+  /* CTA button */
+  .cta-wrap { text-align: center; margin-bottom: 24px; }
+  .cta-btn  { display: inline-block; background: linear-gradient(135deg, #002f59, #004080); color: #ffffff !important; text-decoration: none; font-size: 15px; font-weight: 700; padding: 14px 36px; border-radius: 8px; letter-spacing: .3px; }
+
   /* Next steps */
   .steps-box { background: #EFF6FF; border: 1px solid #BFDBFE; border-radius: 8px; padding: 20px 24px; margin-bottom: 24px; }
   .steps-box h3 { font-size: 13px; font-weight: 700; color: #1D4ED8; margin-bottom: 12px; }
@@ -119,14 +133,40 @@
       </table>
     </div>
 
+    {{-- Identifiants de connexion (uniquement si compte créé) ── --}}
+    @if($tempPassword)
+    <div class="creds-box">
+      <h3>🔐 Vos identifiants de connexion</h3>
+      <table class="creds-table">
+        <tr>
+          <td>Identifiant</td>
+          <td><span class="creds-value">{{ $enrollment->email }}</span></td>
+        </tr>
+        <tr>
+          <td>Mot de passe</td>
+          <td><span class="creds-value">{{ $tempPassword }}</span></td>
+        </tr>
+      </table>
+      <p class="creds-warn">
+        ⚠️ Conservez ces informations en lieu sûr. Vous pourrez changer votre mot de passe
+        depuis votre profil après la première connexion.
+      </p>
+    </div>
+
+    {{-- Bouton accès portail ── --}}
+    <div class="cta-wrap">
+      <a href="{{ $portalUrl }}" class="cta-btn">Accéder au portail agent →</a>
+    </div>
+    @endif
+
     {{-- Prochaines étapes ── --}}
     <div class="steps-box">
       <h3>🎉 Prochaines étapes</h3>
       <p>
-        Vous pouvez dès à présent vous rapprocher du service RH pour :
-        <br>• Obtenir vos identifiants d'accès à la plateforme
-        <br>• Consulter vos bulletins de paie et congés
-        <br>• Compléter votre profil si nécessaire
+        Connectez-vous dès maintenant au portail pour :
+        <br>• Consulter votre solde de congés et vos bulletins de paie
+        <br>• Compléter votre profil personnel
+        <br>• Soumettre vos demandes de congés en ligne
       </p>
     </div>
 

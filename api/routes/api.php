@@ -34,6 +34,7 @@ use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\LeaveCarryoverController;
 use App\Http\Controllers\Api\LeavePostponementController;
 use App\Http\Controllers\Api\AssistantController;
+use App\Http\Controllers\Api\AgentIAController;
 use App\Http\Controllers\Api\EnrollmentController;
 use App\Http\Controllers\Api\EvalCampagneController;
 use App\Http\Controllers\Api\EvalFicheController;
@@ -106,12 +107,15 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/leave-settings',                [LeaveSettingsController::class, 'show']);
     Route::put('/leave-settings',                [LeaveSettingsController::class, 'update']);
 
-    // Assistant IA
+    // Assistant IA (config & upload)
     Route::get('/assistant/config',  [AssistantController::class, 'config']);
     Route::put('/assistant/config',  [AssistantController::class, 'updateConfig']);
     Route::post('/assistant/test',   [AssistantController::class, 'test']);
     Route::post('/assistant/chat',   [AssistantController::class, 'chat']);
     Route::post('/assistant/upload', [AssistantController::class, 'upload']);
+
+    // Agent IA (tool use — conversation persistante)
+    Route::post('/ia/chat', [AgentIAController::class, 'chat'])->middleware('throttle:20,1');
 
     // Paramètres de messagerie (mailing)
     Route::get('/mail-settings',       [MailSettingController::class, 'index']);

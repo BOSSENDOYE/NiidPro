@@ -60,6 +60,11 @@ class User extends Authenticatable
         return $this->belongsTo(Department::class);
     }
 
+    public function iaConversations()
+    {
+        return $this->hasMany(IAConversation::class);
+    }
+
     public function hasFullAccess(): bool
     {
         return $this->hasAnyRole(['super_admin', 'admin_rh']);

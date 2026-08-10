@@ -17,14 +17,18 @@ class EnrollmentValidated extends Mailable
 
     public string  $companyName;
     public ?string $logoUrl;
+    public ?string $tempPassword;
+    public string  $portalUrl;
 
-    public function __construct(public EnrollmentRequest $enrollment)
+    public function __construct(public EnrollmentRequest $enrollment, ?string $tempPassword = null)
     {
         $settings          = CompanySetting::current();
         $this->companyName = $settings->name ?? 'ANASER';
         $this->logoUrl     = $settings->logo_path
             ? Storage::disk('public')->url($settings->logo_path)
             : null;
+        $this->tempPassword = $tempPassword;
+        $this->portalUrl    = rtrim(config('app.url'), '/');
     }
 
     public function envelope(): Envelope

@@ -1,134 +1,84 @@
 import { useState, useRef, useEffect } from 'react';
-import { useQuery } from '@tanstack/react-query';
 import {
   Box, IconButton, Paper, Stack, Typography, TextField,
-  Avatar, CircularProgress, Chip, Tooltip, Fade, Badge,
-  LinearProgress,
+  Avatar, CircularProgress, Tooltip, Fade, Badge,
 } from '@mui/material';
-import {
-  SmartToy, Close, Send, Delete, AttachFile,
-  PictureAsPdf, Image, Article, Person, Remove,
-} from '@mui/icons-material';
-import { assistantApi, type ChatMessage, type UploadedFile } from '../../api/assistant';
+import { SmartToy, Close, Send, Delete, Person, Remove } from '@mui/icons-material';
+import { agentIAApi } from '../../api/agentIA';
 import { useAuthStore } from '../../store/auth.store';
 
 const NAV = '#0D2137';
 const ACT = '#E85D04';
 
-interface Message extends ChatMessage {
+interface Message {
   id:       number;
+  role:     'user' | 'assistant';
+  content:  string;
   loading?: boolean;
   error?:   boolean;
-  fileLabel?: string;
 }
 
 export default function ChatbotWidget() {
   const { hasRole } = useAuthStore();
-  const canAccess   = hasRole('super_admin') || hasRole('admin_rh');
 
-  const [open,        setOpen]        = useState(false);
-  const [minimized,   setMinimized]   = useState(false);
-  const [messages,    setMessages]    = useState<Message[]>([]);
-  const [input,       setInput]       = useState('');
-  const [busy,        setBusy]        = useState(false);
-  const [attachment,  setAttachment]  = useState<UploadedFile | null>(null);
-  const [uploading,   setUploading]   = useState(false);
-  const [unread,      setUnread]      = useState(0);
-  const fileInputRef                  = useRef<HTMLInputElement>(null);
-  const bottomRef                     = useRef<HTMLDivElement>(null);
-  const nextId                        = useRef(1);
+  // Visible pour tous les rôles authentifiés
+  const canAccess =
+    hasRole('super_admin') ||
+    hasRole('admin_rh')    ||
+    hasRole('manager')     ||
+    hasRole('employe');
 
-  const { data: cfg } = useQuery({
-    queryKey: ['assistant-config'],
-    queryFn:  assistantApi.getConfig,
-    enabled:  canAccess,
-  });
+  const [open,      setOpen]      = useState(false);
+  const [minimized, setMinimized] = useState(false);
+  const [messages,  setMessages]  = useState<Message[]>([]);
+  const [input,     setInput]     = useState('');
+  const [busy,      setBusy]      = useState(false);
+  const [unread,    setUnread]    = useState(0);
+  const bottomRef                 = useRef<HTMLDivElement>(null);
+  const nextId                    = useRef(1);
 
-  // Scroll bas automatique
   useEffect(() => {
     if (open && !minimized) {
       bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
     }
   }, [messages, open, minimized]);
 
-  // Compteur messages non lus quand fermé
   useEffect(() => {
-    if (!open) return;
-    setUnread(0);
+    if (open) setUnread(0);
   }, [open]);
 
-  // Le bouton flottant est toujours visible si l'utilisateur a les droits
-  // (même si la config charge encore ou si l'assistant est inactif)
   if (!canAccess) return null;
 
-  const inactive = cfg !== undefined && !cfg.is_active;
-
-  const history: ChatMessage[] = messages
-    .filter(m => !m.loading && !m.error)
-    .map(({ role, content }) => ({ role, content }));
-
-  // ── Upload ──
-  const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setUploading(true);
-    try {
-      const uploaded = await assistantApi.upload(file);
-      setAttachment(uploaded);
-    } catch {
-      // silently ignore in widget — user sees nothing in chat
-    } finally {
-      setUploading(false);
-      if (fileInputRef.current) fileInputRef.current.value = '';
-    }
-  };
-
-  // ── Envoyer ──
   const send = async () => {
     const text = input.trim();
     if (!text || busy) return;
 
-    const fileToSend = attachment;
     setInput('');
-    setAttachment(null);
     setBusy(true);
 
-    const fileLabel = fileToSend ? ` [📎 ${fileToSend.filename}]` : '';
-    const userMsg: Message  = { id: nextId.current++, role: 'user',      content: text + fileLabel };
-    const botMsg:  Message  = { id: nextId.current++, role: 'assistant', content: '', loading: true };
+    const userMsg: Message = { id: nextId.current++, role: 'user',      content: text };
+    const botMsg:  Message = { id: nextId.current++, role: 'assistant', content: '', loading: true };
     setMessages(prev => [...prev, userMsg, botMsg]);
 
     try {
-      const { reply } = await assistantApi.chat(text, history, fileToSend ?? undefined);
+      const { reply } = await agentIAApi.chat(text);
       setMessages(prev =>
-        prev.map(m => m.id === botMsg.id ? { ...m, content: reply, loading: false } : m)
+        prev.map(m => m.id === botMsg.id ? { ...m, content: reply, loading: false } : m),
       );
       if (!open) setUnread(u => u + 1);
     } catch (e: unknown) {
       const msg = (e as { response?: { data?: { message?: string } } })
         ?.response?.data?.message ?? 'Erreur. Veuillez réessayer.';
       setMessages(prev =>
-        prev.map(m => m.id === botMsg.id ? { ...m, content: msg, loading: false, error: true } : m)
+        prev.map(m => m.id === botMsg.id ? { ...m, content: msg, loading: false, error: true } : m),
       );
     } finally {
       setBusy(false);
     }
   };
 
-  const fileIcon = (type?: string) => {
-    if (type === 'image')    return <Image sx={{ fontSize: 13 }} />;
-    if (type === 'document') return <PictureAsPdf sx={{ fontSize: 13 }} />;
-    return <Article sx={{ fontSize: 13 }} />;
-  };
-
   return (
     <>
-      {/* ── Input fichier caché ── */}
-      <input ref={fileInputRef} type="file" hidden
-        accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.doc,.docx,.txt,.csv"
-        onChange={handleFile}
-      />
-
       {/* ── Panel chat ── */}
       <Fade in={open}>
         <Paper elevation={8} sx={{
@@ -153,14 +103,13 @@ export default function ChatbotWidget() {
                     Assistant RH
                   </Typography>
                   <Typography sx={{ color: '#93C5FD', fontSize: 10.5 }}>
-                    {cfg?.model?.includes('haiku') ? 'Claude Haiku' :
-                     cfg?.model?.includes('sonnet') ? 'Claude Sonnet' : 'Claude'}
+                    Propulsé par Claude
                   </Typography>
                 </Box>
               </Stack>
               <Stack direction="row" spacing={0.3}>
                 {messages.length > 0 && (
-                  <Tooltip title="Effacer">
+                  <Tooltip title="Effacer la conversation">
                     <IconButton size="small" onClick={() => setMessages([])} sx={{ color: '#93C5FD' }}>
                       <Delete sx={{ fontSize: 16 }} />
                     </IconButton>
@@ -189,10 +138,13 @@ export default function ChatbotWidget() {
             '&::-webkit-scrollbar-thumb': { bgcolor: '#CBD5E1', borderRadius: 2 },
           }}>
             {messages.length === 0 && (
-              <Box sx={{ textAlign: 'center', mt: 3 }}>
-                <SmartToy sx={{ fontSize: 32, color: '#CBD5E1', mb: 1 }} />
-                <Typography sx={{ fontSize: 13, color: '#94A3B8' }}>
-                  Bonjour ! Comment puis-je vous aider ?
+              <Box sx={{ textAlign: 'center', mt: 4 }}>
+                <SmartToy sx={{ fontSize: 36, color: '#CBD5E1', mb: 1 }} />
+                <Typography sx={{ fontSize: 13, color: '#94A3B8', fontWeight: 600 }}>
+                  Bonjour ! Je suis votre assistant RH.
+                </Typography>
+                <Typography sx={{ fontSize: 12, color: '#CBD5E1', mt: 0.5 }}>
+                  Posez-moi une question sur les congés,{'\n'}les agents, les contrats…
                 </Typography>
               </Box>
             )}
@@ -214,12 +166,14 @@ export default function ChatbotWidget() {
                   px: 1.5, py: 0.9,
                   bgcolor: msg.role === 'user'
                     ? NAV : msg.error ? '#FEF2F2' : '#fff',
-                  color: msg.role === 'user' ? '#fff' : msg.error ? '#991B1B' : '#0F172A',
+                  color: msg.role === 'user' ? '#fff'
+                    : msg.error ? '#991B1B' : '#0F172A',
                   borderRadius: msg.role === 'user'
                     ? '12px 12px 3px 12px' : '12px 12px 12px 3px',
-                  border: msg.role === 'assistant' && !msg.error ? '1px solid #E2E8F0' : 'none',
+                  border: msg.role === 'assistant' && !msg.error
+                    ? '1px solid #E2E8F0' : 'none',
                   fontSize: 13,
-                  lineHeight: 1.55,
+                  lineHeight: 1.6,
                   whiteSpace: 'pre-wrap',
                   wordBreak: 'break-word',
                 }}>
@@ -242,53 +196,11 @@ export default function ChatbotWidget() {
 
           {/* Zone saisie */}
           <Box sx={{ px: 1.5, py: 1, bgcolor: '#fff', borderTop: '1px solid #E2E8F0', flexShrink: 0 }}>
-            {inactive && (
-              <Box sx={{ mb: 0.75, px: 1, py: 0.75, bgcolor: '#FFF7ED', borderRadius: '8px', border: '1px solid #FED7AA' }}>
-                <Typography sx={{ fontSize: 11.5, color: '#92400E' }}>
-                  Assistant non configuré. Allez dans <strong>Configuration → Assistant IA</strong>.
-                </Typography>
-              </Box>
-            )}
-            {uploading && <LinearProgress sx={{ mb: 0.75, borderRadius: 1 }} />}
-
-            {attachment && (
-              <Box sx={{ mb: 0.75 }}>
-                <Chip
-                  icon={fileIcon(attachment.type)}
-                  label={attachment.filename}
-                  size="small"
-                  onDelete={() => setAttachment(null)}
-                  sx={{
-                    fontSize: 11, maxWidth: '100%',
-                    bgcolor: attachment.type === 'image'    ? '#EFF6FF' :
-                             attachment.type === 'document' ? '#FEF2F2' : '#F0FDF4',
-                    color:   attachment.type === 'image'    ? '#2563EB' :
-                             attachment.type === 'document' ? '#DC2626' : '#16A34A',
-                  }}
-                />
-              </Box>
-            )}
-
             <Stack direction="row" spacing={0.75} alignItems="flex-end">
-              <Tooltip title="Joindre un fichier">
-                <span>
-                  <IconButton size="small" disabled={busy || uploading}
-                    onClick={() => fileInputRef.current?.click()}
-                    sx={{
-                      color: attachment ? ACT : '#94A3B8',
-                      border: '1px solid #E2E8F0', borderRadius: '8px',
-                      width: 34, height: 34, flexShrink: 0,
-                      '&:hover': { color: ACT, bgcolor: '#FFF7ED' },
-                    }}>
-                    <AttachFile sx={{ fontSize: 16 }} />
-                  </IconButton>
-                </span>
-              </Tooltip>
-
               <TextField
                 fullWidth multiline maxRows={3} size="small"
-                placeholder={inactive ? 'Assistant non configuré…' : 'Votre question…'}
-                disabled={busy || inactive}
+                placeholder="Votre question…"
+                disabled={busy}
                 value={input}
                 onChange={e => setInput(e.target.value)}
                 onKeyDown={e => {
@@ -299,9 +211,9 @@ export default function ChatbotWidget() {
                   '& .MuiOutlinedInput-input': { py: 0.75 },
                 }}
               />
-
-              <IconButton size="small"
-                disabled={!input.trim() || busy || inactive}
+              <IconButton
+                size="small"
+                disabled={!input.trim() || busy}
                 onClick={send}
                 sx={{
                   bgcolor: NAV, color: '#fff',
@@ -322,7 +234,7 @@ export default function ChatbotWidget() {
 
       {/* ── Bouton flottant ── */}
       <Box sx={{ position: 'fixed', bottom: 24, right: 24, zIndex: 1400 }}>
-        <Tooltip title={open ? 'Fermer l\'assistant' : 'Assistant IA'} placement="left">
+        <Tooltip title={open ? "Fermer l'assistant" : 'Assistant IA'} placement="left">
           <Badge badgeContent={unread} color="error" overlap="circular">
             <IconButton
               onClick={() => { setOpen(o => !o); setMinimized(false); setUnread(0); }}
