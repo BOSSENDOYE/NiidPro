@@ -37,15 +37,23 @@ class EnrollmentController extends Controller
             'photo'              => 'nullable|image|mimes:jpeg,png,jpg,webp|max:3072',
         ]);
 
-        // Block duplicate pending requests for same email
-        $existing = EnrollmentRequest::where('email', $data['email'])
-            ->where('status', 'pending')
+        // Bloquer si une demande non rejetée existe déjà (par email ou matricule)
+        $existingByEmail = EnrollmentRequest::where('email', $data['email'])
+            ->whereIn('status', ['pending', 'validated'])
             ->first();
 
+        $existingByMatricule = EnrollmentRequest::where('matricule', $data['matricule'])
+            ->whereIn('status', ['pending', 'validated'])
+            ->first();
+
+        $existing = $existingByEmail ?? $existingByMatricule;
+
         if ($existing) {
-            return response()->json([
-                'message' => 'Une demande en attente existe déjà pour cet email. Veuillez patienter ou contacter les RH.',
-            ], 422);
+            $msg = $existing->status === 'validated'
+                ? 'Un enrôlement validé existe déjà pour cet agent. Veuillez contacter le service RH.'
+                : 'Une demande en attente existe déjà pour cet agent. Veuillez patienter ou contacter les RH.';
+
+            return response()->json(['message' => $msg], 422);
         }
 
         if ($request->hasFile('photo')) {
