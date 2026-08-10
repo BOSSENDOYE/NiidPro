@@ -18,6 +18,26 @@ interface Message {
   error?:   boolean;
 }
 
+const URL_RE = /(https?:\/\/[^\s]+)/g;
+
+function renderMessageContent(text: string) {
+  const parts = text.split(URL_RE);
+  return (
+    <>
+      {parts.map((part, i) =>
+        URL_RE.test(part) ? (
+          <a key={i} href={part} target="_blank" rel="noopener noreferrer"
+            style={{ color: '#004080', fontWeight: 600, wordBreak: 'break-all' }}>
+            Télécharger le document ↗
+          </a>
+        ) : (
+          <span key={i}>{part}</span>
+        )
+      )}
+    </>
+  );
+}
+
 export default function ChatbotWidget() {
   const { hasRole } = useAuthStore();
 
@@ -182,7 +202,7 @@ export default function ChatbotWidget() {
                       <CircularProgress size={11} sx={{ color: '#94A3B8' }} />
                       <Typography sx={{ fontSize: 12, color: '#94A3B8' }}>…</Typography>
                     </Stack>
-                  ) : msg.content}
+                  ) : renderMessageContent(msg.content)}
                 </Box>
                 {msg.role === 'user' && (
                   <Avatar sx={{ bgcolor: ACT, width: 22, height: 22, mb: 0.3, flexShrink: 0 }}>

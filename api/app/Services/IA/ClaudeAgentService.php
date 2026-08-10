@@ -10,7 +10,7 @@ class ClaudeAgentService
 {
     private const MAX_ITERATIONS = 5;
 
-    private const SYSTEM_PROMPT = <<<'PROMPT'
+    private const DEFAULT_SYSTEM_PROMPT = <<<'PROMPT'
 Tu es l'assistant RH de NiidPro, une plateforme de gestion des ressources humaines.
 Tu aides les utilisateurs à consulter des informations RH : soldes de congés, fiches agents, contrats, etc.
 
@@ -39,8 +39,14 @@ PROMPT;
             throw new \RuntimeException('Clé API Anthropic non configurée. Allez dans Configuration → Assistant IA.');
         }
 
-        $model = $cfg->model ?? config('services.anthropic.model', 'claude-sonnet-5');
-        $tools = $this->toolRegistry->schemaForClaude();
+        $model   = $cfg->model ?? config('services.anthropic.model', 'claude-sonnet-5');
+        $tools   = $this->toolRegistry->schemaForClaude();
+
+        // Le prompt personnalisé enrichit le contexte, mais les règles outils restent toujours actives
+        $customContext = trim($cfg->system_prompt ?? '');
+        $systemPrompt  = $customContext
+            ? $customContext . "\n\n" . self::DEFAULT_SYSTEM_PROMPT
+            : self::DEFAULT_SYSTEM_PROMPT;
 
         for ($i = 0; $i < self::MAX_ITERATIONS; $i++) {
             $response = Http::withHeaders([
@@ -50,7 +56,7 @@ PROMPT;
             ])->post('https://api.anthropic.com/v1/messages', [
                 'model'      => $model,
                 'max_tokens' => 1024,
-                'system'     => self::SYSTEM_PROMPT,
+                'system'     => $systemPrompt,
                 'tools'      => $tools,
                 'messages'   => $messages,
             ])->throw()->json();
