@@ -54,9 +54,8 @@ export default function AssistantPage() {
   const [drawerOpen,  setDrawerOpen]  = useState(false);
   const [uploading,   setUploading]   = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
-  const bottomRef  = useRef<HTMLDivElement>(null);
-  const fileInput  = useRef<HTMLInputElement>(null);
-  const nextId     = useRef(1);
+  const bottomRef = useRef<HTMLDivElement>(null);
+  const nextId    = useRef(1);
 
   const { data: cfg, isLoading: cfgLoading } = useQuery({
     queryKey: ['assistant-config'],
@@ -154,8 +153,11 @@ export default function AssistantPage() {
 
   return (
     <Box sx={{ display: 'flex', height: 'calc(100vh - 100px)', gap: 0 }}>
-      {/* Input fichier unique partagé par le chat et la bibliothèque */}
-      <input ref={fileInput} type="file" hidden
+      {/* Input fichier — déclenché via label htmlFor="ia-file-input" */}
+      <input
+        id="ia-file-input"
+        type="file"
+        style={{ display: 'none' }}
         accept=".txt,.csv,.json,.md,.pdf,.jpg,.jpeg,.png,.gif,.webp,.doc,.docx"
         onChange={handleFileUpload}
       />
@@ -326,23 +328,32 @@ export default function AssistantPage() {
           )}
 
           <Stack direction="row" spacing={1} alignItems="flex-end">
-            {/* Bouton joindre fichier */}
+            {/* Bouton joindre fichier — label htmlFor pour ouvrir le sélecteur nativement */}
             <Tooltip title="Joindre un fichier (PDF, image, texte…)">
-              <span>
+              <Box
+                component="label"
+                htmlFor={busy || uploading ? undefined : 'ia-file-input'}
+                sx={{
+                  display: 'inline-flex',
+                  flexShrink: 0,
+                  cursor: busy || uploading ? 'not-allowed' : 'pointer',
+                  pointerEvents: busy || uploading ? 'none' : 'auto',
+                }}
+              >
                 <IconButton
+                  component="span"
                   size="small"
-                  disabled={!cfg?.is_active || busy || uploading}
-                  onClick={() => fileInput.current?.click()}
+                  disabled={busy || uploading}
                   sx={{
                     color: attachment ? ACT : '#94A3B8',
                     border: '1px solid #E2E8F0', borderRadius: '10px',
-                    width: 40, height: 40, flexShrink: 0,
+                    width: 40, height: 40,
                     '&:hover': { bgcolor: '#F8FAFC', color: ACT },
                   }}
                 >
                   <AttachFile sx={{ fontSize: 18 }} />
                 </IconButton>
-              </span>
+              </Box>
             </Tooltip>
 
             <TextField
@@ -399,26 +410,29 @@ export default function AssistantPage() {
           </Stack>
         </Box>
 
-        {/* Bouton upload */}
+        {/* Bouton upload — label htmlFor pour ouvrir le sélecteur nativement */}
         <Box sx={{ p: 2, flexShrink: 0 }}>
-          <Paper
-            elevation={0}
-            onClick={() => fileInput.current?.click()}
-            sx={{
-              border: '2px dashed #CBD5E1', borderRadius: '10px',
-              p: 2, textAlign: 'center', cursor: 'pointer',
-              '&:hover': { borderColor: ACT, bgcolor: '#FFF7ED' },
-              transition: 'all .15s',
-            }}
-          >
-            <AddPhotoAlternate sx={{ fontSize: 28, color: '#94A3B8', mb: 0.5 }} />
-            <Typography sx={{ fontSize: 12.5, color: '#64748B', fontWeight: 600 }}>
-              Déposer un fichier
-            </Typography>
-            <Typography sx={{ fontSize: 11, color: '#94A3B8', mt: 0.3 }}>
-              PDF, image, texte, CSV — max 5 Mo
-            </Typography>
-          </Paper>
+          <label htmlFor="ia-file-input" style={{ display: 'block', cursor: 'pointer' }}>
+            <Paper
+              elevation={0}
+              component="span"
+              sx={{
+                display: 'block',
+                border: '2px dashed #CBD5E1', borderRadius: '10px',
+                p: 2, textAlign: 'center',
+                '&:hover': { borderColor: ACT, bgcolor: '#FFF7ED' },
+                transition: 'all .15s',
+              }}
+            >
+              <AddPhotoAlternate sx={{ fontSize: 28, color: '#94A3B8', mb: 0.5 }} />
+              <Typography sx={{ fontSize: 12.5, color: '#64748B', fontWeight: 600 }}>
+                Cliquer pour choisir un fichier
+              </Typography>
+              <Typography sx={{ fontSize: 11, color: '#94A3B8', mt: 0.3 }}>
+                PDF, image, texte, CSV — max 5 Mo
+              </Typography>
+            </Paper>
+          </label>
           {uploading && <LinearProgress sx={{ mt: 1, borderRadius: 1 }} />}
           {uploadError && (
             <Alert severity="error" onClose={() => setUploadError(null)} sx={{ mt: 1, py: 0.5, fontSize: 12 }}>
