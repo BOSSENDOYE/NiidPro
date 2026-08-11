@@ -115,8 +115,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/assistant/upload', [AssistantController::class, 'upload']);
 
     // Agent IA (tool use — conversation persistante)
-    Route::post('/ia/chat',       [AgentIAController::class, 'chat'])->middleware('throttle:20,1');
-    Route::delete('/ia/history',  [AgentIAController::class, 'clearHistory']);
+    Route::post('/ia/chat',                    [AgentIAController::class, 'chat'])->middleware('throttle:20,1');
+    Route::delete('/ia/history',               [AgentIAController::class, 'clearHistory']);
+    // Bibliothèque de fichiers de l'assistant
+    Route::post('/ia/upload',                  [AgentIAController::class, 'upload']);
+    Route::get('/ia/files',                    [AgentIAController::class, 'listFiles']);
+    Route::delete('/ia/files/{id}',            [AgentIAController::class, 'deleteFile']);
+    Route::patch('/ia/files/{id}/persistent',  [AgentIAController::class, 'togglePersistent']);
 
     // Paramètres de messagerie (mailing)
     Route::get('/mail-settings',       [MailSettingController::class, 'index']);

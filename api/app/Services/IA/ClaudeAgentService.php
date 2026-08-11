@@ -28,6 +28,7 @@ Outils disponibles (utilise-les systématiquement) :
 - Sanctions disciplinaires → get_sanctions_agent
 - Rechercher un agent par nom → rechercher_agent
 - Générer un document PDF → generer_document
+- Lire/lister les fichiers mémorisés par l'utilisateur → lire_fichier_memoire
 
 Règles :
 - Réponds toujours en français, de façon concise et professionnelle.
@@ -68,7 +69,9 @@ PROMPT;
             $response = Http::withHeaders([
                 'x-api-key'         => $apiKey,
                 'anthropic-version' => '2023-06-01',
+                'anthropic-beta'    => 'pdfs-2024-09-25',
                 'content-type'      => 'application/json',
+            // anthropic-beta: pdfs-2024-09-25 active le support des documents PDF
             ])->post('https://api.anthropic.com/v1/messages', [
                 'model'      => $model,
                 'max_tokens' => 1024,

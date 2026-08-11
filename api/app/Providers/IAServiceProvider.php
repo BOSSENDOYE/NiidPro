@@ -15,6 +15,7 @@ use App\Services\IA\Tools\RechercherAgentTool;
 use App\Services\IA\Tools\SanctionsAgentTool;
 use App\Services\IA\Tools\SoldeCongesTool;
 use App\Services\IA\Tools\StatistiquesRHTool;
+use App\Services\IA\Tools\LireFichierTool;
 use Illuminate\Support\ServiceProvider;
 
 class IAServiceProvider extends ServiceProvider
@@ -51,6 +52,9 @@ class IAServiceProvider extends ServiceProvider
             // Statistiques & Documents
             $registry->register(new StatistiquesRHTool());
             $registry->register(new GenererDocumentTool());
+
+            // Bibliothèque de fichiers
+            $registry->register(new LireFichierTool());
 
             return $registry;
         });
