@@ -16,6 +16,8 @@ use App\Services\IA\Tools\SanctionsAgentTool;
 use App\Services\IA\Tools\SoldeCongesTool;
 use App\Services\IA\Tools\StatistiquesRHTool;
 use App\Services\IA\Tools\LireFichierTool;
+use App\Services\IA\Tools\ExplorerSchemaTool;
+use App\Services\IA\Tools\InterrogerTableTool;
 use Illuminate\Support\ServiceProvider;
 
 class IAServiceProvider extends ServiceProvider
@@ -55,6 +57,10 @@ class IAServiceProvider extends ServiceProvider
 
             // Bibliothèque de fichiers
             $registry->register(new LireFichierTool());
+
+            // Accès générique à toute la base de données
+            $registry->register(new ExplorerSchemaTool());
+            $registry->register(new InterrogerTableTool());
 
             return $registry;
         });

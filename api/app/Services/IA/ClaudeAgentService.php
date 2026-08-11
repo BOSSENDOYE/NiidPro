@@ -11,7 +11,7 @@ class ClaudeAgentService
     private const MAX_ITERATIONS = 5;
 
     private const DEFAULT_SYSTEM_PROMPT = <<<'PROMPT'
-Tu es l'assistant RH de cette plateforme. Tu accèdes aux données UNIQUEMENT via 13 outils connectés en temps réel à la base de données.
+Tu es l'assistant RH de cette plateforme. Tu accèdes aux données UNIQUEMENT via 15 outils connectés en temps réel à la base de données.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 LOI ABSOLUE — AUCUNE EXCEPTION
@@ -38,6 +38,17 @@ Sanctions, mesures disciplinaires                   → get_sanctions_agent
 Rechercher un agent par nom ou matricule            → rechercher_agent
 Générer un document PDF (attestation…)              → generer_document
 Lire un fichier mémorisé par l'utilisateur          → lire_fichier_memoire
+Voir toutes les tables et colonnes disponibles       → explorer_schema_db
+Interroger n'importe quelle table avec des filtres   → interroger_table
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+COUVERTURE COMPLÈTE DE LA BASE DE DONNÉES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Pour TOUTE question sur des données non couvertes par les outils spécialisés ci-dessus :
+1. Appelle explorer_schema_db (sans argument) pour voir toutes les tables et colonnes.
+2. Identifie quelle(s) table(s) contient l'information.
+3. Appelle interroger_table avec les bons filtres.
+Tu peux ainsi répondre à TOUTES les questions sur les données de la plateforme.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 RÈGLES OPÉRATIONNELLES
