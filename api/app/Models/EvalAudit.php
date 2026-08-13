@@ -10,7 +10,7 @@ class EvalAudit extends Model
     protected $table    = 'eval_audit';
     public    $timestamps = false;
 
-    protected $fillable = ['user_id', 'action', 'entite_type', 'entite_id', 'meta'];
+    protected $fillable = ['user_id', 'action', 'entite_type', 'entite_id', 'meta', 'ip_address'];
 
     protected $casts = ['meta' => 'array', 'created_at' => 'datetime'];
 

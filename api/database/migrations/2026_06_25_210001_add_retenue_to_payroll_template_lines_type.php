@@ -7,6 +7,9 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if (DB::getDriverName() !== 'mysql') {
+            return;
+        }
         DB::statement(
             "ALTER TABLE payroll_template_lines MODIFY COLUMN `type` ENUM('base','augmentation','ipress','ipm','css','ir','trimf','retenue') NOT NULL"
         );
@@ -14,6 +17,9 @@ return new class extends Migration
 
     public function down(): void
     {
+        if (DB::getDriverName() !== 'mysql') {
+            return;
+        }
         DB::statement(
             "ALTER TABLE payroll_template_lines MODIFY COLUMN `type` ENUM('base','augmentation','ipress','ipm','css','ir','trimf') NOT NULL"
         );

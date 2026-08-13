@@ -12,11 +12,17 @@ return new class extends Migration
      */
     public function up(): void
     {
+        if (DB::getDriverName() !== 'mysql') {
+            return;
+        }
         DB::statement("ALTER TABLE `employees` MODIFY COLUMN `anciennete_recrutement` DECIMAL(5,1) UNSIGNED NOT NULL DEFAULT 0");
     }
 
     public function down(): void
     {
+        if (DB::getDriverName() !== 'mysql') {
+            return;
+        }
         DB::statement("ALTER TABLE `employees` MODIFY COLUMN `anciennete_recrutement` SMALLINT UNSIGNED NOT NULL DEFAULT 0");
     }
 };

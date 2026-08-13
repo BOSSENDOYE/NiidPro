@@ -38,6 +38,11 @@ use App\Http\Controllers\Api\AgentIAController;
 use App\Http\Controllers\Api\EnrollmentController;
 use App\Http\Controllers\Api\EvalCampagneController;
 use App\Http\Controllers\Api\EvalFicheController;
+use App\Http\Controllers\Api\EvalSyntheseController;
+use App\Http\Controllers\Api\EvalDecisionDgController;
+use App\Http\Controllers\Api\EvalDashboardController;
+use App\Http\Controllers\Api\EvalNotificationDafController;
+use App\Http\Controllers\Api\EvalReferentielController;
 use App\Http\Controllers\Api\OrganisationUnitController;
 use Illuminate\Support\Facades\Route;
 
@@ -511,36 +516,123 @@ Route::middleware('auth:sanctum')->group(function () {
     // ── Module Évaluation Annuelle ANASER (CDC-ANASER-EVAL-2026-01) ───────────
     Route::prefix('eval')->group(function () {
 
-        // Campagnes
-        Route::prefix('campagnes')->group(function () {
-            Route::get('/',                       [EvalCampagneController::class, 'index']);
-            Route::post('/',                      [EvalCampagneController::class, 'store']);
-            Route::get('/{campagne}',             [EvalCampagneController::class, 'show']);
-            Route::put('/{campagne}',             [EvalCampagneController::class, 'update']);
-            Route::put('/{campagne}/lancer',      [EvalCampagneController::class, 'lancer']);
-            Route::get('/{campagne}/synthese',    [EvalCampagneController::class, 'synthese']);
-            Route::delete('/{campagne}',          [EvalCampagneController::class, 'destroy']);
+        // ── Référentiels de critères (§4.1) ────────────────────────────────
+        Route::prefix('referentiels')->group(function () {
+            Route::get('/',                                   [EvalReferentielController::class, 'index']);
+            Route::post('/',                                  [EvalReferentielController::class, 'store']);
+            Route::post('/seed',                              [EvalReferentielController::class, 'seed']);
+            Route::get('/{referentiel}',                      [EvalReferentielController::class, 'show']);
+            Route::put('/{referentiel}',                      [EvalReferentielController::class, 'update']);
+            Route::put('/{referentiel}/criteres',             [EvalReferentielController::class, 'storeCriteres']);
+            Route::delete('/{referentiel}',                   [EvalReferentielController::class, 'destroy']);
         });
 
-        // Critères (référentiel)
-        Route::get('/criteres',                   [EvalFicheController::class, 'criteres']);
+        // ── Campagnes (SP1) ────────────────────────────────────────────────
+        Route::prefix('campagnes')->group(function () {
+            Route::get('/',                                   [EvalCampagneController::class, 'index']);
+            Route::post('/',                                  [EvalCampagneController::class, 'store']);
+            Route::get('/{campagne}',                         [EvalCampagneController::class, 'show']);
+            Route::put('/{campagne}',                         [EvalCampagneController::class, 'update']);
+            Route::delete('/{campagne}',                      [EvalCampagneController::class, 'destroy']);
+            // SP1 — flux de lancement
+            Route::get('/{campagne}/anomalies',               [EvalCampagneController::class, 'anomalies']);
+            Route::get('/{campagne}/perimetre',               [EvalCampagneController::class, 'perimetre']);
+            Route::post('/{campagne}/note-service',           [EvalCampagneController::class, 'genererNoteService']);
+            Route::post('/{campagne}/signer-note',            [EvalCampagneController::class, 'signerNoteService']);
+            Route::get('/{campagne}/note-service/pdf',        [EvalCampagneController::class, 'telechargerNoteService']);
+            Route::put('/{campagne}/lancer',                  [EvalCampagneController::class, 'lancer']);
+            // SP4 — tableau de synthèse
+            Route::get('/{campagne}/synthese',                [EvalCampagneController::class, 'synthese']);
+        });
 
-        // Fiches
+        // ── Fiches d'évaluation ────────────────────────────────────────────
         Route::prefix('fiches')->group(function () {
+            // Routes statiques AVANT {fiche} pour éviter le binding sur des slugs
+            Route::get('/tableau-bord',                    [EvalFicheController::class, 'tableauBord']);
+            Route::post('/planifier-lot',                  [EvalFicheController::class, 'planifierLot']);
+            Route::post('/creer-lot',                      [EvalFicheController::class, 'creerLot']);
+
             Route::get('/',                                [EvalFicheController::class, 'index']);
             Route::post('/',                               [EvalFicheController::class, 'store']);
             Route::get('/{fiche}',                         [EvalFicheController::class, 'show']);
+            Route::get('/{fiche}/criteres',                [EvalFicheController::class, 'criteres']);
+            Route::get('/{fiche}/pdf',                     [EvalFicheController::class, 'telechargerPdf']);
+
+            // SP2 — Planification des entretiens
             Route::put('/{fiche}/planifier',               [EvalFicheController::class, 'planifier']);
+            Route::post('/{fiche}/replanifier',            [EvalFicheController::class, 'replanifier']);
+            Route::post('/{fiche}/accuser-consultation',   [EvalFicheController::class, 'accuserConsultation']);
+
+            // SP3 — Notation et signatures
             Route::put('/{fiche}/noter',                   [EvalFicheController::class, 'noter']);
+            Route::put('/{fiche}/bilan',                   [EvalFicheController::class, 'sauvegarderBilan']);
             Route::put('/{fiche}/besoins',                 [EvalFicheController::class, 'sauvegarderBesoins']);
             Route::put('/{fiche}/objectifs',               [EvalFicheController::class, 'sauvegarderObjectifs']);
             Route::put('/{fiche}/signer-evaluateur',       [EvalFicheController::class, 'signerEvaluateur']);
             Route::put('/{fiche}/signer-agent',            [EvalFicheController::class, 'signerAgent']);
+
+            // SP4 — Transmission et traitement
             Route::put('/{fiche}/transmettre-daf',         [EvalFicheController::class, 'transmettreDAF']);
             Route::put('/{fiche}/annoter-dg',              [EvalFicheController::class, 'annoterDG']);
+
+            // SP6 — Notification et archivage
             Route::put('/{fiche}/notifier',                [EvalFicheController::class, 'notifier']);
             Route::put('/{fiche}/archiver',                [EvalFicheController::class, 'archiver']);
+
+            // §8 — Cas particuliers
+            Route::put('/{fiche}/changer-evaluateur',      [EvalFicheController::class, 'changerEvaluateur']);
+            Route::put('/{fiche}/avis-chef-service',       [EvalFicheController::class, 'avisChefService']);
+            Route::put('/{fiche}/ref-fp',                  [EvalFicheController::class, 'refFp']);
+
             Route::delete('/{fiche}',                      [EvalFicheController::class, 'destroy']);
+        });
+
+        // ── Notifications DAF (SP6 — §7.6) ───────────────────────────────
+        Route::prefix('notifications-daf')->group(function () {
+            // Modèles de lettre (paramétrables §9)
+            Route::get('/modeles',                                [EvalNotificationDafController::class, 'modeles']);
+            Route::post('/modeles',                               [EvalNotificationDafController::class, 'creerModele']);
+            Route::put('/modeles/{modele}',                       [EvalNotificationDafController::class, 'mettreAJourModele']);
+            // Courriers d'une synthèse
+            Route::get('/{synthese}/courriers',                   [EvalNotificationDafController::class, 'courriers']);
+            Route::post('/{synthese}/generer',                    [EvalNotificationDafController::class, 'generer']);
+            Route::post('/{synthese}/archiver-lot',               [EvalNotificationDafController::class, 'archiverLot']);
+            // Actions sur un courrier individuel
+            Route::get('/courriers/{courrier}/pdf',               [EvalNotificationDafController::class, 'pdf']);
+            Route::post('/courriers/{courrier}/signer',           [EvalNotificationDafController::class, 'signer']);
+            Route::post('/courriers/{courrier}/envoyer',          [EvalNotificationDafController::class, 'envoyer']);
+            Route::post('/courriers/{courrier}/accuser',          [EvalNotificationDafController::class, 'accuser']);
+            // Archivage fiche individuelle
+            Route::post('/fiches/{fiche}/archiver',               [EvalNotificationDafController::class, 'archiverFiche']);
+        });
+
+        // ── Décisions DG (SP5) ────────────────────────────────────────────
+        Route::prefix('decisions-dg')->group(function () {
+            Route::post('/{synthese}/ouvrir-etude',                    [EvalDecisionDgController::class, 'ouvrirEtude']);
+            Route::put('/{synthese}/annoter-synthese',                 [EvalDecisionDgController::class, 'annoterSynthese']);
+            Route::put('/{synthese}/fiches/{fiche}/annoter',           [EvalDecisionDgController::class, 'annoterFiche']);
+            Route::post('/{synthese}/fiches/{fiche}/gratification',    [EvalDecisionDgController::class, 'enregistrerGratification']);
+            Route::get('/{synthese}/gratifications',                   [EvalDecisionDgController::class, 'listeGratifications']);
+            Route::post('/{synthese}/valider',                         [EvalDecisionDgController::class, 'valider']);
+            Route::get('/{synthese}/export-pdf',                       [EvalDecisionDgController::class, 'exporterPdf']);
+        });
+
+        // ── Tableau de bord par rôle (§10.2) + Historique agent (§8.5) ──────
+        Route::get('/dashboard',                                        [EvalDashboardController::class, 'index']);
+        Route::get('/agents/{employee}/historique',                     [EvalDashboardController::class, 'historiqueAgent']);
+
+        // ── Tableaux de synthèse (SP4) ─────────────────────────────────────
+        Route::prefix('syntheses')->group(function () {
+            Route::get('/',                                             [EvalSyntheseController::class, 'index']);
+            Route::post('/',                                            [EvalSyntheseController::class, 'generer']);
+            Route::get('/{synthese}',                                   [EvalSyntheseController::class, 'show']);
+            Route::get('/{synthese}/completude',                        [EvalSyntheseController::class, 'completude']);
+            Route::post('/{synthese}/confirmer-completude',             [EvalSyntheseController::class, 'confirmerCompletude']);
+            Route::put('/{synthese}/annoter',                           [EvalSyntheseController::class, 'annoter']);
+            Route::post('/{synthese}/transmettre-dg',                   [EvalSyntheseController::class, 'transmettreAuDg']);
+            Route::post('/{synthese}/relancer/{fiche}',                 [EvalSyntheseController::class, 'relancer']);
+            Route::get('/{synthese}/export-pdf',                        [EvalSyntheseController::class, 'exporterPdf']);
+            Route::get('/{synthese}/export-excel',                      [EvalSyntheseController::class, 'exporterExcel']);
         });
     });
 

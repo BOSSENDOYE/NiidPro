@@ -2,33 +2,38 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class EvalCritere extends Model
 {
+    use HasFactory;
+
     protected $table = 'eval_criteres';
 
-    protected $fillable = ['code', 'libelle', 'categorie', 'ordre', 'actif'];
+    protected $fillable = ['referentiel_id', 'code', 'libelle', 'type', 'ordre', 'actif'];
 
     protected $casts = ['actif' => 'boolean'];
+
+    public function referentiel(): BelongsTo
+    {
+        return $this->belongsTo(EvalReferentiel::class, 'referentiel_id');
+    }
 
     public function notations(): HasMany
     {
         return $this->hasMany(EvalNotation::class, 'critere_id');
     }
 
-    /** Retourne les critères applicables selon le statut de l'agent. */
-    public static function pourStatutAgent(string $statut): \Illuminate\Database\Eloquent\Collection
+    public function estSocle(): bool
     {
-        $categories = match ($statut) {
-            'fonctionnaire' => ['base', 'complementaire', 'fonctionnaire'],
-            default         => ['base', 'complementaire'],
-        };
+        return $this->type === 'socle';
+    }
 
-        return static::where('actif', true)
-            ->whereIn('categorie', $categories)
-            ->orderBy('ordre')
-            ->get();
+    public function estComplementaire(): bool
+    {
+        return $this->type === 'complementaire';
     }
 }

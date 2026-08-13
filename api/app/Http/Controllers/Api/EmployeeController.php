@@ -39,6 +39,7 @@ class EmployeeController extends Controller
                   ->orWhere('professional_email', 'like', "%{$s}%")
             ))
             ->when($request->department_id, fn($q, $d) => $q->where('department_id', $d))
+            ->when($request->organisation_unit_id, fn($q, $u) => $q->where('organisation_unit_id', $u))
             ->when($request->status, fn($q, $s) => $q->where('status', $s))
             ->when($request->position_id, fn($q, $p) => $q->where('position_id', $p));
 
