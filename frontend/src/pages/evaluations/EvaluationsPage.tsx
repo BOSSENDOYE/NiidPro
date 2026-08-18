@@ -7,7 +7,7 @@ import {
   TextField, MenuItem, Select, FormControl, InputLabel,
   Stepper, Step, StepLabel, StepContent,
   CircularProgress, Alert, Tooltip, Stack, Divider, Avatar,
-  LinearProgress, Badge, Snackbar,
+  LinearProgress, Badge, Snackbar, Checkbox, FormControlLabel,
 } from '@mui/material';
 import {
   Assignment, BarChart, PlayArrow, CheckCircle, Send, Archive,
@@ -15,7 +15,8 @@ import {
   TrendingUp, Warning, Block, Star, HowToVote, Grade,
   Notifications, FolderOpen, Description, Edit, Refresh,
   ArticleOutlined, Groups, AdminPanelSettings, AccountBalance,
-  Timeline, EmojiEvents, Close, Download,
+  Timeline, EmojiEvents, Close, Download, Gavel, DriveFileRenameOutline,
+  VerifiedUser, PictureAsPdf,
 } from '@mui/icons-material';
 import {
   evalCampagnesApi, evalFichesApi, evalSynthesesApi,
@@ -689,6 +690,94 @@ function NoterDialog({
   );
 }
 
+// ── Dialog Créer Référentiel (depuis CampagneFormDialog) ───────────────────
+function CreerReferentielDialog({
+  open, onClose, onCreated,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onCreated: (ref: EvalReferentiel) => void;
+}) {
+  const qc = useQueryClient();
+  const [code, setCode] = useState('ANASER');
+  const [libelle, setLibelle] = useState("Référentiel d'évaluation ANASER");
+  const [avecCriteres, setAvecCriteres] = useState(true);
+
+  const mutation = useMutation({
+    mutationFn: () =>
+      avecCriteres
+        ? evalReferentielsApi.seed({ code: code.trim(), libelle: libelle.trim() })
+        : evalReferentielsApi.create({ code: code.trim(), libelle: libelle.trim() }),
+    onSuccess: (r) => {
+      qc.invalidateQueries({ queryKey: ['eval-referentiels'] });
+      onCreated(r.data);
+      onClose();
+    },
+  });
+
+  return (
+    <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth PaperProps={{ sx: { borderRadius: 3 } }}>
+      <DialogTitle sx={{ fontWeight: 800, pb: 1, color: NAVY }}>
+        Créer un référentiel
+      </DialogTitle>
+      <DialogContent>
+        <Stack spacing={2} sx={{ mt: 0.5 }}>
+          <TextField
+            label="Code *"
+            value={code}
+            onChange={e => setCode(e.target.value.toUpperCase())}
+            fullWidth size="small"
+            helperText="Si ce code existe déjà, une nouvelle version est créée automatiquement"
+          />
+          <TextField
+            label="Libellé *"
+            value={libelle}
+            onChange={e => setLibelle(e.target.value)}
+            fullWidth size="small"
+          />
+          <FormControlLabel
+            control={
+              <Checkbox
+                checked={avecCriteres}
+                onChange={e => setAvecCriteres(e.target.checked)}
+                sx={{ color: NAVY, '&.Mui-checked': { color: NAVY } }}
+              />
+            }
+            label={
+              <Box>
+                <Typography variant="body2" fontWeight={600}>
+                  Pré-remplir les 13 critères officiels ANASER
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  7 critères socles (C01–C07) + 6 critères complémentaires (C08–C13)
+                </Typography>
+              </Box>
+            }
+          />
+        </Stack>
+        {mutation.isError && (
+          <Alert severity="error" sx={{ mt: 2, fontSize: 12 }}>
+            {(mutation.error as any)?.response?.data?.message ?? (mutation.error as Error)?.message ?? 'Erreur'}
+          </Alert>
+        )}
+      </DialogContent>
+      <DialogActions sx={{ px: 3, pb: 2.5 }}>
+        <Button onClick={onClose} sx={{ textTransform: 'none' }}>Annuler</Button>
+        <Button
+          variant="contained"
+          disabled={mutation.isPending || !code.trim() || !libelle.trim()}
+          onClick={() => mutation.mutate()}
+          sx={{ textTransform: 'none', bgcolor: NAVY, borderRadius: 2 }}
+        >
+          {mutation.isPending
+            ? <CircularProgress size={16} sx={{ color: '#fff' }} />
+            : 'Créer le référentiel'}
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
 // ── Dialog Créer/Modifier Campagne ─────────────────────────────────────────
 function CampagneFormDialog({
   open, onClose, onSuccess, campagne,
@@ -703,6 +792,7 @@ function CampagneFormDialog({
   const [refId, setRefId] = useState<number | ''>(campagne?.referentiel_id ?? '');
   const [dateLancement, setDateLancement] = useState(campagne?.date_lancement ?? '');
   const [dateCloture, setDateCloture] = useState(campagne?.date_cloture ?? '');
+  const [refDialogOpen, setRefDialogOpen] = useState(false);
 
   const { data: refs } = useQuery({
     queryKey: ['eval-referentiels'],
@@ -746,19 +836,47 @@ function CampagneFormDialog({
             fullWidth size="small"
           />
           {!campagne && (
-            <FormControl size="small" fullWidth>
-              <InputLabel>Référentiel</InputLabel>
-              <Select
-                value={refId}
-                label="Référentiel"
-                onChange={e => setRefId(e.target.value as number | '')}
+            <Box>
+              <FormControl size="small" fullWidth>
+                <InputLabel>Référentiel</InputLabel>
+                <Select
+                  value={refId}
+                  label="Référentiel"
+                  onChange={e => setRefId(e.target.value as number | '')}
+                >
+                  <MenuItem value="">— Sélectionner —</MenuItem>
+                  {(refs as EvalReferentiel[] | undefined)?.map(r => (
+                    <MenuItem key={r.id} value={r.id}>
+                      <Box>
+                        <Typography variant="body2" fontWeight={600}>
+                          {r.code} v{r.version}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          {r.libelle}
+                        </Typography>
+                      </Box>
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+              {!(refs as EvalReferentiel[] | undefined)?.length && (
+                <Alert severity="warning" sx={{ mt: 1, fontSize: 12, py: 0.5 }}>
+                  Aucun référentiel disponible.
+                </Alert>
+              )}
+              <Button
+                size="small"
+                onClick={() => setRefDialogOpen(true)}
+                sx={{ mt: 0.5, textTransform: 'none', color: NAVY, fontWeight: 600, p: 0, minWidth: 0 }}
               >
-                <MenuItem value="">— Sélectionner —</MenuItem>
-                {(refs as EvalReferentiel[] | undefined)?.map(r => (
-                  <MenuItem key={r.id} value={r.id}>{r.code} v{r.version} — {r.libelle}</MenuItem>
-                ))}
-              </Select>
-            </FormControl>
+                + Créer un nouveau référentiel
+              </Button>
+              <CreerReferentielDialog
+                open={refDialogOpen}
+                onClose={() => setRefDialogOpen(false)}
+                onCreated={(ref) => { setRefId(ref.id); setRefDialogOpen(false); }}
+              />
+            </Box>
           )}
           <TextField
             label="Date de lancement"
@@ -1006,12 +1124,564 @@ function DashboardTab() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+// ── DIALOG ORGANIGRAMME (correction avant lancement) ─────────────────────
+// ═══════════════════════════════════════════════════════════════════════════
+function OrganigrammeDialog({
+  open, onClose, campagneId, onFixed,
+}: {
+  open: boolean;
+  onClose: () => void;
+  campagneId: number;
+  onFixed: () => void;
+}) {
+  const qc = useQueryClient();
+  const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  const [deptId, setDeptId] = useState<number | ''>('');
+  const [serviceId, setServiceId] = useState<number | ''>('');
+  const [managerId, setManagerId] = useState<number | ''>('');
+  const [search, setSearch] = useState('');
+  const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' | 'warning' }>({
+    open: false, message: '', severity: 'success',
+  });
+
+  const { data: empData, isLoading, refetch } = useQuery({
+    queryKey: ['employees-correction-orga', campagneId],
+    queryFn: () => rhApi.employees({ per_page: 500, status: 'active' }).then(r => r.data.data),
+    enabled: open,
+    staleTime: 0,
+  });
+
+  const { data: departments = [] } = useQuery({
+    queryKey: ['eval-departments'],
+    queryFn: () => rhApi.departments().then(r => r.data),
+    enabled: open,
+  });
+
+  const { data: services = [] } = useQuery({
+    queryKey: ['eval-services-orga', deptId],
+    queryFn: () => rhApi.organisationUnits(deptId ? { department_id: deptId as number } : undefined).then(r => r.data),
+    enabled: open,
+  });
+
+  const tousEmployes = empData ?? [];
+
+  const sansManager = useMemo(
+    () => tousEmployes.filter(e => !e.manager_id),
+    [tousEmployes]
+  );
+
+  const filtered = useMemo(() => {
+    const q = search.toLowerCase();
+    return sansManager.filter(e =>
+      !q ||
+      `${e.first_name} ${e.last_name}`.toLowerCase().includes(q) ||
+      (e.employee_number ?? '').toLowerCase().includes(q) ||
+      (e.department?.name ?? '').toLowerCase().includes(q)
+    );
+  }, [sansManager, search]);
+
+  const allSelected = filtered.length > 0 && filtered.every(e => selectedIds.includes(e.id));
+
+  const toggleAll = () => {
+    if (allSelected) {
+      setSelectedIds(ids => ids.filter(id => !filtered.some(e => e.id === id)));
+    } else {
+      setSelectedIds(ids => [...new Set([...ids, ...filtered.map(e => e.id)])]);
+    }
+  };
+
+  const toggle = (id: number) =>
+    setSelectedIds(ids => ids.includes(id) ? ids.filter(i => i !== id) : [...ids, id]);
+
+  const canApply = selectedIds.length > 0 && (deptId !== '' || serviceId !== '' || managerId !== '');
+
+  const affecterLot = useMutation({
+    mutationFn: () =>
+      rhApi.affecterLot({
+        employee_ids: selectedIds,
+        ...(deptId !== '' ? { department_id: deptId as number } : {}),
+        ...(serviceId !== '' ? { organisation_unit_id: serviceId as number } : {}),
+        ...(managerId !== '' ? { manager_id: managerId as number } : {}),
+      }),
+    onSuccess: (r) => {
+      setSnackbar({ open: true, message: r.data.message, severity: 'success' });
+      setSelectedIds([]);
+      refetch();
+      qc.invalidateQueries({ queryKey: ['eval-campagnes'] });
+      qc.invalidateQueries({ queryKey: ['eval-fiches'] });
+    },
+    onError: (err: any) => {
+      setSnackbar({ open: true, message: err?.response?.data?.message ?? 'Erreur lors de la mise à jour.', severity: 'error' });
+    },
+  });
+
+  const nomManager = useMemo(() => {
+    if (managerId === '') return null;
+    const m = tousEmployes.find(e => e.id === managerId);
+    return m ? `${m.first_name} ${m.last_name}` : null;
+  }, [managerId, tousEmployes]);
+
+  return (
+    <Dialog open={open} onClose={onClose} maxWidth="lg" fullWidth
+      PaperProps={{ sx: { borderRadius: 3, height: '92vh', display: 'flex', flexDirection: 'column' } }}>
+      <DialogTitle sx={{ pb: 1, flexShrink: 0 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+          <Warning sx={{ color: ORANGE, fontSize: 28 }} />
+          <Box sx={{ flex: 1 }}>
+            <Typography fontWeight={800} color={NAVY} variant="h6">
+              Corriger l'organigramme
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              {isLoading ? '…' : sansManager.length} agent(s) sans responsable hiérarchique — à corriger avant le lancement
+            </Typography>
+          </Box>
+          {!isLoading && sansManager.length === 0 && (
+            <Chip
+              icon={<CheckCircle sx={{ fontSize: 14 }} />}
+              label="Organigramme complet"
+              size="small"
+              sx={{ bgcolor: '#D1FAE5', color: '#065F46', fontWeight: 700 }}
+            />
+          )}
+          <IconButton onClick={onClose} size="small"><Close /></IconButton>
+        </Box>
+      </DialogTitle>
+
+      <DialogContent dividers sx={{ p: 0, flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+
+        {/* ── Zone d'affectation en lot ─────────────────────────────────── */}
+        <Box sx={{ px: 2.5, py: 2, bgcolor: '#F8FAFC', borderBottom: '1px solid #E2E8F0', flexShrink: 0 }}>
+          <Typography variant="body2" fontWeight={700} color={NAVY} sx={{ mb: 1.5 }}>
+            Affectation en lot
+            {selectedIds.length > 0 && (
+              <Chip label={`${selectedIds.length} sélectionné(s)`} size="small"
+                sx={{ ml: 1, bgcolor: NAVY + '18', color: NAVY, fontWeight: 700, fontSize: 11 }} />
+            )}
+          </Typography>
+          <Grid container spacing={1.5} alignItems="flex-start">
+            <Grid item xs={12} sm={3}>
+              <FormControl size="small" fullWidth>
+                <InputLabel>Direction</InputLabel>
+                <Select
+                  value={deptId}
+                  label="Direction"
+                  onChange={e => { setDeptId(e.target.value as number | ''); setServiceId(''); setManagerId(''); }}
+                >
+                  <MenuItem value="">— Toutes —</MenuItem>
+                  {(departments as EvalDepartment[]).map(d => (
+                    <MenuItem key={d.id} value={d.id}>{d.name}</MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={12} sm={3}>
+              <FormControl size="small" fullWidth>
+                <InputLabel>Service</InputLabel>
+                <Select
+                  value={serviceId}
+                  label="Service"
+                  onChange={e => setServiceId(e.target.value as number | '')}
+                  disabled={!deptId}
+                >
+                  <MenuItem value="">— Tous —</MenuItem>
+                  {(services as EvalOrganisationUnit[]).map(s => (
+                    <MenuItem key={s.id} value={s.id}>{s.libelle}</MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={12} sm={4}>
+              <FormControl size="small" fullWidth>
+                <InputLabel>Responsable hiérarchique *</InputLabel>
+                <Select
+                  value={managerId}
+                  label="Responsable hiérarchique *"
+                  onChange={e => setManagerId(e.target.value as number | '')}
+                >
+                  <MenuItem value="">— Sélectionner —</MenuItem>
+                  {tousEmployes
+                    .filter(e => !deptId || e.department_id === deptId)
+                    .map(e => (
+                      <MenuItem key={e.id} value={e.id}>
+                        <Box>
+                          <Typography variant="body2" fontWeight={600}>
+                            {e.first_name} {e.last_name}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {e.department?.name ?? '—'}{e.position?.title ? ` · ${e.position.title}` : ''}
+                          </Typography>
+                        </Box>
+                      </MenuItem>
+                    ))}
+                </Select>
+              </FormControl>
+              {!managerId && (
+                <Typography variant="caption" color="text.secondary" sx={{ mt: 0.3, display: 'block' }}>
+                  Obligatoire pour pouvoir lancer la campagne
+                </Typography>
+              )}
+            </Grid>
+            <Grid item xs={12} sm={2}>
+              <Button
+                variant="contained"
+                fullWidth
+                size="medium"
+                disabled={!canApply || affecterLot.isPending}
+                onClick={() => affecterLot.mutate()}
+                sx={{ textTransform: 'none', bgcolor: NAVY, borderRadius: 2, height: 40 }}
+              >
+                {affecterLot.isPending
+                  ? <CircularProgress size={16} sx={{ color: '#fff' }} />
+                  : 'Appliquer'}
+              </Button>
+            </Grid>
+          </Grid>
+
+          {/* Résumé de l'affectation à appliquer */}
+          {(deptId !== '' || serviceId !== '' || managerId !== '') && selectedIds.length > 0 && (
+            <Alert severity="info" sx={{ mt: 1.5, fontSize: 12, py: 0.5 }}>
+              <strong>{selectedIds.length} agent(s)</strong> →
+              {deptId !== '' && ` Direction: ${(departments as EvalDepartment[]).find(d => d.id === deptId)?.name}`}
+              {serviceId !== '' && ` · Service: ${(services as EvalOrganisationUnit[]).find(s => s.id === serviceId)?.libelle}`}
+              {managerId !== '' && ` · Responsable: ${nomManager}`}
+            </Alert>
+          )}
+        </Box>
+
+        {/* ── Recherche + liste ─────────────────────────────────────────── */}
+        <Box sx={{ px: 2.5, py: 1.5, borderBottom: '1px solid #F1F5F9', flexShrink: 0 }}>
+          <TextField
+            size="small"
+            placeholder="Rechercher par nom, matricule, direction…"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            InputProps={{ startAdornment: <Person sx={{ color: '#94A3B8', mr: 0.5, fontSize: 18 }} /> }}
+            sx={{ width: 320 }}
+          />
+          <Typography variant="caption" color="text.secondary" sx={{ ml: 2 }}>
+            {filtered.length} agent(s) affiché(s) sur {sansManager.length} sans responsable
+          </Typography>
+        </Box>
+
+        <Box sx={{ flex: 1, overflow: 'auto' }}>
+          {isLoading ? (
+            <Box sx={{ p: 6, textAlign: 'center' }}><CircularProgress sx={{ color: NAVY }} /></Box>
+          ) : sansManager.length === 0 ? (
+            <Box sx={{ p: 6, textAlign: 'center' }}>
+              <CheckCircle sx={{ fontSize: 56, color: '#059669', mb: 1.5 }} />
+              <Typography variant="h6" fontWeight={700} color="#059669" gutterBottom>
+                Organigramme complet !
+              </Typography>
+              <Typography color="text.secondary">
+                Tous les agents actifs ont un responsable hiérarchique. Vous pouvez lancer la campagne.
+              </Typography>
+            </Box>
+          ) : (
+            <TableContainer>
+              <Table size="small" stickyHeader>
+                <TableHead>
+                  <TableRow>
+                    <TableCell padding="checkbox" sx={{ bgcolor: '#F8FAFC' }}>
+                      <Checkbox
+                        checked={allSelected}
+                        indeterminate={selectedIds.some(id => filtered.some(e => e.id === id)) && !allSelected}
+                        onChange={toggleAll}
+                        sx={{ color: NAVY, '&.Mui-checked': { color: NAVY } }}
+                      />
+                    </TableCell>
+                    <TableCell sx={{ fontWeight: 700, bgcolor: '#F8FAFC', fontSize: 12, color: NAVY }}>Agent</TableCell>
+                    <TableCell sx={{ fontWeight: 700, bgcolor: '#F8FAFC', fontSize: 12, color: NAVY }}>Matricule</TableCell>
+                    <TableCell sx={{ fontWeight: 700, bgcolor: '#F8FAFC', fontSize: 12, color: NAVY }}>Direction actuelle</TableCell>
+                    <TableCell sx={{ fontWeight: 700, bgcolor: '#F8FAFC', fontSize: 12, color: NAVY }}>Service</TableCell>
+                    <TableCell sx={{ fontWeight: 700, bgcolor: '#F8FAFC', fontSize: 12, color: NAVY }}>Fonction</TableCell>
+                    <TableCell sx={{ fontWeight: 700, bgcolor: '#F8FAFC', fontSize: 12, color: NAVY }}>Responsable</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {filtered.map(e => (
+                    <TableRow
+                      key={e.id}
+                      hover
+                      selected={selectedIds.includes(e.id)}
+                      onClick={() => toggle(e.id)}
+                      sx={{ cursor: 'pointer', '&.Mui-selected': { bgcolor: NAVY + '08' } }}
+                    >
+                      <TableCell padding="checkbox">
+                        <Checkbox
+                          checked={selectedIds.includes(e.id)}
+                          onClick={ev => ev.stopPropagation()}
+                          onChange={() => toggle(e.id)}
+                          sx={{ color: NAVY, '&.Mui-checked': { color: NAVY } }}
+                        />
+                      </TableCell>
+                      <TableCell sx={{ fontWeight: 600, fontSize: 13 }}>
+                        {e.first_name} {e.last_name}
+                      </TableCell>
+                      <TableCell sx={{ fontSize: 12, color: 'text.secondary', fontFamily: 'monospace' }}>
+                        {e.employee_number ?? '—'}
+                      </TableCell>
+                      <TableCell>
+                        {e.department?.name
+                          ? <Chip label={e.department.name} size="small"
+                              sx={{ fontSize: 11, bgcolor: '#EFF6FF', color: '#1D4ED8', fontWeight: 600 }} />
+                          : <Chip label="Non affecté" size="small"
+                              sx={{ fontSize: 11, bgcolor: '#FEF2F2', color: '#DC2626' }} />}
+                      </TableCell>
+                      <TableCell sx={{ fontSize: 12, color: 'text.secondary' }}>
+                        {e.organisation_unit?.libelle ?? '—'}
+                      </TableCell>
+                      <TableCell sx={{ fontSize: 12, color: 'text.secondary' }}>
+                        {e.position?.title ?? '—'}
+                      </TableCell>
+                      <TableCell>
+                        <Chip label="Manquant" size="small"
+                          sx={{ fontSize: 10, bgcolor: '#FEF3C7', color: '#92400E', fontWeight: 600 }} />
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          )}
+        </Box>
+      </DialogContent>
+
+      <DialogActions sx={{ px: 3, py: 2, borderTop: '1px solid #F1F5F9', flexShrink: 0 }}>
+        <Box sx={{ flex: 1 }}>
+          {sansManager.length > 0
+            ? <Typography variant="body2" color="text.secondary">
+                <strong style={{ color: ORANGE }}>{sansManager.length}</strong> agent(s) restant(s) à corriger
+              </Typography>
+            : <Typography variant="body2" color="#059669" fontWeight={700}>
+                Prêt pour le lancement ✓
+              </Typography>}
+        </Box>
+        <Button onClick={onClose} sx={{ textTransform: 'none' }}>Fermer</Button>
+        {sansManager.length === 0 && (
+          <Button
+            variant="contained"
+            startIcon={<PlayArrow />}
+            onClick={() => { onClose(); onFixed(); }}
+            sx={{ textTransform: 'none', bgcolor: '#059669', borderRadius: 2, fontWeight: 700 }}
+          >
+            Lancer la campagne
+          </Button>
+        )}
+      </DialogActions>
+
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={5000}
+        onClose={() => setSnackbar(s => ({ ...s, open: false }))}
+        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+      >
+        <Alert severity={snackbar.severity} onClose={() => setSnackbar(s => ({ ...s, open: false }))}
+          sx={{ fontWeight: 700, fontSize: 13, borderRadius: 2, boxShadow: 4 }}>
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
+    </Dialog>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ── DIALOG NOTE DE SERVICE ────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════
+function NoteServiceDialog({
+  open, onClose, campagne, onUpdated,
+}: {
+  open: boolean;
+  onClose: () => void;
+  campagne: EvalCampagneAnn;
+  onUpdated: () => void;
+}) {
+  const [texte, setTexte] = useState(campagne.note_service ?? '');
+  const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({
+    open: false, message: '', severity: 'success',
+  });
+  const estSignee = !!campagne.note_service_signee;
+
+  const generer = useMutation({
+    mutationFn: () => evalCampagnesApi.genererNote(campagne.id),
+    onSuccess: (r) => {
+      setTexte(r.data.note_service);
+      setSnackbar({ open: true, message: 'Note de service générée.', severity: 'success' });
+      onUpdated();
+    },
+    onError: (err: any) => {
+      setSnackbar({ open: true, message: err?.response?.data?.message ?? 'Erreur lors de la génération.', severity: 'error' });
+    },
+  });
+
+  const signer = useMutation({
+    mutationFn: () => evalCampagnesApi.signerNote(campagne.id),
+    onSuccess: () => {
+      setSnackbar({ open: true, message: 'Note de service signée avec succès.', severity: 'success' });
+      onUpdated();
+    },
+    onError: (err: any) => {
+      setSnackbar({ open: true, message: err?.response?.data?.message ?? 'Erreur lors de la signature.', severity: 'error' });
+    },
+  });
+
+  const telecharger = async () => {
+    try {
+      const r = await evalCampagnesApi.downloadNotePdf(campagne.id);
+      const url = URL.createObjectURL(r.data as unknown as Blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `note_service_${campagne.exercice}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      setSnackbar({ open: true, message: 'Impossible de télécharger le PDF.', severity: 'error' });
+    }
+  };
+
+  return (
+    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth PaperProps={{ sx: { borderRadius: 3 } }}>
+      <DialogTitle sx={{ pb: 1 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+          <ArticleOutlined sx={{ color: NAVY }} />
+          <Box sx={{ flex: 1 }}>
+            <Typography fontWeight={800} color={NAVY}>
+              Note de service — Exercice {campagne.exercice}
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              {campagne.titre ?? `Campagne d'évaluation ${campagne.exercice}`}
+            </Typography>
+          </Box>
+          {estSignee ? (
+            <Chip
+              icon={<VerifiedUser sx={{ fontSize: 14 }} />}
+              label="Signée"
+              size="small"
+              sx={{ bgcolor: '#D1FAE5', color: '#065F46', fontWeight: 700, fontSize: 11 }}
+            />
+          ) : (
+            <Chip
+              label="Non signée"
+              size="small"
+              sx={{ bgcolor: '#FEF3C7', color: '#92400E', fontWeight: 700, fontSize: 11 }}
+            />
+          )}
+        </Box>
+      </DialogTitle>
+
+      <DialogContent dividers sx={{ p: 0 }}>
+        {/* Barre d'actions */}
+        <Box sx={{ px: 2.5, py: 1.5, borderBottom: '1px solid #F1F5F9', display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center' }}>
+          <Button
+            size="small"
+            variant="outlined"
+            startIcon={<DriveFileRenameOutline />}
+            onClick={() => generer.mutate()}
+            disabled={generer.isPending || estSignee}
+            sx={{ textTransform: 'none', borderColor: NAVY, color: NAVY, borderRadius: 2 }}
+          >
+            {generer.isPending ? <CircularProgress size={14} /> : (texte ? 'Regénérer' : 'Générer la note')}
+          </Button>
+          {texte && !estSignee && (
+            <Button
+              size="small"
+              variant="contained"
+              startIcon={<Gavel />}
+              onClick={() => signer.mutate()}
+              disabled={signer.isPending}
+              sx={{ textTransform: 'none', bgcolor: '#059669', borderRadius: 2, '&:hover': { bgcolor: '#047857' } }}
+            >
+              {signer.isPending ? <CircularProgress size={14} sx={{ color: '#fff' }} /> : 'Signer (DG)'}
+            </Button>
+          )}
+          {texte && (
+            <Button
+              size="small"
+              variant="outlined"
+              startIcon={<PictureAsPdf />}
+              onClick={telecharger}
+              sx={{ textTransform: 'none', borderColor: '#DC2626', color: '#DC2626', borderRadius: 2, ml: 'auto' }}
+            >
+              Télécharger PDF
+            </Button>
+          )}
+        </Box>
+
+        {/* Corps de la note */}
+        {!texte ? (
+          <Box sx={{ p: 4, textAlign: 'center' }}>
+            <ArticleOutlined sx={{ fontSize: 48, color: '#CBD5E1', mb: 1 }} />
+            <Typography color="text.secondary" gutterBottom>
+              La note de service n'a pas encore été générée.
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              Cliquez sur "Générer la note" pour créer le projet basé sur le calendrier de la campagne.
+            </Typography>
+          </Box>
+        ) : (
+          <Box sx={{ p: 2.5 }}>
+            {estSignee && (
+              <Alert severity="success" sx={{ mb: 2, fontSize: 12 }}>
+                <strong>Note signée</strong> le {new Date(campagne.note_service_signee_at!).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}.
+                Le contenu ne peut plus être modifié.
+              </Alert>
+            )}
+            <TextField
+              value={texte}
+              onChange={e => setTexte(e.target.value)}
+              multiline
+              minRows={18}
+              fullWidth
+              disabled={estSignee}
+              InputProps={{
+                sx: {
+                  fontFamily: 'monospace',
+                  fontSize: 13,
+                  lineHeight: 1.7,
+                  bgcolor: estSignee ? '#F8FAFC' : '#fff',
+                },
+              }}
+              sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+            />
+            {!estSignee && (
+              <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
+                Vous pouvez modifier le texte avant de signer. Une fois signée, la note sera verrouillée.
+              </Typography>
+            )}
+          </Box>
+        )}
+      </DialogContent>
+
+      <DialogActions sx={{ px: 3, py: 2 }}>
+        <Button onClick={onClose} sx={{ textTransform: 'none' }}>Fermer</Button>
+      </DialogActions>
+
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={5000}
+        onClose={() => setSnackbar(s => ({ ...s, open: false }))}
+        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+      >
+        <Alert severity={snackbar.severity} onClose={() => setSnackbar(s => ({ ...s, open: false }))}
+          sx={{ fontWeight: 700, fontSize: 13, borderRadius: 2, boxShadow: 4 }}>
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
+    </Dialog>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // ── ONGLET CAMPAGNES ───────────────────────────────────────────────────────
 // ═══════════════════════════════════════════════════════════════════════════
 function CampagnesTab() {
   const qc = useQueryClient();
   const [formOpen, setFormOpen] = useState(false);
   const [editCampagne, setEditCampagne] = useState<EvalCampagneAnn | undefined>();
+  const [noteDialog, setNoteDialog] = useState<EvalCampagneAnn | null>(null);
+  const [orgDialog, setOrgDialog] = useState<{ campagneId: number } | null>(null);
+  const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'warning' | 'error' }>({
+    open: false, message: '', severity: 'success',
+  });
 
   const { data: campagnes = [], isLoading } = useQuery({
     queryKey: ['eval-campagnes'],
@@ -1020,7 +1690,18 @@ function CampagnesTab() {
 
   const lancer = useMutation({
     mutationFn: (id: number) => evalCampagnesApi.lancer(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['eval-campagnes'] }),
+    onSuccess: (r) => {
+      invalidate();
+      const msg = (r as any)?.data?.message ?? 'Campagne lancée avec succès.';
+      setSnackbar({ open: true, message: msg, severity: 'success' });
+    },
+    onError: (err: any, campId: number) => {
+      const msg = err?.response?.data?.message ?? err?.message ?? 'Erreur lors du lancement.';
+      setSnackbar({ open: true, message: msg, severity: 'error' });
+      if (msg.includes('sans responsable hiérarchique')) {
+        setOrgDialog({ campagneId: campId });
+      }
+    },
   });
 
   const STATUT_CAMPAGNE: Record<string, { label: string; color: string; bg: string }> = {
@@ -1108,16 +1789,36 @@ function CampagnesTab() {
                       >
                         Modifier
                       </Button>
-                      <Button
-                        size="small"
-                        variant="contained"
-                        startIcon={<PlayArrow />}
-                        disabled={lancer.isPending}
-                        onClick={() => lancer.mutate(c.id, { onSuccess: invalidate })}
-                        sx={{ textTransform: 'none', bgcolor: '#059669', borderRadius: 2, '&:hover': { bgcolor: '#047857' } }}
-                      >
-                        {lancer.isPending ? <CircularProgress size={14} sx={{ color: '#fff' }} /> : 'Lancer'}
-                      </Button>
+                      <Tooltip title={c.note_service_signee ? 'Note de service signée ✓' : 'Note de service à signer avant le lancement'}>
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          startIcon={c.note_service_signee ? <VerifiedUser sx={{ color: '#059669' }} /> : <ArticleOutlined />}
+                          onClick={() => setNoteDialog(c)}
+                          sx={{
+                            textTransform: 'none',
+                            borderColor: c.note_service_signee ? '#059669' : ORANGE,
+                            color: c.note_service_signee ? '#059669' : ORANGE,
+                            borderRadius: 2,
+                          }}
+                        >
+                          Note de service
+                        </Button>
+                      </Tooltip>
+                      <Tooltip title={!c.note_service_signee ? 'Signez d\'abord la note de service' : ''}>
+                        <span>
+                          <Button
+                            size="small"
+                            variant="contained"
+                            startIcon={<PlayArrow />}
+                            disabled={lancer.isPending || !c.note_service_signee}
+                            onClick={() => lancer.mutate(c.id)}
+                            sx={{ textTransform: 'none', bgcolor: '#059669', borderRadius: 2, '&:hover': { bgcolor: '#047857' } }}
+                          >
+                            {lancer.isPending ? <CircularProgress size={14} sx={{ color: '#fff' }} /> : 'Lancer'}
+                          </Button>
+                        </span>
+                      </Tooltip>
                     </>
                   )}
                 </Box>
@@ -1152,6 +1853,24 @@ function CampagnesTab() {
         })}
       </Stack>
 
+      {orgDialog && (
+        <OrganigrammeDialog
+          open={!!orgDialog}
+          campagneId={orgDialog.campagneId}
+          onClose={() => setOrgDialog(null)}
+          onFixed={() => lancer.mutate(orgDialog.campagneId)}
+        />
+      )}
+
+      {noteDialog && (
+        <NoteServiceDialog
+          open={!!noteDialog}
+          campagne={noteDialog}
+          onClose={() => setNoteDialog(null)}
+          onUpdated={() => qc.invalidateQueries({ queryKey: ['eval-campagnes'] })}
+        />
+      )}
+
       {formOpen && (
         <CampagneFormDialog
           open={formOpen}
@@ -1160,6 +1879,21 @@ function CampagnesTab() {
           campagne={editCampagne}
         />
       )}
+
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={7000}
+        onClose={() => setSnackbar(s => ({ ...s, open: false }))}
+        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+      >
+        <Alert
+          severity={snackbar.severity}
+          onClose={() => setSnackbar(s => ({ ...s, open: false }))}
+          sx={{ fontWeight: 700, fontSize: 14, borderRadius: 2, boxShadow: 4, maxWidth: 600 }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }
@@ -1261,10 +1995,10 @@ function CreerFichesDialog({
       setSelectedIds([]);
       onSuccess();
     },
-    onError: (err: Error) => {
+    onError: (err: any) => {
       setSnackbar({
         open: true,
-        message: err?.message ?? 'Erreur lors de la création des fiches.',
+        message: err?.response?.data?.message ?? err?.message ?? 'Erreur lors de la création des fiches.',
         severity: 'error',
       });
     },

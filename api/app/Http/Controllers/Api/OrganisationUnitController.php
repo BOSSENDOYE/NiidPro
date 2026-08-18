@@ -14,7 +14,9 @@ class OrganisationUnitController extends Controller
     /** GET /api/organisation-units — liste plate avec nb agents par unité */
     public function index(): JsonResponse
     {
-        $units = OrganisationUnit::orderBy('niveau')->orderBy('ordre')->get();
+        $units = OrganisationUnit::with([
+            'responsable:id,first_name,last_name,employee_number',
+        ])->orderBy('niveau')->orderBy('ordre')->get();
 
         // Compte des agents par code de direction (jointure sur departments.name)
         $agentsByDept = DB::table('employees')
@@ -26,7 +28,6 @@ class OrganisationUnitController extends Controller
             ->pluck('cnt', 'name');
 
         $units->each(function ($unit) use ($agentsByDept) {
-            // Correspondance souple sur le libellé ou le code
             $cnt = $agentsByDept->first(function ($v, $k) use ($unit) {
                 return str_contains(strtolower($k), strtolower($unit->code))
                     || str_contains(strtolower($unit->libelle), strtolower($k));
@@ -41,12 +42,13 @@ class OrganisationUnitController extends Controller
     public function store(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'code'      => 'required|string|max:30|unique:organisation_units,code',
-            'libelle'   => 'required|string|max:200',
-            'type'      => 'required|in:gouvernance,appui,cellule,direction,division',
-            'niveau'    => 'required|integer|min:0|max:5',
-            'parent_id' => 'nullable|integer|exists:organisation_units,id',
-            'ordre'     => 'nullable|integer|min:0',
+            'code'           => 'required|string|max:30|unique:organisation_units,code',
+            'libelle'        => 'required|string|max:200',
+            'type'           => 'required|in:gouvernance,appui,cellule,direction,division',
+            'niveau'         => 'required|integer|min:0|max:5',
+            'parent_id'      => 'nullable|integer|exists:organisation_units,id',
+            'ordre'          => 'nullable|integer|min:0',
+            'responsable_id' => 'nullable|integer|exists:employees,id',
         ]);
 
         $unit = OrganisationUnit::create([
@@ -54,23 +56,29 @@ class OrganisationUnitController extends Controller
             'ordre' => $data['ordre'] ?? OrganisationUnit::where('parent_id', $data['parent_id'] ?? null)->count(),
         ]);
 
-        return response()->json($unit, 201);
+        return response()->json(
+            $unit->load('responsable:id,first_name,last_name,employee_number'),
+            201
+        );
     }
 
     /** PUT /api/organisation-units/{id} */
     public function update(Request $request, OrganisationUnit $organisationUnit): JsonResponse
     {
         $data = $request->validate([
-            'code'      => 'sometimes|string|max:30|unique:organisation_units,code,' . $organisationUnit->id,
-            'libelle'   => 'sometimes|string|max:200',
-            'type'      => 'sometimes|in:gouvernance,appui,cellule,direction,division',
-            'parent_id' => 'nullable|integer|exists:organisation_units,id',
-            'ordre'     => 'nullable|integer|min:0',
+            'code'           => 'sometimes|string|max:30|unique:organisation_units,code,' . $organisationUnit->id,
+            'libelle'        => 'sometimes|string|max:200',
+            'type'           => 'sometimes|in:gouvernance,appui,cellule,direction,division',
+            'parent_id'      => 'nullable|integer|exists:organisation_units,id',
+            'ordre'          => 'nullable|integer|min:0',
+            'responsable_id' => 'nullable|integer|exists:employees,id',
         ]);
 
         $organisationUnit->update($data);
 
-        return response()->json($organisationUnit->fresh());
+        return response()->json(
+            $organisationUnit->fresh()->load('responsable:id,first_name,last_name,employee_number')
+        );
     }
 
     /** DELETE /api/organisation-units/{id} */

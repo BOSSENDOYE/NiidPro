@@ -60,6 +60,7 @@ Route::prefix('auth')->group(function () {
 // Enrôlement agent (public — sans authentification)
 Route::post('/enroll/submit', [EnrollmentController::class, 'submit']);
 Route::get('/enroll/organisation-units', [OrganisationUnitController::class, 'index']);
+Route::get('/enroll/fonctions', [EnrollmentController::class, 'fonctions']);
 
 // Protected routes
 Route::middleware('auth:sanctum')->group(function () {
@@ -151,6 +152,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/employees/counts',                    [EmployeeController::class, 'counts']);
     Route::get('/employees/export',                    [EmployeeController::class, 'export']);
     Route::post('/employees/import',                   [EmployeeController::class, 'import']);
+    Route::get('/employees/fonctions',                 [EmployeeController::class, 'fonctions']);
+    Route::put('/employees/affecter-lot',              [EmployeeController::class, 'affecterLot']);
     Route::get('/employees/{employee}/paye-data',      [EmployeeController::class, 'payeData']);
     Route::post('/employees/{employee}/calcul-irpp',   [EmployeeController::class, 'calculIrpp']);
     Route::get('/employees/{employee}/heures-sup',     [EmployeeController::class, 'heuresSup']);

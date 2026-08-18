@@ -17,6 +17,18 @@ use Illuminate\Support\Str;
 
 class EnrollmentController extends Controller
 {
+    /** GET /api/enroll/fonctions — liste des fonctions déjà enregistrées (public) */
+    public function fonctions()
+    {
+        $fonctions = Employee::whereNotNull('fonction')
+            ->where('fonction', '!=', '')
+            ->distinct()
+            ->orderBy('fonction')
+            ->pluck('fonction');
+
+        return response()->json($fonctions);
+    }
+
     /** POST /api/enroll/submit — public, no auth */
     public function submit(Request $request)
     {

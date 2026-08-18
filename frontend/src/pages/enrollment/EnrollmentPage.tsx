@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import {
   Box, Typography, TextField, Button, Grid, CircularProgress,
   Alert, Paper, Divider, InputAdornment, Avatar, IconButton, Tooltip,
-  FormControl, InputLabel, Select, MenuItem,
+  FormControl, InputLabel, Select, MenuItem, Autocomplete,
 } from '@mui/material';
 import {
   Person, Badge, Cake, LocationOn, Work, Phone, Email,
@@ -45,6 +45,9 @@ export default function EnrollmentPage() {
   const [directionId, setDirectionId] = useState<number | ''>('');
   const [divisionId, setDivisionId]   = useState<number | ''>('');
 
+  /* Fonctions enregistrées */
+  const [fonctions, setFonctions] = useState<string[]>([]);
+
   /* Charger settings + org units au montage */
   useEffect(() => {
     axios.get(`${API}/settings`).then(res => {
@@ -56,6 +59,10 @@ export default function EnrollmentPage() {
     axios.get(`${API}/enroll/organisation-units`).then(res => {
       const data = Array.isArray(res.data) ? res.data : (res.data?.data ?? []);
       setOrgUnits(data);
+    }).catch(() => {});
+
+    axios.get(`${API}/enroll/fonctions`).then(res => {
+      setFonctions(Array.isArray(res.data) ? res.data : []);
     }).catch(() => {});
   }, []);
 
@@ -299,17 +306,11 @@ export default function EnrollmentPage() {
                 <Grid item xs={12}><Divider sx={{ borderStyle: 'dashed' }} /></Grid>
 
                 {/* ── Emploi ── */}
-                <Grid item xs={12} sm={5}>
+                <Grid item xs={12} sm={6}>
                   <TextField fullWidth label="Date d'embauche *" type="date" value={form.date_embauche}
                     onChange={set('date_embauche')} error={!!errors.date_embauche}
                     helperText={errors.date_embauche} size="small" InputLabelProps={{ shrink: true }}
                     InputProps={{ startAdornment: <InputAdornment position="start"><CalendarMonth sx={adornSx} /></InputAdornment> }}
-                  />
-                </Grid>
-                <Grid item xs={12} sm={7}>
-                  <TextField fullWidth label="Fonction *" value={form.fonction} onChange={set('fonction')}
-                    error={!!errors.fonction} helperText={errors.fonction} size="small"
-                    InputProps={{ startAdornment: <InputAdornment position="start"><Work sx={adornSx} /></InputAdornment> }}
                   />
                 </Grid>
                 <Grid item xs={12} sm={6}>
@@ -368,8 +369,68 @@ export default function EnrollmentPage() {
                       </FormControl>
                     </Grid>
 
+                    {/* Fonction (autocomplete après org) */}
+                    <Grid item xs={12}>
+                      <Autocomplete
+                        freeSolo
+                        options={fonctions}
+                        value={form.fonction}
+                        onInputChange={(_, value) => setForm(f => ({ ...f, fonction: value }))}
+                        renderInput={(params) => (
+                          <TextField
+                            {...params}
+                            fullWidth
+                            label="Fonction *"
+                            size="small"
+                            error={!!errors.fonction}
+                            helperText={errors.fonction ?? 'Sélectionnez une fonction existante ou saisissez-en une nouvelle'}
+                            InputProps={{
+                              ...params.InputProps,
+                              startAdornment: (
+                                <>
+                                  <InputAdornment position="start"><Work sx={adornSx} /></InputAdornment>
+                                  {params.InputProps.startAdornment}
+                                </>
+                              ),
+                            }}
+                          />
+                        )}
+                      />
+                    </Grid>
+
                     <Grid item xs={12}><Divider sx={{ borderStyle: 'dashed' }} /></Grid>
                   </>
+                )}
+
+                {/* Fonction (sans org units chargés) */}
+                {directions.length === 0 && (
+                  <Grid item xs={12} sm={7}>
+                    <Autocomplete
+                      freeSolo
+                      options={fonctions}
+                      value={form.fonction}
+                      onInputChange={(_, value) => setForm(f => ({ ...f, fonction: value }))}
+                      renderInput={(params) => (
+                        <TextField
+                          {...params}
+                          fullWidth
+                          label="Fonction *"
+                          size="small"
+                          error={!!errors.fonction}
+                          helperText={errors.fonction ?? 'Sélectionnez une fonction existante ou saisissez-en une nouvelle'}
+                          InputProps={{
+                            ...params.InputProps,
+                            startAdornment: (
+                              <>
+                                <InputAdornment position="start"><Work sx={adornSx} /></InputAdornment>
+                                {params.InputProps.startAdornment}
+                              </>
+                            ),
+                          }}
+                        />
+                      )}
+                    />
+                  </Grid>
                 )}
 
                 {/* ── Contact & Adresse ── */}

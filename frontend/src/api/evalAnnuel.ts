@@ -59,8 +59,14 @@ export interface EvalCampagneAnn {
   date_lancement?: string;
   date_cloture?: string;
   cree_par?: number;
+  lance_par?: number;
+  lance_at?: string;
   createur?: { id: number; name: string };
+  lanceur?: { id: number; name: string };
   referentiel?: EvalReferentiel;
+  note_service?: string;
+  note_service_signee?: boolean;
+  note_service_signee_at?: string;
   stats?: {
     total: number;
     a_planifier: number;
@@ -266,6 +272,22 @@ export const evalCampagnesApi = {
       {}
     ),
   destroy: (id: number) => client.delete<{ message: string }>(`/eval/campagnes/${id}`),
+  genererNote: (id: number) =>
+    client.post<{ message: string; note_service: string }>(`/eval/campagnes/${id}/note-service`, {}),
+  signerNote: (id: number) =>
+    client.post<{ message: string; note_service_signee: boolean; signee_at: string }>(
+      `/eval/campagnes/${id}/signer-note`, {}
+    ),
+  downloadNotePdf: (id: number) =>
+    client.get<Blob>(`/eval/campagnes/${id}/note-service/pdf`, { responseType: 'blob' }),
+  anomalies: (id: number) =>
+    client.get<{
+      peut_lancer: boolean;
+      anomalies_orga: Array<{ id: number; matricule: string; nom_complet: string; direction: string | null; fonction: string | null }>;
+      nb_anomalies_orga: number;
+      erreurs_parametrage: string[];
+      note_service_signee: boolean;
+    }>(`/eval/campagnes/${id}/anomalies`),
 };
 
 // ── API Référentiels ───────────────────────────────────────────────────────
@@ -275,6 +297,8 @@ export const evalReferentielsApi = {
   show: (id: number) => client.get<{ referentiel: EvalReferentiel }>(`/eval/referentiels/${id}`),
   create: (data: Partial<EvalReferentiel>) =>
     client.post<EvalReferentiel>('/eval/referentiels', data),
+  seed: (data?: { code?: string; libelle?: string }) =>
+    client.post<EvalReferentiel>('/eval/referentiels/seed', data ?? {}),
 };
 
 // ── API Fiches ─────────────────────────────────────────────────────────────
@@ -435,6 +459,8 @@ export interface EvalEmployee {
   employee_number?: string;
   department_id?: number;
   organisation_unit_id?: number;
+  manager_id?: number;
+  manager?: { id: number; first_name: string; last_name: string };
   department?: { id: number; name: string };
   organisation_unit?: { id: number; libelle: string };
   position?: { id: number; title: string };
@@ -454,15 +480,14 @@ export interface EvalOrganisationUnit {
 }
 
 export const rhApi = {
-  // Retourne un objet paginé { data: Employee[], ... }
   employees: (params?: { department_id?: number; organisation_unit_id?: number; status?: string; per_page?: number }) =>
     client.get<{ data: EvalEmployee[]; total: number }>('/employees', { params: { per_page: 500, ...params, status: params?.status ?? 'active' } }),
-  // Retourne un tableau direct
   departments: () =>
     client.get<EvalDepartment[]>('/departments'),
-  // Retourne un tableau direct
   organisationUnits: (params?: { department_id?: number }) =>
     client.get<EvalOrganisationUnit[]>('/organisation-units', { params }),
+  affecterLot: (data: { employee_ids: number[]; department_id?: number; organisation_unit_id?: number; manager_id?: number }) =>
+    client.put<{ message: string; updated: number }>('/employees/affecter-lot', data),
 };
 
 // ── Constantes workflow (pour affichage frontend) ──────────────────────────

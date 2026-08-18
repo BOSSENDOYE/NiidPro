@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Employee;
 use App\Models\EmployeeFamilyMember;
+use App\Models\EvalFiche;
 use App\Services\IrppCalculatorService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -141,6 +142,91 @@ class EmployeeController extends Controller
         }
 
         return response()->json($employee->fresh()->load(['department', 'position', 'organisationUnit', 'familyMembers', 'indice.hierarchy']));
+    }
+
+    /** GET /api/employees/fonctions — liste distincte des fonctions enregistrées */
+    public function fonctions()
+    {
+        $fonctions = Employee::whereNotNull('fonction')
+            ->where('fonction', '!=', '')
+            ->distinct()
+            ->orderBy('fonction')
+            ->pluck('fonction');
+
+        return response()->json($fonctions);
+    }
+
+    /**
+     * PUT /api/employees/affecter-lot
+     * Affecte en lot un responsable, une direction et/ou un service à plusieurs agents.
+     * Utilisé pour corriger l'organigramme avant le lancement d'une campagne.
+     */
+    public function affecterLot(Request $request)
+    {
+        $data = $request->validate([
+            'employee_ids'         => 'required|array|min:1',
+            'employee_ids.*'       => 'integer|exists:employees,id',
+            'department_id'        => 'nullable|integer|exists:departments,id',
+            'organisation_unit_id' => 'nullable|integer|exists:organisation_units,id',
+            'manager_id'           => 'nullable|integer|exists:employees,id',
+        ]);
+
+        $updates = array_filter([
+            'department_id'        => $data['department_id'] ?? null,
+            'organisation_unit_id' => $data['organisation_unit_id'] ?? null,
+            'manager_id'           => $data['manager_id'] ?? null,
+        ], fn($v) => $v !== null);
+
+        if (empty($updates)) {
+            return response()->json([
+                'message' => 'Spécifiez au moins un champ à mettre à jour (direction, service ou responsable).',
+            ], 422);
+        }
+
+        // 1. Mettre à jour les employés
+        Employee::whereIn('id', $data['employee_ids'])->update($updates);
+
+        // 2. Recharger avec les relations pour synchroniser les fiches
+        $employes = Employee::with([
+            'department:id,name',
+            'organisationUnit:id,libelle',
+            'manager:id,user_id,first_name,last_name',
+        ])->whereIn('id', $data['employee_ids'])->get();
+
+        $fichesSyncees = 0;
+
+        foreach ($employes as $employee) {
+            $ficheUpdates = [];
+
+            if (isset($updates['department_id'])) {
+                $ficheUpdates['snapshot_direction'] = $employee->department?->name;
+            }
+            if (isset($updates['organisation_unit_id'])) {
+                $ficheUpdates['snapshot_service'] = $employee->organisationUnit?->libelle;
+            }
+            if (isset($updates['manager_id'])) {
+                $ficheUpdates['snapshot_superieur'] = $employee->manager
+                    ? trim("{$employee->manager->first_name} {$employee->manager->last_name}")
+                    : null;
+                $ficheUpdates['evaluateur_id'] = $employee->manager?->user_id;
+            }
+
+            if (!empty($ficheUpdates)) {
+                $fichesSyncees += EvalFiche::where('employee_id', $employee->id)->update($ficheUpdates);
+            }
+        }
+
+        $nbUpdated = $employes->count();
+        $msg = "{$nbUpdated} agent(s) mis à jour avec succès.";
+        if ($fichesSyncees > 0) {
+            $msg .= " {$fichesSyncees} fiche(s) d'évaluation synchronisée(s).";
+        }
+
+        return response()->json([
+            'message'        => $msg,
+            'updated'        => $nbUpdated,
+            'fiches_syncees' => $fichesSyncees,
+        ]);
     }
 
     /** Règles de validation des membres de la famille (onglet Conjoints/Enfants) */

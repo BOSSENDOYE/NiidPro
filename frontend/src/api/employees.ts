@@ -78,4 +78,6 @@ export const employeesApi = {
       { headers: { 'Content-Type': 'multipart/form-data' } }
     );
   },
+
+  fonctions: () => client.get<string[]>('/employees/fonctions'),
 };

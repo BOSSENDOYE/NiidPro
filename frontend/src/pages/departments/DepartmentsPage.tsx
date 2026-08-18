@@ -3,15 +3,16 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm, Controller } from 'react-hook-form';
 import {
   Box, Typography, IconButton, Tooltip, Button, Skeleton,
-  Chip, Collapse, InputAdornment, TextField,
+  Chip, Collapse, InputAdornment, TextField, Autocomplete,
   Dialog, DialogTitle, DialogContent, DialogActions,
   MenuItem, FormControl, InputLabel, Select,
 } from '@mui/material';
 import {
   Add, Edit, Delete, People, ExpandMore, ChevronRight,
-  Search, AccountTree, Hub, UnfoldMore, UnfoldLess,
+  Search, AccountTree, Hub, UnfoldMore, UnfoldLess, Person,
 } from '@mui/icons-material';
 import { organisationUnitApi, type OrgUnit } from '../../api/organisationUnits';
+import { rhApi, type EvalEmployee } from '../../api/evalAnnuel';
 import PageHeader from '../../components/common/PageHeader';
 import OrganigrammePage from '../organigramme/OrganigrammePage';
 
@@ -164,6 +165,33 @@ function OrgRow({ node, level, expanded, toggle, onEdit, onDelete }: OrgRowProps
           }}
         />
 
+        {/* Responsable hiérarchique */}
+        {node.responsable && (
+          <Box sx={{
+            display: { xs: 'none', md: 'flex' },
+            alignItems: 'center',
+            gap: 0.5,
+            minWidth: 140,
+            maxWidth: 180,
+            flexShrink: 0,
+          }}>
+            <Person sx={{ fontSize: 12, color: isRupturePrinc ? '#93C5FD' : '#94A3B8', flexShrink: 0 }} />
+            <Typography
+              sx={{ fontSize: 11, color: isRupturePrinc ? '#E0F2FE' : '#475569', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
+              title={`${node.responsable.first_name} ${node.responsable.last_name}`}
+            >
+              {node.responsable.first_name} {node.responsable.last_name}
+            </Typography>
+          </Box>
+        )}
+        {!node.responsable && !isRupturePrinc && (
+          <Box sx={{ display: { xs: 'none', md: 'flex' }, minWidth: 140, flexShrink: 0 }}>
+            <Typography sx={{ fontSize: 11, color: '#CBD5E1', fontStyle: 'italic' }}>
+              — sans responsable
+            </Typography>
+          </Box>
+        )}
+
         {/* Compteur agents */}
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, minWidth: 48, justifyContent: 'flex-end', flexShrink: 0 }}>
           <People sx={{ fontSize: 12, color: isRupturePrinc ? '#93C5FD' : '#94A3B8' }} />
@@ -228,6 +256,7 @@ type FormData = {
   niveau: number;
   parent_id: string;
   ordre: number;
+  responsable_id: number | null;
 };
 
 export default function DepartmentsPage() {
@@ -290,22 +319,30 @@ export default function DepartmentsPage() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['org-units'] }),
   });
 
-  const { register, handleSubmit, reset, control } = useForm<FormData>();
+  const { register, handleSubmit, reset, control, setValue, watch } = useForm<FormData>();
+  const responsableIdWatch = watch('responsable_id');
+
+  const { data: employees = [] } = useQuery<EvalEmployee[]>({
+    queryKey: ['employees-active-for-orgunit'],
+    queryFn: () => rhApi.employees({ per_page: 500, status: 'active' }).then(r => r.data.data),
+    enabled: dialogOpen,
+  });
 
   const openCreate = () => {
-    reset({ code: '', libelle: '', type: 'division', niveau: 2, parent_id: '', ordre: 100 });
+    reset({ code: '', libelle: '', type: 'division', niveau: 2, parent_id: '', ordre: 100, responsable_id: null });
     setEditTarget(null);
     setDialogOpen(true);
   };
   const openEdit = (u: OrgUnit) => {
     setEditTarget(u);
     reset({
-      code:      u.code,
-      libelle:   u.libelle,
-      type:      u.type,
-      niveau:    u.niveau,
-      parent_id: u.parent_id ? String(u.parent_id) : '',
-      ordre:     u.ordre,
+      code:           u.code,
+      libelle:        u.libelle,
+      type:           u.type,
+      niveau:         u.niveau,
+      parent_id:      u.parent_id ? String(u.parent_id) : '',
+      ordre:          u.ordre,
+      responsable_id: u.responsable_id ?? null,
     });
     setDialogOpen(true);
   };
@@ -313,12 +350,13 @@ export default function DepartmentsPage() {
 
   const onSubmit = (form: FormData) => {
     const payload: Partial<OrgUnit> = {
-      code:      form.code.toUpperCase(),
-      libelle:   form.libelle,
-      type:      form.type,
-      niveau:    Number(form.niveau),
-      parent_id: form.parent_id ? Number(form.parent_id) : null,
-      ordre:     Number(form.ordre),
+      code:           form.code.toUpperCase(),
+      libelle:        form.libelle,
+      type:           form.type,
+      niveau:         Number(form.niveau),
+      parent_id:      form.parent_id ? Number(form.parent_id) : null,
+      ordre:          Number(form.ordre),
+      responsable_id: form.responsable_id ?? null,
     };
     if (editTarget) updateMut.mutate({ id: editTarget.id, data: payload });
     else createMut.mutate(payload);
@@ -451,6 +489,9 @@ export default function DepartmentsPage() {
             <Typography sx={{ fontSize: 11, fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.06em', minWidth: 90, display: { xs: 'none', sm: 'block' } }}>
               Type
             </Typography>
+            <Typography sx={{ fontSize: 11, fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.06em', minWidth: 140, display: { xs: 'none', md: 'block' } }}>
+              Responsable
+            </Typography>
             <Typography sx={{ fontSize: 11, fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.06em', minWidth: 56, textAlign: 'right' }}>
               Agents
             </Typography>
@@ -578,6 +619,48 @@ export default function DepartmentsPage() {
                   )}
                 />
               </FormControl>
+
+              <Autocomplete
+                size="small"
+                options={employees}
+                getOptionLabel={(e: EvalEmployee) =>
+                  `${e.first_name} ${e.last_name}${e.employee_number ? ` (${e.employee_number})` : ''}`
+                }
+                value={employees.find(e => e.id === responsableIdWatch) ?? null}
+                onChange={(_, emp) => setValue('responsable_id', emp?.id ?? null)}
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    label="Responsable hiérarchique"
+                    placeholder="Rechercher un agent…"
+                    InputProps={{
+                      ...params.InputProps,
+                      startAdornment: (
+                        <>
+                          <Person sx={{ color: '#94A3B8', mr: 0.5, fontSize: 18 }} />
+                          {params.InputProps.startAdornment}
+                        </>
+                      ),
+                    }}
+                  />
+                )}
+                renderOption={(props, emp) => (
+                  <Box component="li" {...props} key={emp.id}>
+                    <Box>
+                      <Typography variant="body2" fontWeight={600}>
+                        {emp.first_name} {emp.last_name}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        {emp.employee_number ? `MAT: ${emp.employee_number} · ` : ''}
+                        {emp.department?.name ?? emp.position?.title ?? ''}
+                      </Typography>
+                    </Box>
+                  </Box>
+                )}
+                noOptionsText="Aucun agent trouvé"
+                clearText="Effacer"
+                fullWidth
+              />
             </Box>
           </DialogContent>
           <DialogActions sx={{ px: 2.5, pb: 2, gap: 1 }}>

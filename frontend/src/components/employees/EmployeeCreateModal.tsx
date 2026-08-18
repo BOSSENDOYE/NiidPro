@@ -5,7 +5,7 @@ import {
   Stack, Avatar, IconButton, Tooltip, FormControl,
   Select, InputAdornment, Chip, CircularProgress, Alert, alpha,
   Tabs, Tab, Divider, Table, TableHead, TableRow, TableCell,
-  TableBody, Checkbox, FormControlLabel,
+  TableBody, Checkbox, FormControlLabel, Autocomplete,
 } from '@mui/material';
 import {
   Close, Save, CameraAlt, Add, Delete, Search as SearchIcon,
@@ -285,10 +285,11 @@ export default function EmployeeCreateModal({ open, onClose, mode = 'create', em
   const isView  = mode === 'view';
   const mCfg    = MODE_CONFIG[mode];
 
-  const [tab,       setTab]       = useState(0);
-  const [photoUrl,  setPhotoUrl]  = useState<string | null>(employee?.photo_url ?? null);
-  const [photoFile, setPhotoFile] = useState<File | null>(null);
-  const [age,       setAge]       = useState<number | null>(null);
+  const [tab,        setTab]       = useState(0);
+  const [photoUrl,   setPhotoUrl]  = useState<string | null>(employee?.photo_url ?? null);
+  const [photoFile,  setPhotoFile] = useState<File | null>(null);
+  const [age,        setAge]       = useState<number | null>(null);
+  const [fonctionVal, setFonctionVal] = useState<string>((employee as unknown as { fonction?: string })?.fonction ?? '');
 
   /* ── Table states ── */
   const [familyRows,  setFamilyRows]  = useState<TableRow[]>([]);
@@ -331,6 +332,11 @@ export default function EmployeeCreateModal({ open, onClose, mode = 'create', em
   const [orgParentId, setOrgParentId] = useState<number | null>(null);
   const childUnits = orgUnits.filter(u => u.parent_id === orgParentId);
 
+  // Sync fonctionVal when employee changes (edit/view mode)
+  useEffect(() => {
+    setFonctionVal((employee as unknown as { fonction?: string })?.fonction ?? '');
+  }, [employee?.id]);
+
   // On edit mode: restore orgParentId from the existing organisation_unit_id
   useEffect(() => {
     if (!employee || !orgUnits.length) return;
@@ -356,6 +362,12 @@ export default function EmployeeCreateModal({ open, onClose, mode = 'create', em
   const { data: indices = [] } = useQuery<RecruitmentIndice[]>({
     queryKey: ['payroll', 'params', 'indices'],
     queryFn: () => recruitmentApi.getIndices().then(r => r.data),
+  });
+
+  const { data: fonctions = [] } = useQuery<string[]>({
+    queryKey: ['employee-fonctions'],
+    queryFn: () => employeesApi.fonctions().then(r => r.data),
+    enabled: open,
   });
 
   /* Valeurs calculées automatiquement depuis l'indice sélectionné */
@@ -408,24 +420,26 @@ export default function EmployeeCreateModal({ open, onClose, mode = 'create', em
 
   const createMutation = useMutation({
     mutationFn: (data: FormData) => {
-      const clean = Object.fromEntries(Object.entries(data).filter(([, v]) => v !== null && v !== undefined && v !== '')) as Partial<FormData>;
+      const clean = Object.fromEntries(Object.entries({ ...data, fonction: fonctionVal || undefined }).filter(([, v]) => v !== null && v !== undefined && v !== '')) as Partial<FormData>;
       return employeesApi.create(clean as FormData);
     },
     onSuccess: async (res) => {
       await uploadPhoto(res.data.id);
       qc.invalidateQueries({ queryKey: ['employees'] });
+      qc.invalidateQueries({ queryKey: ['employee-fonctions'] });
       handleClose();
     },
   });
 
   const updateMutation = useMutation({
     mutationFn: (data: FormData) => {
-      const clean = Object.fromEntries(Object.entries(data).filter(([, v]) => v !== null && v !== undefined && v !== '')) as Partial<FormData>;
+      const clean = Object.fromEntries(Object.entries({ ...data, fonction: fonctionVal || undefined }).filter(([, v]) => v !== null && v !== undefined && v !== '')) as Partial<FormData>;
       return employeesApi.update(employee!.id, clean as FormData);
     },
     onSuccess: async () => {
       await uploadPhoto(employee!.id);
       qc.invalidateQueries({ queryKey: ['employees'] });
+      qc.invalidateQueries({ queryKey: ['employee-fonctions'] });
       handleClose();
     },
   });
@@ -440,7 +454,7 @@ export default function EmployeeCreateModal({ open, onClose, mode = 'create', em
     reset(); setTab(0); setPhotoUrl(null); setPhotoFile(null); setAge(null);
     setFamilyRows([]); setDiplomas([]); setQuals([]);
     setCategories([]); setPostings([]); setDocuments([]);
-    setOrgParentId(null);
+    setOrgParentId(null); setFonctionVal('');
     onClose();
   };
 
@@ -752,6 +766,38 @@ export default function EmployeeCreateModal({ open, onClose, mode = 'create', em
                           ))}
                         </Select>
                       </FormControl>
+                    </Grid>
+                    <Grid item xs={12} sm={3}>
+                      <Typography variant="caption" sx={labelSx}>Fonction</Typography>
+                      <Autocomplete
+                        freeSolo
+                        options={fonctions}
+                        value={fonctionVal}
+                        disabled={isView}
+                        onInputChange={(_, value) => setFonctionVal(value)}
+                        sx={inputSx}
+                        renderInput={(params) => (
+                          <TextField
+                            {...params}
+                            size="small"
+                            fullWidth
+                            placeholder="Sélectionner ou saisir…"
+                            disabled={isView}
+                            sx={inputSx}
+                            InputProps={{
+                              ...params.InputProps,
+                              startAdornment: (
+                                <>
+                                  <InputAdornment position="start">
+                                    <Work sx={{ fontSize: 14, color: '#94A3B8' }} />
+                                  </InputAdornment>
+                                  {params.InputProps.startAdornment}
+                                </>
+                              ),
+                            }}
+                          />
+                        )}
+                      />
                     </Grid>
                   </Grid>
                 </Grid>

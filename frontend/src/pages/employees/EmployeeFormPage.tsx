@@ -6,7 +6,7 @@ import {
   CircularProgress, Alert, Tabs, Tab, Stack, Divider,
   IconButton, Tooltip, Table, TableHead, TableRow, TableCell,
   TableBody, Checkbox, FormControlLabel, Select, InputLabel,
-  FormControl, InputAdornment, Chip, alpha,
+  FormControl, InputAdornment, Chip, alpha, Autocomplete,
 } from '@mui/material';
 import {
   Save, Close, Autorenew, CameraAlt, Add, Delete, Search,
@@ -211,6 +211,7 @@ export default function EmployeeFormPage() {
   const [activeTab, setActiveTab] = useState(0);
   const [photoUrl,  setPhotoUrl]  = useState<string | null>(null);
   const [age,       setAge]       = useState<number | null>(null);
+  const [fonctionVal, setFonctionVal] = useState('');
 
   /* ── Tables state ── */
   const [familyRows,  setFamilyRows]  = useState<TableRow[]>([]);
@@ -232,6 +233,11 @@ export default function EmployeeFormPage() {
   const { data: payrollTemplates = [] } = useQuery({
     queryKey: ['payroll-templates'],
     queryFn: getPayrollTemplates,
+  });
+
+  const { data: fonctions = [] } = useQuery({
+    queryKey: ['employee-fonctions'],
+    queryFn: () => employeesApi.fonctions().then(r => r.data),
   });
 
   const { data: employee, isLoading: loadingEmp } = useQuery({
@@ -275,6 +281,7 @@ export default function EmployeeFormPage() {
         payroll_template_id: employee.payroll_template_id ?? null,
       });
       if (employee.photo_url) setPhotoUrl(employee.photo_url);
+      setFonctionVal((employee as unknown as { fonction?: string }).fonction ?? '');
 
       // ── Onglet Conjoints/Enfants ──
       setFamilyRows((employee.family_members ?? []).map((m) => ({
@@ -316,7 +323,7 @@ export default function EmployeeFormPage() {
       }));
 
   const onSubmit = (data: FormData) => {
-    const payload = { ...data, family_members: buildFamilyPayload(familyRows) };
+    const payload = { ...data, fonction: fonctionVal || null, family_members: buildFamilyPayload(familyRows) };
     isEdit ? updateMutation.mutate(payload) : createMutation.mutate(payload);
   };
   const mutError = (createMutation.error ?? updateMutation.error) as { response?: { data?: { message?: string } } } | null;
@@ -504,7 +511,7 @@ export default function EmployeeFormPage() {
                 </Grid>
               </Grid>
 
-              {/* Ligne 3 */}
+              {/* Ligne 3 — Structure / Service / Division / Bureau / Fonction */}
               <Grid container spacing={1.5}>
                 <Grid item xs={6} sm={3}>
                   <Controller name="department_id" control={control}
@@ -518,14 +525,42 @@ export default function EmployeeFormPage() {
                     )}
                   />
                 </Grid>
-                <Grid item xs={6} sm={3}>
+                <Grid item xs={6} sm={2}>
                   <TextField label="Service" size="small" fullWidth sx={{ bgcolor: '#fff' }} />
                 </Grid>
-                <Grid item xs={6} sm={3}>
+                <Grid item xs={6} sm={2}>
                   <TextField label="Division" size="small" fullWidth sx={{ bgcolor: '#fff' }} />
                 </Grid>
-                <Grid item xs={6} sm={3}>
+                <Grid item xs={6} sm={2}>
                   <TextField label="Bureau" size="small" fullWidth sx={{ bgcolor: '#fff' }} />
+                </Grid>
+                <Grid item xs={12} sm={3}>
+                  <Autocomplete
+                    freeSolo
+                    options={fonctions}
+                    value={fonctionVal}
+                    onInputChange={(_, value) => setFonctionVal(value)}
+                    renderInput={(params) => (
+                      <TextField
+                        {...params}
+                        label="Fonction"
+                        size="small"
+                        fullWidth
+                        sx={{ bgcolor: '#fff' }}
+                        InputProps={{
+                          ...params.InputProps,
+                          startAdornment: (
+                            <>
+                              <InputAdornment position="start">
+                                <Work sx={{ fontSize: 14, color: '#94A3B8' }} />
+                              </InputAdornment>
+                              {params.InputProps.startAdornment}
+                            </>
+                          ),
+                        }}
+                      />
+                    )}
+                  />
                 </Grid>
               </Grid>
             </Grid>

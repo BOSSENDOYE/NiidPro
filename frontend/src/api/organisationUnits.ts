@@ -8,6 +8,8 @@ export interface OrgUnit {
   niveau: number;
   parent_id: number | null;
   ordre: number;
+  responsable_id?: number | null;
+  responsable?: { id: number; first_name: string; last_name: string; employee_number?: string } | null;
   nb_agents?: number;
 }
 

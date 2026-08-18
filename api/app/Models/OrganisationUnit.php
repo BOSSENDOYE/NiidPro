@@ -5,10 +5,11 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use App\Models\Employee;
 
 class OrganisationUnit extends Model
 {
-    protected $fillable = ['code', 'libelle', 'type', 'niveau', 'parent_id', 'ordre'];
+    protected $fillable = ['code', 'libelle', 'type', 'niveau', 'parent_id', 'ordre', 'responsable_id'];
 
     public function parent(): BelongsTo
     {
@@ -18,6 +19,11 @@ class OrganisationUnit extends Model
     public function children(): HasMany
     {
         return $this->hasMany(OrganisationUnit::class, 'parent_id')->orderBy('ordre');
+    }
+
+    public function responsable(): BelongsTo
+    {
+        return $this->belongsTo(Employee::class, 'responsable_id');
     }
 
     /** Retourne l'arbre complet (récursif) depuis les racines. */
