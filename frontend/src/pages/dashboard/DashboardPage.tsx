@@ -23,7 +23,7 @@ import type { Justification } from '../../api/justifications';
 import { trainingsApi } from '../../api/trainings';
 import { recruitmentApi } from '../../api/recruitment';
 import client from '../../api/client';
-import { formatDate } from '../../utils/format';
+import { formatDate, civilite } from '../../utils/format';
 import { useAuthStore } from '../../store/auth.store';
 import type { DashboardStats, ExpiringContract, Leave, Training, RecruitmentRequest, PaginatedResponse } from '../../types';
 
@@ -685,7 +685,8 @@ export default function DashboardPage() {
   const now = new Date();
   const hour = now.getHours();
   const greeting = hour < 12 ? 'Bonjour' : hour < 18 ? 'Bon apres-midi' : 'Bonsoir';
-  const firstName = user?.name?.split(' ')[0] ?? '';
+  const civ = civilite(user?.employee?.gender);
+  const firstName = civ ? `${civ} ${user?.name ?? ''}` : (user?.name ?? '');
   const total = data?.today_attendance.total ?? 0;
   const presenceRate = data ? percent(data.today_attendance.present + data.today_attendance.late, total) : 0;
   const attentionItems = data

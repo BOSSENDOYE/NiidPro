@@ -198,6 +198,93 @@ function OcNode({ node, onEdit, onDelete, onAdd }: {
   );
 }
 
+// ─── Panneau latéral (cellules / appui attachés à un nœud de la colonne CS-DG-SG) ─
+function PanelBox({ items, side, onEdit, onDelete, onAdd }: {
+  items: TreeNode[];
+  side: 'left' | 'right';
+  onEdit: (n: TreeNode) => void;
+  onDelete: (n: TreeNode) => void;
+  onAdd: (parent: TreeNode) => void;
+}) {
+  if (items.length === 0) return null;
+  return (
+    <Paper variant="outlined" sx={{
+      borderRadius: '10px',
+      borderLeft: side === 'right' ? '4px solid #ff7631' : '1px solid #E2E8F0',
+      borderRight: side === 'left' ? '4px solid #ff7631' : '1px solid #E2E8F0',
+      bgcolor: '#F8FAFC',
+      p: 1,
+      minWidth: 220,
+      maxWidth: 270,
+    }}>
+      <Stack spacing={0.25}>
+        {items.map(item => (
+          <Box key={item.id}>
+            <Box sx={{
+              display: 'flex', alignItems: 'center', gap: 0.75,
+              borderRadius: '6px', px: 0.75, py: 0.4,
+              '&:hover': { bgcolor: '#EEF2F7' },
+              '&:hover .oc-panel-actions': { opacity: 1 },
+            }}>
+              <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: '#002f59', flexShrink: 0 }} />
+              <Typography sx={{ fontSize: 11.5, color: '#1E293B', fontWeight: 600, flexGrow: 1, lineHeight: 1.3 }}>
+                {item.libelle}
+              </Typography>
+              <Stack direction="row" spacing={0.25} className="oc-panel-actions oc-no-print" sx={{ opacity: 0, transition: 'opacity .15s' }}>
+                <Tooltip title="Ajouter un enfant">
+                  <IconButton size="small" onClick={() => onAdd(item)} sx={{ p: 0.25 }}>
+                    <Add sx={{ fontSize: 12, color: '#94A3B8' }} />
+                  </IconButton>
+                </Tooltip>
+                <Tooltip title="Modifier">
+                  <IconButton size="small" onClick={() => onEdit(item)} sx={{ p: 0.25 }}>
+                    <Edit sx={{ fontSize: 12, color: '#94A3B8' }} />
+                  </IconButton>
+                </Tooltip>
+                {item.children.length === 0 && (
+                  <Tooltip title="Supprimer">
+                    <IconButton size="small" onClick={() => onDelete(item)} sx={{ p: 0.25 }}>
+                      <Delete sx={{ fontSize: 12, color: '#DC2626' }} />
+                    </IconButton>
+                  </Tooltip>
+                )}
+              </Stack>
+            </Box>
+            {item.children.length > 0 && (
+              <ul className="oc-ul" style={{ paddingTop: 14 }}>
+                {item.children.map(child => (
+                  <OcNode key={child.id} node={child} onEdit={onEdit} onDelete={onDelete} onAdd={onAdd} />
+                ))}
+              </ul>
+            )}
+          </Box>
+        ))}
+      </Stack>
+    </Paper>
+  );
+}
+
+// ─── Colonne hiérarchique CS → DG → SG avec panneaux latéraux ─────────────────
+interface SpineLevel { node: TreeNode; panelChildren: TreeNode[]; branchChildren: TreeNode[]; panelSide: 'left' | 'right' }
+
+function buildGovernanceLayout(tree: TreeNode[]): SpineLevel[] | null {
+  const root = tree.find(n => n.type === 'gouvernance');
+  if (!root) return null;
+  const levels: SpineLevel[] = [];
+  let current: TreeNode | undefined = root;
+  while (current) {
+    const spineChild: TreeNode | undefined = current.children.find(c => c.type === 'gouvernance');
+    const branchChildren = current.children.filter(c => c.type === 'direction').sort((a, b) => a.ordre - b.ordre);
+    const panelChildren = current.children.filter(c => c.type !== 'gouvernance' && c.type !== 'direction')
+      .sort((a, b) => a.ordre - b.ordre);
+    // Le nœud qui porte les directions (SG) bascule son panneau à gauche pour
+    // laisser la place à l'arborescence des directions qui descend en dessous.
+    levels.push({ node: current, panelChildren, branchChildren, panelSide: branchChildren.length > 0 ? 'left' : 'right' });
+    current = spineChild;
+  }
+  return levels;
+}
+
 // ─── Légende ─────────────────────────────────────────────────────────────────
 const LEGEND = [
   { label: 'Gouvernance',   color: '#002f59' },
@@ -221,6 +308,7 @@ export default function OrganigrammePage({ embeddedMode = false }: { embeddedMod
   });
 
   const tree = useMemo(() => buildTree(units), [units]);
+  const govLayout = useMemo(() => buildGovernanceLayout(tree), [tree]);
 
   // ── États dialogs ──
   const [editTarget, setEditTarget]   = useState<TreeNode | null>(null);
@@ -318,6 +406,36 @@ export default function OrganigrammePage({ embeddedMode = false }: { embeddedMod
               sx={{ bgcolor: '#002f59', borderRadius: 2, textTransform: 'none' }}>
               Charger la structure ANASER
             </Button>
+          </Box>
+        ) : govLayout ? (
+          <Box sx={{ minWidth: 1100, display: 'flex', flexDirection: 'column', alignItems: 'center', pb: 2 }}>
+            {govLayout.map((level, idx) => (
+              <Box key={level.node.id} sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                {idx > 0 && <Box sx={{ width: 0, height: 26, borderLeft: `2px solid ${CONN_COLOR}` }} />}
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0 }}>
+                  {level.panelSide === 'left' && level.panelChildren.length > 0 && (
+                    <>
+                      <PanelBox items={level.panelChildren} side="left" onEdit={openEdit} onDelete={setDeleteTarget} onAdd={openAdd} />
+                      <Box sx={{ width: 24, height: 0, borderTop: `2px solid ${CONN_COLOR}` }} />
+                    </>
+                  )}
+                  <NodeCard node={level.node} onEdit={openEdit} onDelete={setDeleteTarget} onAdd={openAdd} />
+                  {level.panelSide === 'right' && level.panelChildren.length > 0 && (
+                    <>
+                      <Box sx={{ width: 24, height: 0, borderTop: `2px solid ${CONN_COLOR}` }} />
+                      <PanelBox items={level.panelChildren} side="right" onEdit={openEdit} onDelete={setDeleteTarget} onAdd={openAdd} />
+                    </>
+                  )}
+                </Box>
+              </Box>
+            ))}
+            {govLayout[govLayout.length - 1].branchChildren.length > 0 && (
+              <ul className="oc-ul">
+                {govLayout[govLayout.length - 1].branchChildren.map(node => (
+                  <OcNode key={node.id} node={node} onEdit={openEdit} onDelete={setDeleteTarget} onAdd={openAdd} />
+                ))}
+              </ul>
+            )}
           </Box>
         ) : (
           <Box sx={{ minWidth: 1100, display: 'flex', justifyContent: 'center', pb: 2 }}>

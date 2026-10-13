@@ -10,12 +10,14 @@ import { useAuthStore } from '../../store/auth.store';
 import { leavesApi } from '../../api/leaves';
 import { attendancesApi } from '../../api/attendances';
 import StatusChip from '../../components/common/StatusChip';
-import { formatDate } from '../../utils/format';
+import { formatDate, civilite } from '../../utils/format';
 import { useNavigate } from 'react-router-dom';
 
 export default function AgentPortalPage() {
   const { user } = useAuthStore();
   const navigate = useNavigate();
+  const civ = civilite(user?.employee?.gender);
+  const displayName = civ ? `${civ} ${user?.name ?? ''}` : (user?.name ?? '');
 
   const { data: leaves, isLoading: loadingLeaves } = useQuery({
     queryKey: ['leaves'],
@@ -75,7 +77,7 @@ export default function AgentPortalPage() {
         </Avatar>
         <Box sx={{ zIndex: 1 }}>
           <Typography sx={{ color: '#fff', fontWeight: 800, fontSize: 20, letterSpacing: '-0.3px' }}>
-            Bonjour, {user?.name?.split(' ')[0]} 👋
+            Bonjour, {displayName} 👋
           </Typography>
           <Typography sx={{ color: 'rgba(255,255,255,0.6)', fontSize: 13 }}>
             {user?.employee?.position?.title ?? 'Espace agent'} · {user?.employee?.department?.name}

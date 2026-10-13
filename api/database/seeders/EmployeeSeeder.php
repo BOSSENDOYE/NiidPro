@@ -251,31 +251,6 @@ class EmployeeSeeder extends Seeder
         // ── Agents sortis (ex-personnel) ─────────────────────────────────────
         $sortis = [
             ['Ndella',            'DIOP'],
-            ['Amadou',            'DIOP'],
-            ['Ousseynou',         'TALL'],
-            ['Oumar',             'TOURE'],
-            ['Abdoulaye Dia',     'NGOM'],
-            ['Abdou',             'MBAYE'],
-            ['Ibrahima',          'DIATTA'],
-            ['Daouda Siguy',      'SARR'],
-            ['Baïdy',             'ANNE'],
-            ['Yaya Samba',        'NIANG'],
-            ['Coura',             'COULIBALY'],
-            ['Boubacar',          'DIOP'],
-            ['Fama',              'THIAM'],
-            ['Amady',             'DIALLO'],
-            ['Fallou',            'GUEYE'],
-            ['Pape Momar Niang',  'BABY'],
-            ['Aly Mbaye',         'THIAM'],
-            ['Alioune',           'CAMARA'],
-            ['Cheikhou Oumar',    'GAYE'],
-            ['Firmin René',       'COLY'],
-            ['Mame Abdou Aziz',   'BA'],
-            ['Ndeye Awa',         'SARR'],
-            ['Adjia Oulimata',    'DIALLO'],
-            ['Fodé',              'DIEME'],
-            ['Mamadou',           'DIOP'],
-            ['Oureye',            'THIAM'],
         ];
 
         foreach ($sortis as [$firstName, $lastName]) {

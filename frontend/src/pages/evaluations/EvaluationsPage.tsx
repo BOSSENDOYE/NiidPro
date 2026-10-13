@@ -4,7 +4,7 @@ import {
   Box, Typography, Tabs, Tab, Chip, Button, IconButton, Paper, Grid,
   Table, TableHead, TableRow, TableCell, TableBody, TableContainer, TablePagination,
   Dialog, DialogTitle, DialogContent, DialogActions,
-  TextField, MenuItem, Select, FormControl, InputLabel,
+  TextField, MenuItem, Select, FormControl, InputLabel, Autocomplete,
   Stepper, Step, StepLabel, StepContent,
   CircularProgress, Alert, Tooltip, Stack, Divider, Avatar,
   LinearProgress, Badge, Snackbar, Checkbox, FormControlLabel,
@@ -1139,6 +1139,7 @@ function OrganigrammeDialog({
   const [deptId, setDeptId] = useState<number | ''>('');
   const [serviceId, setServiceId] = useState<number | ''>('');
   const [managerId, setManagerId] = useState<number | ''>('');
+  const [managerObj, setManagerObj] = useState<EvalEmployee | null>(null);
   const [search, setSearch] = useState('');
   const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' | 'warning' }>({
     open: false, message: '', severity: 'success',
@@ -1149,6 +1150,13 @@ function OrganigrammeDialog({
     queryFn: () => rhApi.employees({ per_page: 500, status: 'active' }).then(r => r.data.data),
     enabled: open,
     staleTime: 0,
+  });
+
+  const { data: responsableCandidats = [] } = useQuery({
+    queryKey: ['employees-responsable-candidats'],
+    queryFn: () => rhApi.employees({ per_page: 9999, status: 'active' }).then(r => r.data.data),
+    enabled: open,
+    staleTime: 5 * 60 * 1000,
   });
 
   const { data: departments = [] } = useQuery({
@@ -1215,11 +1223,7 @@ function OrganigrammeDialog({
     },
   });
 
-  const nomManager = useMemo(() => {
-    if (managerId === '') return null;
-    const m = tousEmployes.find(e => e.id === managerId);
-    return m ? `${m.first_name} ${m.last_name}` : null;
-  }, [managerId, tousEmployes]);
+  const nomManager = managerObj ? `${managerObj.first_name} ${managerObj.last_name}` : null;
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="lg" fullWidth
@@ -1265,7 +1269,7 @@ function OrganigrammeDialog({
                 <Select
                   value={deptId}
                   label="Direction"
-                  onChange={e => { setDeptId(e.target.value as number | ''); setServiceId(''); setManagerId(''); }}
+                  onChange={e => { setDeptId(e.target.value as number | ''); setServiceId(''); setManagerId(''); setManagerObj(null); }}
                 >
                   <MenuItem value="">— Toutes —</MenuItem>
                   {(departments as EvalDepartment[]).map(d => (
@@ -1291,30 +1295,33 @@ function OrganigrammeDialog({
               </FormControl>
             </Grid>
             <Grid item xs={12} sm={4}>
-              <FormControl size="small" fullWidth>
-                <InputLabel>Responsable hiérarchique *</InputLabel>
-                <Select
-                  value={managerId}
-                  label="Responsable hiérarchique *"
-                  onChange={e => setManagerId(e.target.value as number | '')}
-                >
-                  <MenuItem value="">— Sélectionner —</MenuItem>
-                  {tousEmployes
-                    .filter(e => !deptId || e.department_id === deptId)
-                    .map(e => (
-                      <MenuItem key={e.id} value={e.id}>
-                        <Box>
-                          <Typography variant="body2" fontWeight={600}>
-                            {e.first_name} {e.last_name}
-                          </Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            {e.department?.name ?? '—'}{e.position?.title ? ` · ${e.position.title}` : ''}
-                          </Typography>
-                        </Box>
-                      </MenuItem>
-                    ))}
-                </Select>
-              </FormControl>
+              <Autocomplete
+                size="small"
+                options={responsableCandidats}
+                value={managerObj}
+                onChange={(_, newVal) => {
+                  setManagerObj(newVal);
+                  setManagerId(newVal?.id ?? '');
+                }}
+                getOptionLabel={e => `${e.first_name} ${e.last_name}`}
+                isOptionEqualToValue={(a, b) => a.id === b.id}
+                renderOption={(props, e) => (
+                  <Box component="li" {...props} key={e.id}>
+                    <Box>
+                      <Typography variant="body2" fontWeight={600}>
+                        {e.first_name} {e.last_name}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        {e.department?.name ?? '—'}{e.position?.title ? ` · ${e.position.title}` : ''}
+                      </Typography>
+                    </Box>
+                  </Box>
+                )}
+                renderInput={(params) => (
+                  <TextField {...params} label="Responsable hiérarchique *" size="small" fullWidth />
+                )}
+                noOptionsText="Aucun agent trouvé"
+              />
               {!managerId && (
                 <Typography variant="caption" color="text.secondary" sx={{ mt: 0.3, display: 'block' }}>
                   Obligatoire pour pouvoir lancer la campagne

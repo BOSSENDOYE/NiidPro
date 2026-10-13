@@ -48,7 +48,8 @@ class AuthController extends Controller
         return response()->json([
             'user'  => $this->userResource($user),
             'token' => $token,
-        ]);
+        ])->header('Cache-Control', 'no-store, no-cache, must-revalidate')
+          ->header('Pragma', 'no-cache');
     }
 
     public function logout(Request $request)

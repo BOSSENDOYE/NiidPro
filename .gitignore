@@ -17,6 +17,9 @@ api/bootstrap/cache/*
 # Dossier de déploiements locaux versionnés (archives locales uniquement)
 _deploiement/
 
+# Fichiers temporaires générés par Vite au chargement de vite.config.ts
+frontend/vite.config.ts.timestamp-*.mjs
+
 # Divers
 .DS_Store
 Thumbs.db

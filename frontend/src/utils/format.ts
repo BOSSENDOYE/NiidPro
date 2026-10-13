@@ -14,6 +14,9 @@ export const formatSalary = (amount: number | null | undefined) =>
     ? new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(amount)
     : '—';
 
+export const civilite = (gender: string | null | undefined) =>
+  gender === 'M' ? 'Monsieur' : gender === 'F' ? 'Madame' : '';
+
 export const formatMinutes = (minutes: number | null | undefined) => {
   if (minutes == null) return '—';
   const h = Math.floor(minutes / 60);

@@ -6,6 +6,7 @@ import {
 } from '@mui/icons-material';
 import { meApi } from '../../api/me';
 import { useAuthStore } from '../../store/auth.store';
+import { civilite } from '../../utils/format';
 import InstallPrompt from './InstallPrompt';
 
 function StatCard({ icon, color, label, value, sub, onClick }: {
@@ -30,7 +31,8 @@ function StatCard({ icon, color, label, value, sub, onClick }: {
 export default function PortalHome() {
   const navigate = useNavigate();
   const { user } = useAuthStore();
-  const firstName = user?.name?.split(' ')[0] ?? 'Agent';
+  const civ = civilite(user?.employee?.gender);
+  const firstName = user?.name ? (civ ? `${civ} ${user.name}` : user.name) : 'Agent';
 
   const { data: att } = useQuery({ queryKey: ['me', 'attendances'], queryFn: () => meApi.attendances().then((r) => r.data) });
   const { data: tasks } = useQuery({ queryKey: ['me', 'tasks'], queryFn: () => meApi.tasks().then((r) => r.data) });
